@@ -93,6 +93,13 @@ const fb = {
     const { F, db } = fb.api;
     return F.deleteDoc(F.doc(db, 'groups', gid, 'items', id));
   },
+
+  // The shared copy of an item in a group, or null if it isn't shared there.
+  async getItem(gid, id) {
+    const { F, db } = fb.api;
+    const snap = await F.getDoc(F.doc(db, 'groups', gid, 'items', id));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  },
 };
 
 // Six letters and digits, without look-alikes (0/O, 1/I/L).
@@ -192,7 +199,8 @@ function renderGroup() {
     </section>`;
   }
   const g = currentGroup();
-  const switcher = grp.groups.length > 1 ? `<label class="field inline"><span>Group</span><select id="group-pick">${grp.groups.map(x => `<option value="${esc(x.id)}" ${x.id === grp.current ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : '';
+  const switcher = grp.groups.length > 1 ? `<div class="segmented group-tabs" role="group" aria-label="Your groups">${grp.groups.map(x =>
+    `<button class="seg${x.id === grp.current ? ' on' : ''}" data-action="group-switch" data-gid="${esc(x.id)}" aria-pressed="${x.id === grp.current}">${esc(x.name)}</button>`).join('')}</div>` : '';
   const createJoin = `<div class="card stack-sm">
       <b>${grp.groups.length ? 'Another group' : 'Start or join a group'}</b>
       <div class="row wrap"><input id="group-name" type="search" class="search" placeholder="New group name, e.g. Into the Woods cast" aria-label="New group name"><button class="btn" data-action="group-create">Create group</button></div>
@@ -211,7 +219,7 @@ function renderGroup() {
     return `<li class="card lib-card"><div class="lib-main">
         <b>${it.kind === 'song' ? '<span class="tag">Song</span> ' : ''}${esc(it.title)}</b>
         <span class="muted small">Shared by ${esc(it.addedBy === fb.user.uid ? 'you' : it.addedByName || 'someone')}${it.updated ? ' · ' + ago(it.updated) : ''}</span></div>
-      <div class="lib-actions">${state}${canRemove ? `<button class="btn ghost" data-action="group-remove" data-id="${esc(it.id)}">Remove</button>` : ''}</div></li>`;
+      <div class="lib-actions">${state}${canRemove ? `<button class="btn ghost" data-action="group-remove" data-id="${esc(it.id)}">Unshare</button>` : ''}</div></li>`;
   }).join('')}</ul>` : '<p class="muted">Nothing shared yet. Open any script or song and tap <b>Share to group</b>.</p>';
   return `<section class="stack">${head}
     ${switcher}
@@ -234,11 +242,42 @@ function loadGroups() {
   });
 }
 
-// Shown on a script's page: share it, or update the shared copy.
+// ---------- Sharing from a script's page ----------
+// The same id is used in every group, so a script can be shared to several groups and found again.
+const itemIdOf = s => s.groupItem?.id || s.id;
+const share = { open: null, status: {} }; // status: gid -> shared item, null (not shared) or 'loading'
+
 function shareButtonHtml(s) {
   if (!fb.user || !grp.groups.length) return '';
-  const shared = grp.current && s.groupItem?.gid === grp.current;
-  return `<button class="btn ghost" data-action="group-share">${shared ? 'Update in group' : 'Share to group'}</button>`;
+  return `<button class="btn ghost" data-action="group-share-panel" aria-expanded="${share.open === s.id}">${share.open === s.id ? 'Close sharing' : 'Share to group'}</button>`;
+}
+
+function sharePanelHtml(s) {
+  if (!fb.user || share.open !== s.id) return '';
+  const rows = grp.groups.map(g => {
+    const st = share.status[g.id];
+    const mineOrOwner = st && st !== 'loading' && (st.addedBy === fb.user.uid || g.ownerUid === fb.user.uid);
+    const actionsHtml = st === 'loading' ? '<span class="muted small">Checking…</span>'
+      : !st ? `<button class="btn primary" data-action="group-share-to" data-gid="${esc(g.id)}">Share</button>`
+      : `<button class="btn" data-action="group-share-to" data-gid="${esc(g.id)}">Update</button>
+         ${mineOrOwner ? `<button class="btn ghost" data-action="group-unshare" data-gid="${esc(g.id)}">Unshare</button>` : ''}`;
+    const note = st && st !== 'loading'
+      ? `Shared${st.addedBy === fb.user.uid ? '' : ` by ${esc(st.addedByName || 'someone')}`}${st.updated ? ' · ' + ago(st.updated) : ''}`
+      : st === null ? 'Not shared' : '';
+    return `<li class="share-row"><div class="lib-main"><b>${esc(g.name)}</b><span class="muted small">${note}</span></div><div class="row">${actionsHtml}</div></li>`;
+  }).join('');
+  return `<div class="card stack-sm share-panel"><b>Share “${esc(s.title)}” with</b><ul class="share-list">${rows}</ul>
+    <p class="muted small">Shared copies go to everyone in that group. Unsharing removes it from the group's list; copies people already added stay with them.</p></div>`;
+}
+
+async function loadShareStatus(s) {
+  const id = itemIdOf(s);
+  for (const g of grp.groups) share.status[g.id] = 'loading';
+  render();
+  await Promise.all(grp.groups.map(async g => {
+    try { share.status[g.id] = await fb.getItem(g.id, id); } catch (e) { share.status[g.id] = null; groupError(e); }
+  }));
+  if (share.open === s.id && app.view === 'script') render();
 }
 
 async function joinGroup(code) {
@@ -255,6 +294,7 @@ async function joinGroup(code) {
 
 Object.assign(actions, {
   group() { leave(); app.view = 'group'; render(); window.scrollTo(0, 0); },
+  'group-switch'(b) { selectGroup(b.dataset.gid); render(); },
   'group-signin'() { fb.signIn().catch(groupError); },
   'group-signout'() { fb.signOut().catch(groupError); },
   async 'group-create'() {
@@ -272,15 +312,35 @@ Object.assign(actions, {
     if (!g || !confirm(`Leave "${g.name}"? Scripts you added to your own list stay there.`)) return;
     try { await fb.leaveGroup(g.id); toast(`You left ${g.name}.`); } catch (e) { groupError(e); }
   },
-  async 'group-share'() {
+  'group-share-panel'() {
     const s = current();
-    if (!grp.current) return;
+    if (share.open === s.id) { share.open = null; render(); return; }
+    share.open = s.id;
+    loadShareStatus(s);
+  },
+  async 'group-share-to'(b) {
+    const s = current(), gid = b.dataset.gid, g = grp.groups.find(x => x.id === gid);
     try {
+      const prev = share.status[gid];
       const item = itemFromScript(s);
-      await fb.shareItem(grp.current, item);
-      s.groupItem = { gid: grp.current, id: item.id, updated: item.updated };
+      // Updating someone else's shared item keeps them as the person who shared it.
+      if (prev && prev.addedBy) Object.assign(item, { addedBy: prev.addedBy, addedByName: prev.addedByName });
+      await fb.shareItem(gid, item);
+      share.status[gid] = item;
+      if (!s.groupItem) s.groupItem = { gid, id: item.id, updated: item.updated };
+      else if (s.groupItem.gid === gid) s.groupItem.updated = item.updated;
       saveScripts();
-      toast(`Shared with ${currentGroup()?.name || 'your group'}.`);
+      toast(prev ? `Updated in ${g?.name || 'the group'}.` : `Shared with ${g?.name || 'the group'}.`);
+      render();
+    } catch (e) { groupError(e); }
+  },
+  async 'group-unshare'(b) {
+    const s = current(), gid = b.dataset.gid, g = grp.groups.find(x => x.id === gid);
+    if (!confirm(`Unshare "${s.title}" from ${g?.name || 'this group'}? Copies people already added stay with them.`)) return;
+    try {
+      await fb.removeItem(gid, itemIdOf(s));
+      share.status[gid] = null;
+      toast(`Unshared from ${g?.name || 'the group'}.`);
       render();
     } catch (e) { groupError(e); }
   },
@@ -294,7 +354,7 @@ Object.assign(actions, {
   },
   async 'group-remove'(b) {
     const item = grp.items.find(it => it.id === b.dataset.id);
-    if (!item || !confirm(`Remove "${item.title}" from the group? Copies people already added stay with them.`)) return;
+    if (!item || !confirm(`Unshare "${item.title}" from ${currentGroup()?.name || 'the group'}? Copies people already added stay with them.`)) return;
     try { await fb.removeItem(grp.current, item.id); } catch (e) { groupError(e); }
   },
 });

@@ -1280,6 +1280,7 @@ function renderScript() {
       <h1>${esc(s.title)}</h1>
       <div class="row wrap">${typeof shareButtonHtml === 'function' ? shareButtonHtml(s) : ''}<button class="btn ghost" data-action="edit-script">Edit</button><button class="btn ghost" data-action="delete-script">Delete</button></div>
     </div>
+    ${typeof sharePanelHtml === 'function' ? sharePanelHtml(s) : ''}
     ${supportNote()}
     <div class="card stack-sm">
       <label class="field inline"><span>I'm playing</span><select id="my-char">
