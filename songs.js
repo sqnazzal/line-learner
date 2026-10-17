@@ -348,7 +348,7 @@ function songPanelHtml(e) {
     <div class="row wrap"><input id="ly-q" type="search" class="search" value="${esc(t ? `${t.title} ${t.artist.split(',')[0]}`.trim() + (t.artist ? '' : ' ') : '')}" placeholder="Song name and artist" aria-label="Find lyrics"><button class="btn" data-action="song-find-lyrics">Find lyrics</button></div>
     ${songUi.busy ? `<p class="muted small">${esc(songUi.busy)}</p>` : ''}
     ${lyricHits}
-    <p class="muted small">Or paste them below (or use From screenshots). Timed lyrics highlight along with the music; untimed ones can be timed by tapping along.</p>
+    <p class="muted small">Or paste them below, or photograph them below. Timed lyrics highlight along with the music; untimed ones can be timed by tapping along.</p>
   </div>`;
 }
 

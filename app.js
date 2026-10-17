@@ -895,8 +895,8 @@ function renderEdit() {
       ${songPanelHtml(e)}
       <label class="field"><span>Lyrics</span><textarea id="ed-raw" rows="14" spellcheck="false" placeholder="One line of the song per line">${esc(e.raw)}</textarea></label>
       <p id="ed-preview" class="muted"></p>
+      ${trayHtml()}
       <div class="row wrap">
-        <label class="btn">From screenshots<input type="file" id="ed-shots" accept="image/*" multiple hidden></label>
         <span class="spacer"></span>
         <button class="btn ghost" data-action="cancel-edit">Cancel</button>
         <button class="btn primary" data-action="save-edit">Save</button>
@@ -916,15 +916,16 @@ JULIET: Ay me!</pre>
         <li><b>Stage directions:</b> put them in (parentheses) or [brackets]. They show up but are never read as part of a line.</li>
         <li><b>Scenes:</b> a line starting with # (or "Act 1", "Scene 2") starts a section you can practice on its own.</li>
         <li><b>Audition monologue?</b> Paste it with no names. Each paragraph becomes one of your lines.</li>
-        <li><b>Screenshots:</b> tap From screenshots and pick one or more (in the order they were taken). They're read by OpenAI using the key you added for AI voices, and added to the end of the text.</li>
-        <li><b>PDF scripts:</b> import or drag in the PDF, then skim the text. Page numbers and repeated headers are removed, but cast lists, title pages or odd layouts may need a quick tidy. Scanned PDFs (pictures of pages) can't be read.</li>
+        <li><b>Paper script or screenshots:</b> tap Take photo for each page (or Choose photos for many at once), then Read pages. They're read in order by OpenAI using the key you added for AI voices, and added to the end of the text.</li>
+        <li><b>Long paper script?</b> Scanning it with the iPhone Notes app (Scan Documents, then share as a PDF) is quickest. Import that PDF here and its pages are read the same way.</li>
+        <li><b>PDF scripts:</b> import or drag in the PDF, then skim the text. Page numbers and repeated headers are removed, but cast lists, title pages or odd layouts may need a quick tidy.</li>
       </ul>
     </details>
     <label class="field"><span>Script</span><textarea id="ed-raw" rows="16" spellcheck="false" placeholder="Paste your scene or monologue here">${esc(e.raw)}</textarea></label>
     <p id="ed-preview" class="muted"></p>
+    ${trayHtml()}
     <div class="row wrap">
       <label class="btn">Import PDF or .txt<input type="file" id="ed-file" accept=".pdf,.txt,application/pdf,text/plain" hidden></label>
-      <label class="btn">From screenshots<input type="file" id="ed-shots" accept="image/*" multiple hidden></label>
       <span class="spacer"></span>
       <button class="btn ghost" data-action="cancel-edit">Cancel</button>
       <button class="btn primary" data-action="save-edit">Save</button>
@@ -1010,12 +1011,16 @@ async function pdfToText(file) {
   const looksLikeSpeech = t => { const m = t.match(/^([^:]{1,40}):\s*\S/); return !!m && isNameLike(m[1]); };
   const repeated = t => pages.length >= 3 && (edgeCounts.get(t) || 0) >= pages.length / 2 && !looksLikeSpeech(t);
   const text = pages.map(lines => lines.filter((t, k) => !((k === 0 || k === lines.length - 1) && repeated(t))).join('\n')).join('\n');
-  if (!text.trim()) throw new Error("This PDF has no selectable text (it's probably a scan), so it can't be imported.");
+  if (!text.trim()) {
+    const err = new Error('This PDF has no text inside (it is scanned pictures of pages).');
+    err.code = 'NO_TEXT';
+    throw err;
+  }
   return text.replace(/\n{3,}/g, '\n\n');
 }
 
 async function importFile(f) {
-  if (isImage(f)) return importScreenshots([f]);
+  if (isImage(f)) return addPages([f], false);
   const isPdf = /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
   try {
     if (isPdf) toast('Reading PDF…');
@@ -1023,7 +1028,19 @@ async function importFile(f) {
     putImportedText(text, f.name.replace(/\.[^.]+$/, ''), false);
     if (isPdf && app.view === 'edit') toast('PDF imported. Check the character list below and tidy anything that came through oddly, then tap Save.');
   } catch (e) {
-    toast(e.message || 'Could not read that file.');
+    if (e.code !== 'NO_TEXT') { toast(e.message || 'Could not read that file.'); return; }
+    // A scanned PDF: read its pages as pictures instead.
+    try {
+      const pages = await pdfPagesToImages(f);
+      const title = $('#ed-title');
+      if (title && !title.value) title.value = f.name.replace(/\.[^.]+$/, '');
+      addPages(pages, false);
+      toast(`This PDF is scanned pages, so they've been added below (${pages.length}). Tap Read ${pages.length} pages.`);
+    } catch (err) {
+      tray.progress = '';
+      refreshTray();
+      toast(err.message || "Couldn't open the PDF's pages.");
+    }
   }
 }
 
@@ -1204,29 +1221,116 @@ async function readScreenshots(images, prompt = SHOT_PROMPT) {
   return text.replace(/^```[a-z]*\n?|```\s*$/gi, '').trim();
 }
 
-async function importScreenshots(files) {
+// ---------- Pages tray: photos, screenshots or scanned-PDF pages waiting to be read ----------
+// Pages collect here (take photos one after another, or choose many at once), then are read in order,
+// six at a time. Long scripts can take a while, so progress shows, the screen stays on, a failed batch is
+// retried once, and if it stops, what's read so far is kept and the rest stay here to continue.
+const tray = { pages: [], reading: false, stop: false, progress: '' };
+const BATCH = 6;
+
+function addPages(files, sortByTime) {
   files = files.filter(isImage);
   if (!files.length) return;
-  if (!ai.key) {
-    toast('Reading screenshots uses your OpenAI key. Add it under "Voices for each character" on any script, or paste the text instead.');
-    return;
-  }
-  // Screenshots are usually taken in reading order, so sort by when they were taken.
-  files.sort((a, b) => a.lastModified - b.lastModified || a.name.localeCompare(b.name, undefined, { numeric: true }));
+  // Screenshots and photos chosen together are put in the order they were taken.
+  if (sortByTime) files.sort((a, b) => a.lastModified - b.lastModified || a.name.localeCompare(b.name, undefined, { numeric: true }));
+  for (const f of files) tray.pages.push({ blob: f, url: URL.createObjectURL(f) });
+  tray.progress = '';
+  refreshTray();
+  toast(`${files.length === 1 ? 'Page' : `${files.length} pages`} added. ${tray.pages.length} ready to read.`);
+}
+
+// Kept for any caller that hands over images directly.
+const importScreenshots = files => addPages(files, true);
+
+function trayHtml() {
+  const n = tray.pages.length, song = app.editing?.kind === 'song';
+  const shown = tray.pages.slice(0, 48);
+  return `<div class="card stack-sm tray" id="tray">
+    <b>${song ? 'Lyrics from photos or screenshots' : 'Script from photos or screenshots'}${n ? ` <span class="muted small">· ${n} ${n === 1 ? 'page' : 'pages'} ready</span>` : ''}</b>
+    <p class="muted small">Take a photo of each page (tap Take photo again for the next one), or choose screenshots. They're read in order and added to the end of the text. Uses your OpenAI key.</p>
+    <div class="row wrap">
+      <label class="btn">Take photo<input type="file" id="ed-cam" accept="image/*" capture="environment" hidden></label>
+      <label class="btn">Choose photos<input type="file" id="ed-shots" accept="image/*" multiple hidden></label>
+      ${n && !tray.reading ? `<button class="btn primary" data-action="tray-read">Read ${n} ${n === 1 ? 'page' : 'pages'}</button><button class="btn ghost" data-action="tray-clear">Clear</button>` : ''}
+      ${tray.reading ? '<button class="btn ghost" data-action="tray-stop">Stop</button>' : ''}
+    </div>
+    ${tray.progress ? `<p class="small" role="status">${esc(tray.progress)}</p>` : ''}
+    ${n ? `<div class="thumbs">${shown.map((p, i) => `<figure class="thumb"><img src="${p.url}" alt="Page ${i + 1}" loading="lazy"><figcaption>${i + 1}</figcaption>
+      ${tray.reading ? '' : `<button class="thumb-x" data-action="tray-remove" data-i="${i}" aria-label="Remove page ${i + 1}">×</button>`}</figure>`).join('')}
+      ${n > shown.length ? `<span class="muted small">and ${n - shown.length} more</span>` : ''}</div>` : ''}
+  </div>`;
+}
+
+function refreshTray() {
+  const el = $('#tray');
+  if (el) el.outerHTML = trayHtml();
+}
+
+// The last speaker read so far, so a speech that runs over a page break keeps its name.
+const lastSpeaker = text => (text.match(/^([^:\n()#]{1,40}):/gm) || []).at(-1)?.slice(0, -1).trim() || '';
+
+async function readTray() {
+  if (tray.reading || !tray.pages.length) return;
+  if (!ai.key) { toast('Reading pages uses your OpenAI key. Add it under "Voices for each character" on any script, or paste the text instead.'); return; }
+  Object.assign(tray, { reading: true, stop: false });
+  keepAwake(true);
+  const total = tray.pages.length, song = app.editing?.kind === 'song';
+  let done = 0, readAny = false;
   try {
-    const parts = [];
-    for (let i = 0; i < files.length; i += 6) {
-      const batch = files.slice(i, i + 6);
-      toast(files.length === 1 ? 'Reading screenshot…' : `Reading screenshots ${i + 1} to ${i + batch.length} of ${files.length}…`);
-      parts.push(await readScreenshots(await Promise.all(batch.map(f => imageToDataUrl(f))), app.editing?.kind === 'song' ? LYRICS_PROMPT : SHOT_PROMPT));
+    while (tray.pages.length && !tray.stop) {
+      const batch = tray.pages.slice(0, BATCH);
+      tray.progress = `Reading pages ${done + 1} to ${done + batch.length} of ${total}… Keep this screen open.`;
+      refreshTray();
+      const sofar = $('#ed-raw')?.value || pendingDraft()?.raw || '';
+      const who = song ? '' : lastSpeaker(sofar);
+      const prompt = (song ? LYRICS_PROMPT : SHOT_PROMPT)
+        + (who ? `\nThe previous page ended with ${who} speaking. If the first page starts in the middle of a speech, begin with "${who}: ".` : '');
+      let text;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          text = await readScreenshots(await Promise.all(batch.map(p => imageToDataUrl(p.blob))), prompt);
+          break;
+        } catch (e) {
+          if (attempt >= 1 || /key|credit|limit/i.test(e.message)) throw e;
+          await new Promise(r => setTimeout(r, 2500)); // one retry for a hiccup
+        }
+      }
+      if (text) { putImportedText(text, '', true); readAny = true; }
+      batch.forEach(p => URL.revokeObjectURL(p.url));
+      tray.pages.splice(0, batch.length);
+      done += batch.length;
     }
-    const text = parts.filter(Boolean).join('\n\n').trim();
-    if (!text) throw new Error("I couldn't find any script text in those screenshots.");
-    putImportedText(text, '', true);
-    if (app.view === 'edit') toast('Screenshots read. Check the text and the character list, then tap Save.');
+    tray.progress = tray.stop && tray.pages.length ? `Stopped after ${done} of ${total} pages. Tap Read to carry on with the rest.` : '';
+    if (!tray.pages.length) toast(readAny ? `All ${total} ${total === 1 ? 'page' : 'pages'} read. Check the text and the character list, then tap Save.` : "I couldn't find any text in those pages.");
   } catch (e) {
-    toast(e.message || "Couldn't read those screenshots.");
+    tray.progress = `Stopped at page ${done + 1} of ${total}: ${e.message || 'something went wrong.'} Pages already read are in the text box. Tap Read to try the rest again.`;
+  } finally {
+    tray.reading = false;
+    keepAwake(false);
+    refreshTray();
   }
+}
+
+// A scanned PDF (pictures of pages, no text inside) becomes pages in the tray, one image per page.
+async function pdfPagesToImages(file) {
+  const pdfjs = await loadPdfJs();
+  const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const out = [];
+  for (let n = 1; n <= doc.numPages; n++) {
+    tray.progress = `Preparing page ${n} of ${doc.numPages}…`;
+    refreshTray();
+    const page = await doc.getPage(n);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: Math.min(3, 1800 / Math.max(base.width, base.height)) });
+    const c = document.createElement('canvas');
+    c.width = Math.round(viewport.width);
+    c.height = Math.round(viewport.height);
+    await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+    out.push(new File([blob], `page-${n}.jpg`, { type: 'image/jpeg', lastModified: n }));
+  }
+  tray.progress = '';
+  return out;
 }
 
 function statDot(st) {
@@ -1783,6 +1887,19 @@ const actions = {
       toast("Couldn't download that play. Check your connection and try again.");
     }
   },
+  'tray-read'() { readTray(); },
+  'tray-stop'() { tray.stop = true; tray.progress = 'Stopping after the pages being read now…'; refreshTray(); },
+  'tray-clear'() {
+    if (tray.pages.length > 3 && !confirm(`Remove all ${tray.pages.length} pages from the list?`)) return;
+    tray.pages.forEach(p => URL.revokeObjectURL(p.url));
+    Object.assign(tray, { pages: [], progress: '' });
+    refreshTray();
+  },
+  'tray-remove'(b, i) {
+    const [p] = tray.pages.splice(i, 1);
+    if (p) URL.revokeObjectURL(p.url);
+    refreshTray();
+  },
   'resume-draft'() {
     const d = pendingDraft();
     if (!d) return;
@@ -1972,8 +2089,8 @@ document.addEventListener('change', e => {
   else if (el.id === 'ed-file' && el.files[0]) {
     importFile(el.files[0]);
     el.value = '';
-  } else if (el.id === 'ed-shots' && el.files.length) {
-    importScreenshots([...el.files]);
+  } else if ((el.id === 'ed-shots' || el.id === 'ed-cam') && el.files.length) {
+    addPages([...el.files], el.id === 'ed-shots');
     el.value = '';
   }
 });

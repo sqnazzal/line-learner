@@ -314,6 +314,13 @@ em.dir { font-style: italic; }
 
 button, .btn { touch-action: manipulation; }
 
+/* Pages tray (photos and screenshots to read) */
+.thumbs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.thumb { position: relative; margin: 0; width: 64px; }
+.thumb img { width: 64px; height: 86px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; }
+.thumb figcaption { position: absolute; left: 4px; bottom: 4px; font: 600 .7rem var(--font-ui); background: var(--surface); color: var(--ink); border-radius: 4px; padding: 0 4px; }
+.thumb-x { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer; line-height: 1; }
+
 /* Groups */
 .group-name { font-size: 1.15rem; }
 .code { font-family: ui-monospace, Consolas, monospace; letter-spacing: .12em; font-size: 1.05rem; }

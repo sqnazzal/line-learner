@@ -79,6 +79,7 @@ Madam! Your mother calls.
 - A line starting with `#`, or like `Act 1` / `Scene 2`, starts a section. You can choose which section to practice.
 - For an audition monologue, paste it with no names. Each paragraph becomes one of your lines.
 
+- **Paper scripts and screenshots:** in the editor, tap **Take photo** for each page (tap it again for the next page) or **Choose photos** to pick many at once, then **Read pages**. Pages are read in order with your OpenAI key, six at a time, with progress shown; if it stops, what's read is kept and the rest stay ready to continue. For a long paper script, scanning it with the iPhone Notes app (Scan Documents, then share as PDF) is quickest: import that PDF and its pages are read the same way.
 - **PDFs:** the text is pulled out of the PDF, wrapped lines are rejoined, and page numbers and repeated page headers are removed. Skim the result before saving, since title pages, cast lists or unusual layouts may need a quick tidy. Scanned PDFs (photos of pages with no selectable text) can't be read.
 
 See `sample-script.txt` for a complete example.
