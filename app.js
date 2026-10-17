@@ -410,7 +410,7 @@ function unlockAudio() {
   sharedAudio.play().catch(() => {});
 }
 
-function playBlob(blob, token) {
+function playBlob(blob, token, rate = 1) {
   stopSharedAudio?.();
   return new Promise(resolve => {
     if (token.cancelled) return resolve();
@@ -431,6 +431,7 @@ function playBlob(blob, token) {
     off = token.onCancel(finish);
     audio.onended = audio.onerror = finish;
     audio.src = url;
+    audio.playbackRate = rate;
     audio.play().catch(finish);
   });
 }
@@ -459,10 +460,16 @@ async function sayLine(item, token, text = item.text) {
   const key = lineKey(item);
   if (settings.useRecordings && recorded.has(key)) {
     const blob = await recordings.get(key).catch(() => null);
-    if (blob) return playBlob(blob, token);
+    if (blob) return playBlob(blob, token, speedOf(item.speaker));
   }
-  return speakText(text, voiceFor(item.speaker), token);
+  return speakAs(item.speaker, text, token);
 }
+
+// Each character's speed slider scales the overall reading speed (1 = same as everyone else).
+const speedOf = speaker => current()?.speeds?.[speaker] ?? 1;
+const speakAs = (speaker, text, token) => speakText(text, voiceFor(speaker), token, settings.rate * speedOf(speaker));
+const speedLabel = v => (v === 1 ? 'Normal' : `${v.toFixed(2)}x`);
+const sayHello = speaker => preview(t => speakAs(speaker, `Hello. I'll be reading ${titleCase(speaker)}.`, t));
 
 let previewToken = makeToken();
 function preview(fn) {
@@ -909,9 +916,13 @@ function renderScript() {
             ${matching.length ? `<optgroup label="${gender === 'f' ? 'Female' : 'Male'} voices">${matching.map(opt).join('')}</optgroup>` : ''}
             ${others.length ? `<optgroup label="Other voices">${others.map(opt).join('')}</optgroup>` : ''}
           </select>
-          <button class="icon-btn" data-action="test-voice" data-char="${esc(c)}" title="Test this voice" aria-label="Test this voice">${icon('speaker')}</button></div>`;
+          <button class="icon-btn" data-action="test-voice" data-char="${esc(c)}" title="Test this voice" aria-label="Test this voice">${icon('speaker')}</button>
+          <label class="voice-speed"><span>Speed</span>
+            <input type="range" min="0.5" max="1.5" step="0.05" value="${speedOf(c)}" data-speed-char="${esc(c)}" aria-label="${esc(titleCase(c))}: speed">
+            <output>${speedLabel(speedOf(c))}</output>
+          </label></div>`;
       }).join('') : '<p class="muted">No computer voices found in this browser.</p>'}
-      <p class="muted small">Voices are picked to match each character. Change Female/Male or pick a specific voice for anyone. ${IS_IOS ? 'For more natural voices on iPhone, download "Enhanced" or "Premium" English (US) voices in Settings > Accessibility > Spoken Content > Voices.' : ''}</p>
+      <p class="muted small">Voices are picked to match each character. Change Female/Male, pick a specific voice, or speed anyone up or down (on top of the overall reading speed in Practice settings). ${IS_IOS ? 'For more natural voices on iPhone, open the Settings app, search for "Voices", and download an "Enhanced" or "Premium" English (US) voice.' : ''}</p>
       <p class="muted small">Tip: use the ${icon('mic')} button on any line to record it yourself (or have a friend read your cues). Recordings play instead of the computer voice.</p>
     </details>
     <h2>Script</h2>
@@ -1247,13 +1258,13 @@ async function runBuildUp(fromK) {
   const s = current();
   const token = beginRun();
   const { i, parts } = P.bu;
-  const voice = voiceFor(s.lines[i].speaker);
+  const speaker = s.lines[i].speaker;
   for (let k = fromK; k < parts.length; k++) {
     if (token.cancelled) return;
     Object.assign(P, { result: null, transcript: '', status: 'speaking', reveal: settings.hint });
     Object.assign(P.bu, { k, phase: 'listen' });
     refreshPlayer();
-    await speakText(parts[k], voice, token);
+    await speakAs(speaker, parts[k], token);
     await sleep(250, token);
     const expected = parts.slice(0, k + 1).join(' ');
     let tries = 0, idle = 0;
@@ -1279,7 +1290,7 @@ async function runBuildUp(fromK) {
       }
       P.status = 'prompting';
       refreshPlayer();
-      await speakText(expected, voice, token);
+      await speakAs(speaker, expected, token);
       if (++tries >= 3) break;
     }
   }
@@ -1397,7 +1408,7 @@ const actions = {
   },
   'test-voice'(b) {
     const c = b.dataset.char;
-    preview(t => speakText(`Hello. I'll be reading ${titleCase(c)}.`, voiceFor(c), t));
+    sayHello(c);
   },
   back() { leave(); app.view = 'script'; render(); },
   toggle: togglePlay,
@@ -1411,7 +1422,7 @@ const actions = {
     const s = current();
     if (P.mode === 'buildup') {
       const { i, parts, k } = P.bu;
-      return preview(t => speakText(parts.slice(0, k + 1).join(' '), voiceFor(s.lines[i].speaker), t));
+      return preview(t => speakAs(s.lines[i].speaker, parts.slice(0, k + 1).join(' '), t));
     }
     const item = s.lines[P.order[P.orderPos]];
     if (item?.type === 'line') preview(t => sayLine(item, t));
@@ -1456,7 +1467,9 @@ document.addEventListener('change', e => {
     if (el.value) s.voices[el.dataset.voiceChar] = el.value;
     else delete s.voices[el.dataset.voiceChar];
     saveScripts();
-    preview(t => speakText(`Hello. I'll be reading ${titleCase(el.dataset.voiceChar)}.`, voiceFor(el.dataset.voiceChar), t));
+    sayHello(el.dataset.voiceChar);
+  } else if (el.dataset.speedChar) {
+    sayHello(el.dataset.speedChar);
   } else if (el.dataset.genderChar) {
     const c = el.dataset.genderChar;
     (s.genders ||= {})[c] = el.value;
@@ -1464,7 +1477,7 @@ document.addEventListener('change', e => {
     s.updated = Date.now();
     saveScripts();
     render();
-    preview(t => speakText(`Hello. I'll be reading ${titleCase(c)}.`, voiceFor(c), t));
+    sayHello(c);
   }
   else if (el.dataset.setting) applySetting(el);
   else if (el.id === 'ed-file' && el.files[0]) {
@@ -1483,6 +1496,15 @@ document.addEventListener('drop', e => {
 document.addEventListener('input', e => {
   if (e.target.id === 'ed-raw') updatePreview();
   else if (e.target.dataset.setting && e.target.type === 'range') applySetting(e.target);
+  else if (e.target.dataset.speedChar) {
+    const s = current(), c = e.target.dataset.speedChar, v = +e.target.value;
+    s.speeds ||= {};
+    if (v === 1) delete s.speeds[c];
+    else s.speeds[c] = v;
+    s.updated = Date.now();
+    saveScripts();
+    e.target.nextElementSibling.textContent = speedLabel(v);
+  }
 });
 
 document.addEventListener('toggle', e => { if (e.target.id === 'voices') app.voicesOpen = e.target.open; }, true);

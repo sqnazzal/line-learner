@@ -187,6 +187,11 @@ textarea { font-family: var(--font-script); line-height: 1.6; resize: vertical; 
 
 .voice-row { display: grid; grid-template-columns: minmax(80px, 140px) auto minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-bottom: 8px; }
 .voice-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.voice-speed { grid-column: 2 / -1; display: flex; align-items: center; gap: 10px; font-size: .85rem; color: var(--muted); margin-top: -2px; }
+.voice-speed input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.voice-speed output { min-width: 4.5em; }
+.voice-row { padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.voice-row:last-of-type { border-bottom: 0; }
 .voice-row select { width: 100%; }
 .voices svg { vertical-align: middle; }
 .small svg { width: 14px; height: 14px; vertical-align: -2px; }
@@ -286,6 +291,7 @@ button, .btn { touch-action: manipulation; }
   .ln .tools { justify-content: flex-end; }
   .keys { display: none; }
   .voice-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .voice-speed { grid-column: 1 / -1; }
   .voice-row > span { grid-column: 1 / -1; }
 }
 
