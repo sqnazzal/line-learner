@@ -152,7 +152,9 @@ function songPanelHtml(e) {
          ${SPOTIFY_CLIENT_ID ? '<div><button class="btn ghost" data-action="song-sp-login">Connect Spotify to pick from your playlists</button></div>' : '<p class="muted small">In Spotify, tap Share > Copy Song Link, then paste it here.</p>'}`;
   }
   const results = songUi.resultKind ? `<ul class="pick-list">${songUi.results.map((r, i) => songUi.resultKind === 'playlists'
-    ? `<li><button class="pick" data-action="song-sp-open-playlist" data-i="${i}"><b>${esc(r.name)}</b><span class="muted small">${r.count} songs</span></button></li>`
+    ? `<li><button class="pick" data-action="song-sp-open-playlist" data-i="${i}" ${r.locked ? 'disabled' : ''}><b>${esc(r.name)}</b><span class="muted small">${r.locked
+      ? `By ${esc(r.owner || 'someone else')}. Spotify doesn't let apps open playlists you didn't make`
+      : `${r.count} songs`}</span></button></li>`
     : `<li><button class="pick" data-action="song-pick-track" data-i="${i}"><b>${esc(r.title)}</b><span class="muted small">${esc(r.artist)}</span></button></li>`).join('')
     || '<li class="muted small">Nothing found.</li>'}</ul>` : '';
   const lyricHits = songUi.lyrics.length ? `<ul class="pick-list">${songUi.lyrics.map((h, i) => `<li><button class="pick" data-action="song-pick-lyrics" data-i="${i}">
@@ -255,8 +257,14 @@ Object.assign(actions, {
   },
   'song-sp-playlists'() {
     songBusy('Loading your playlists…', async () => {
-      const data = await spotifyApi('/me/playlists?limit=50');
-      Object.assign(songUi, { resultKind: 'playlists', results: (data.items || []).filter(Boolean).map(p => ({ id: p.id, name: p.name, count: p.items?.total ?? p.tracks?.total ?? '' })) });
+      const [me, data] = await Promise.all([spotifyApi('/me'), spotifyApi('/me/playlists?limit=50')]);
+      // Spotify only lets apps open playlists you made or collaborate on; list those first and mark the rest.
+      const results = (data.items || []).filter(Boolean).map(p => ({
+        id: p.id, name: p.name, count: p.items?.total ?? p.tracks?.total ?? '',
+        locked: p.owner?.id !== me.id && !p.collaborative, owner: p.owner?.display_name || '',
+      }));
+      results.sort((a, b) => a.locked - b.locked);
+      Object.assign(songUi, { resultKind: 'playlists', results });
     });
   },
   'song-sp-open-playlist'(b, i) {
