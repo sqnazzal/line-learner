@@ -124,3 +124,13 @@ Tap **+ New song** on the home screen.
 **Sing along** plays the real track in Spotify's player with the current line highlighted. Hide words as you learn (**First letters**, **Fill in as I sing**, **Hidden**), tap a line to jump there, and **Repeat this line** to loop a tricky bit. Spotify decides whether the player plays the full track or a preview, depending on whether you're signed in to Spotify in that browser.
 
 Connecting a Spotify account needs a Spotify developer app: set its Redirect URI to `https://sqnazzal.github.io/line-learner/`, put its Client ID in `SPOTIFY_CLIENT_ID` at the top of `songs.js`, and add anyone else who signs in under User Management. Since February 2026 Spotify only runs personal developer apps like this when the app's owner has Spotify Premium, allows 5 users per app, and only lets apps open playlists you own or collaborate on. Pasting a song link works without any of this.
+
+## Groups (cast, friends and family)
+
+Tap **Group** on the home screen and sign in with Google.
+
+- **Create a group** and share its invite code or link. People who open the link and sign in join automatically.
+- Open any script or song and tap **Share to group**. Everyone in the group sees it under **Shared scripts and songs** and taps **Add to my scripts** to practice it. When you change something you shared, tap **Update in group**; others get an **Update my copy** button that keeps their progress and character.
+- Each person's progress, recordings, voices and personal scripts stay private. Only what you share goes to the group.
+
+Groups use Google Firebase (project `line-learner-45bd1`): Authentication with Google sign-in, and Firestore for groups and shared items. Access is controlled by `firestore.rules`; paste it into **Databases and storage > Firestore > Rules** in the Firebase console and tap **Publish** whenever it changes. Sign-in only works from domains listed under **Security > Authentication > Settings > Authorized domains** (add `sqnazzal.github.io`).

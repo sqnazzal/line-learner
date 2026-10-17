@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// Security rules for Line Learner groups. Paste into Firebase: Databases and storage > Firestore > Rules, then Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function memberOf(gid) {
+      return signedIn() && request.auth.uid in get(/databases/$(database)/documents/groups/$(gid)).data.members;
+    }
+
+    // Invite codes point to a group. They can be looked up one at a time (to join) but never listed.
+    match /invites/{code} {
+      allow get: if signedIn();
+      // Created together with its group, by that group's creator.
+      allow create: if signedIn()
+        && request.auth.uid in getAfter(/databases/$(database)/documents/groups/$(request.resource.data.gid)).data.members;
+    }
+
+    match /groups/{gid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.members == [request.auth.uid];
+      // Members can update the group (and leave it); the owner can't be changed.
+      // Anyone else can only add themselves, and only by showing the group's invite code.
+      allow update: if signedIn() && (
+        (request.auth.uid in resource.data.members && request.resource.data.ownerUid == resource.data.ownerUid)
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberNames', 'lastJoinCode'])
+            && request.resource.data.lastJoinCode == resource.data.inviteCode
+            && request.resource.data.members.hasAll(resource.data.members)
+            && request.resource.data.members.toSet().difference(resource.data.members.toSet()) == [request.auth.uid].toSet())
+      );
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      // Shared scripts and songs: any member can read, add, update or remove.
+      match /items/{itemId} {
+        allow read, write: if memberOf(gid);
+      }
+    }
+  }
+}

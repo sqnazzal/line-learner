@@ -314,6 +314,10 @@ em.dir { font-style: italic; }
 
 button, .btn { touch-action: manipulation; }
 
+/* Groups */
+.group-name { font-size: 1.15rem; }
+.code { font-family: ui-monospace, Consolas, monospace; letter-spacing: .12em; font-size: 1.05rem; }
+
 /* Songs */
 .track { display: flex; align-items: center; gap: 12px; }
 .track img { border-radius: 6px; flex-shrink: 0; }

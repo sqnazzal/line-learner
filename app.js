@@ -862,6 +862,7 @@ function renderLibrary() {
       <div class="row wrap">
         <button class="btn primary" data-action="new">+ New script</button>
         <button class="btn" data-action="new-song">+ New song</button>
+        <button class="btn" data-action="group">Group</button>
         <button class="btn" data-action="browse">Browse free scripts &amp; monologues</button>
         <button class="btn ghost" data-action="sample">Try a sample scene</button>
       </div>
@@ -1277,7 +1278,7 @@ function renderScript() {
   return `<section class="stack">
     <div class="row between wrap">
       <h1>${esc(s.title)}</h1>
-      <div class="row"><button class="btn ghost" data-action="edit-script">Edit</button><button class="btn ghost" data-action="delete-script">Delete</button></div>
+      <div class="row wrap">${typeof shareButtonHtml === 'function' ? shareButtonHtml(s) : ''}<button class="btn ghost" data-action="edit-script">Edit</button><button class="btn ghost" data-action="delete-script">Delete</button></div>
     </div>
     ${supportNote()}
     <div class="card stack-sm">
