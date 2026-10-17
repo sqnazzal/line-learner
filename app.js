@@ -36,6 +36,7 @@ const DEFAULT_SETTINGS = {
   readDirections: false,
   useRecordings: true,
   loop: false,
+  skipCuts: false,         // reading pages: leave out printed lines crossed out by hand
 };
 
 function loadJSON(key, fallback) {
@@ -1162,7 +1163,8 @@ function pendingDraft() {
 
 // ---------- Importing screenshots (read by OpenAI) ----------
 const VISION_MODEL = 'gpt-6-luna';
-const SHOT_PROMPT = `These are screenshots of a theatre script or audition sides, in reading order. Transcribe them into plain text in exactly this format:
+const SHOT_PROMPT = `These are photos or screenshots of a theatre script or audition sides, in reading order. Transcribe them into plain text in exactly this format:
+- Transcribe only the PRINTED or typed script. Ignore everything handwritten: blocking notes (like "X DSL", "cross to chair", "sit"), arrows, circles, brackets, margin notes, pencil or pen marks, sticky notes and doodles. Never copy a handwritten word into the script.
 - Each speech on its own line as CHARACTER NAME: the words they say. Join speeches that wrap across lines or continue onto the next screenshot.
 - Stage directions in (parentheses), on their own line or inside the speech where they appear.
 - Act or scene headings on their own line starting with "# ".
@@ -1198,7 +1200,13 @@ const LYRICS_PROMPT = `These are screenshots of song lyrics or sheet music, in o
 - One sung line per line, with a blank line between verses or sections.
 - Keep a section label like [Chorus] or [Verse 2] on its own line if the screenshot shows one.
 - Leave out chord symbols, musical notation, page numbers, and any phone or app interface.
-- Keep every word exactly as written. Reply with only the lyrics.`;
+- Keep every word exactly as written. Reply with only the lyrics.
+- Transcribe only printed or typed lyrics. Ignore everything handwritten: notes, breath marks, arrows, circles, pencil or pen marks.`;
+
+// How to treat printed lines that have been crossed out or marked by hand (actors often cross out cuts).
+const markedTextRule = skipCuts => skipCuts
+  ? '\n- Printed text that has been crossed out or struck through by hand is a cut: leave it out. Printed text that is only highlighted, underlined or circled stays in.'
+  : '\n- Keep all printed text, even where it has been highlighted, underlined, circled or crossed out by hand.';
 
 async function readScreenshots(images, prompt = SHOT_PROMPT) {
   const res = await fetch('https://api.openai.com/v1/responses', {
@@ -1254,6 +1262,8 @@ function trayHtml() {
       ${n && !tray.reading ? `<button class="btn primary" data-action="tray-read">Read ${n} ${n === 1 ? 'page' : 'pages'}</button><button class="btn ghost" data-action="tray-clear">Clear</button>` : ''}
       ${tray.reading ? '<button class="btn ghost" data-action="tray-stop">Stop</button>' : ''}
     </div>
+    <p class="muted small">Handwriting (blocking, notes, arrows) is ignored; only the printed script is read.</p>
+    <label class="check-row small"><input type="checkbox" data-setting="skipCuts" ${settings.skipCuts ? 'checked' : ''}${tray.reading ? ' disabled' : ''}><span>Leave out lines crossed out by hand (cuts)</span></label>
     ${tray.progress ? `<p class="small" role="status">${esc(tray.progress)}</p>` : ''}
     ${n ? `<div class="thumbs">${shown.map((p, i) => `<figure class="thumb"><img src="${p.url}" alt="Page ${i + 1}" loading="lazy"><figcaption>${i + 1}</figcaption>
       ${tray.reading ? '' : `<button class="thumb-x" data-action="tray-remove" data-i="${i}" aria-label="Remove page ${i + 1}">×</button>`}</figure>`).join('')}
@@ -1283,7 +1293,7 @@ async function readTray() {
       refreshTray();
       const sofar = $('#ed-raw')?.value || pendingDraft()?.raw || '';
       const who = song ? '' : lastSpeaker(sofar);
-      const prompt = (song ? LYRICS_PROMPT : SHOT_PROMPT)
+      const prompt = (song ? LYRICS_PROMPT : SHOT_PROMPT) + markedTextRule(settings.skipCuts)
         + (who ? `\nThe previous page ended with ${who} speaking. If the first page starts in the middle of a speech, begin with "${who}: ".` : '');
       let text;
       for (let attempt = 0; ; attempt++) {
