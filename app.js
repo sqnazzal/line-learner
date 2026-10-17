@@ -865,6 +865,11 @@ function renderLibrary() {
       </div>
     </div>
     ${supportNote()}
+    ${(() => {
+      const d = pendingDraft();
+      return d ? `<div class="note row between wrap"><span>You have an unsaved script${d.title ? ` ("${esc(d.title)}")` : ''}. It isn't in your list or synced until you save it.</span>
+        <span class="row"><button class="btn primary" data-action="resume-draft">Continue editing</button><button class="btn ghost" data-action="discard-draft">Discard</button></span></div>` : '';
+    })()}
     ${scripts.length ? `<h2>Your scripts</h2><ul class="cards">${cards}</ul>` : ''}
     <div class="card how">
       <h2>How to practice</h2>
@@ -893,6 +898,7 @@ JULIET: Ay me!</pre>
         <li><b>Stage directions:</b> put them in (parentheses) or [brackets]. They show up but are never read as part of a line.</li>
         <li><b>Scenes:</b> a line starting with # (or "Act 1", "Scene 2") starts a section you can practice on its own.</li>
         <li><b>Audition monologue?</b> Paste it with no names. Each paragraph becomes one of your lines.</li>
+        <li><b>Screenshots:</b> tap From screenshots and pick one or more (in the order they were taken). They're read by OpenAI using the key you added for AI voices, and added to the end of the text.</li>
         <li><b>PDF scripts:</b> import or drag in the PDF, then skim the text. Page numbers and repeated headers are removed, but cast lists, title pages or odd layouts may need a quick tidy. Scanned PDFs (pictures of pages) can't be read.</li>
       </ul>
     </details>
@@ -900,6 +906,7 @@ JULIET: Ay me!</pre>
     <p id="ed-preview" class="muted"></p>
     <div class="row wrap">
       <label class="btn">Import PDF or .txt<input type="file" id="ed-file" accept=".pdf,.txt,application/pdf,text/plain" hidden></label>
+      <label class="btn">From screenshots<input type="file" id="ed-shots" accept="image/*" multiple hidden></label>
       <span class="spacer"></span>
       <button class="btn ghost" data-action="cancel-edit">Cancel</button>
       <button class="btn primary" data-action="save-edit">Save</button>
@@ -984,17 +991,128 @@ async function pdfToText(file) {
 }
 
 async function importFile(f) {
+  if (isImage(f)) return importScreenshots([f]);
   const isPdf = /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
   try {
     if (isPdf) toast('Reading PDF…');
     const text = isPdf ? await pdfToText(f) : await f.text();
-    if (app.view !== 'edit') return;
-    $('#ed-raw').value = text;
-    if (!$('#ed-title').value) $('#ed-title').value = f.name.replace(/\.[^.]+$/, '');
-    updatePreview();
-    if (isPdf) toast('PDF imported. Check the character list below and tidy anything that came through oddly.');
+    putImportedText(text, f.name.replace(/\.[^.]+$/, ''), false);
+    if (isPdf && app.view === 'edit') toast('PDF imported. Check the character list below and tidy anything that came through oddly, then tap Save.');
   } catch (e) {
     toast(e.message || 'Could not read that file.');
+  }
+}
+
+// Puts imported text in the editor (or, if you've moved on, keeps it as an unsaved draft so it's never lost).
+function putImportedText(text, title, append) {
+  if (app.view !== 'edit') {
+    const d = pendingDraft() || app.editing || { id: null, title: '', raw: '' };
+    saveJSON(LS_DRAFT, { ...d, title: d.title || title, raw: append && d.raw.trim() ? d.raw.trimEnd() + '\n\n' + text : text });
+    toast('Your import is ready. Tap "Continue editing" on the home screen to finish it.');
+    if (app.view === 'library') render();
+    return;
+  }
+  const box = $('#ed-raw');
+  box.value = append && box.value.trim() ? box.value.trimEnd() + '\n\n' + text : text;
+  if (!$('#ed-title').value) $('#ed-title').value = title;
+  updatePreview();
+  saveDraft();
+}
+
+// ---------- Unsaved script drafts ----------
+// The editor's text is kept as you type or import, so leaving the page or tapping elsewhere never loses it.
+const LS_DRAFT = 'lineLearner.draft';
+function saveDraft() {
+  const t = $('#ed-title'), r = $('#ed-raw');
+  if (!t || !r || !app.editing) return;
+  Object.assign(app.editing, { title: t.value, raw: r.value });
+  saveJSON(LS_DRAFT, app.editing);
+}
+function clearDraft() {
+  try { localStorage.removeItem(LS_DRAFT); } catch { /* nothing saved */ }
+}
+function pendingDraft() {
+  const d = loadJSON(LS_DRAFT, null);
+  return d && typeof d.raw === 'string' && d.raw.trim() ? d : null;
+}
+
+// ---------- Importing screenshots (read by OpenAI) ----------
+const VISION_MODEL = 'gpt-6-luna';
+const SHOT_PROMPT = `These are screenshots of a theatre script or audition sides, in reading order. Transcribe them into plain text in exactly this format:
+- Each speech on its own line as CHARACTER NAME: the words they say. Join speeches that wrap across lines or continue onto the next screenshot.
+- Stage directions in (parentheses), on their own line or inside the speech where they appear.
+- Act or scene headings on their own line starting with "# ".
+- Keep every spoken word exactly as written. Do not summarize, correct or add anything.
+- Leave out page numbers, running headers, watermarks, and any phone or app interface (status bar, buttons, toolbars).
+- If it's a monologue with no character names, write each paragraph on its own line without a name.
+Reply with only the transcribed script.`;
+
+const isImage = f => (f.type || '').startsWith('image/') || /\.(png|jpe?g|heic|heif|webp|gif)$/i.test(f.name);
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Couldn't open ${file.name}.`)); };
+    img.src = url;
+  });
+}
+
+// Shrinks big photos so uploads stay quick, while keeping script text sharp enough to read.
+async function imageToDataUrl(file, max = 2400) {
+  const img = await loadImage(file);
+  const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.naturalWidth * scale);
+  c.height = Math.round(img.naturalHeight * scale);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+
+async function readScreenshots(images) {
+  const res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + ai.key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: VISION_MODEL,
+      input: [{ role: 'user', content: [{ type: 'input_text', text: SHOT_PROMPT }, ...images.map(url => ({ type: 'input_image', image_url: url, detail: 'high' }))] }],
+    }),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error?.message || ''; } catch { /* no details */ }
+    throw new Error(res.status === 401 ? "OpenAI didn't accept your key. Check it under Voices for each character."
+      : res.status === 429 ? 'OpenAI says you are out of credit or over your limit.'
+      : `OpenAI couldn't read the screenshots (${res.status}). ${detail}`);
+  }
+  const data = await res.json();
+  const text = data.output_text ?? (data.output || []).flatMap(o => o.content || []).filter(c => c.type === 'output_text').map(c => c.text).join('');
+  return text.replace(/^```[a-z]*\n?|```\s*$/gi, '').trim();
+}
+
+async function importScreenshots(files) {
+  files = files.filter(isImage);
+  if (!files.length) return;
+  if (!ai.key) {
+    toast('Reading screenshots uses your OpenAI key. Add it under "Voices for each character" on any script, or paste the text instead.');
+    return;
+  }
+  // Screenshots are usually taken in reading order, so sort by when they were taken.
+  files.sort((a, b) => a.lastModified - b.lastModified || a.name.localeCompare(b.name, undefined, { numeric: true }));
+  try {
+    const parts = [];
+    for (let i = 0; i < files.length; i += 6) {
+      const batch = files.slice(i, i + 6);
+      toast(files.length === 1 ? 'Reading screenshot…' : `Reading screenshots ${i + 1} to ${i + batch.length} of ${files.length}…`);
+      parts.push(await readScreenshots(await Promise.all(batch.map(f => imageToDataUrl(f)))));
+    }
+    const text = parts.filter(Boolean).join('\n\n').trim();
+    if (!text) throw new Error("I couldn't find any script text in those screenshots.");
+    putImportedText(text, '', true);
+    if (app.view === 'edit') toast('Screenshots read. Check the text and the character list, then tap Save.');
+  } catch (e) {
+    toast(e.message || "Couldn't read those screenshots.");
   }
 }
 
@@ -1515,7 +1633,30 @@ function openScript(id) {
 
 const actions = {
   home() { leave(); app.view = 'library'; render(); },
-  new() { leave(); app.editing = { id: null, title: '', raw: '' }; app.view = 'edit'; render(); $('#ed-title').focus(); },
+  new() {
+    leave();
+    const d = pendingDraft();
+    app.editing = d && !d.id ? d : { id: null, title: '', raw: '' };
+    app.view = 'edit';
+    render();
+    if (d && !d.id) toast('Picked up your unsaved script where you left off.');
+    else $('#ed-title').focus();
+  },
+  'resume-draft'() {
+    const d = pendingDraft();
+    if (!d) return;
+    leave();
+    if (d.id && !scripts.some(x => x.id === d.id)) d.id = null;
+    app.editing = d;
+    app.scriptId = d.id || app.scriptId;
+    app.view = 'edit';
+    render();
+  },
+  'discard-draft'() {
+    if (!confirm('Discard your unsaved script?')) return;
+    clearDraft();
+    render();
+  },
   sample() {
     const s = makeScript('Romeo and Juliet: the balcony (sample)', SAMPLE);
     s.myChar = 'JULIET';
@@ -1527,7 +1668,8 @@ const actions = {
   'edit-script'() {
     const s = current();
     leave();
-    app.editing = { id: s.id, title: s.title, raw: s.raw };
+    const d = pendingDraft();
+    app.editing = d?.id === s.id ? d : { id: s.id, title: s.title, raw: s.raw };
     app.view = 'edit';
     render();
   },
@@ -1549,7 +1691,14 @@ const actions = {
     app.view = 'library';
     render();
   },
-  'cancel-edit'() { app.view = app.editing.id ? 'script' : 'library'; render(); },
+  'cancel-edit'() {
+    const raw = $('#ed-raw').value;
+    const original = app.editing.id ? scripts.find(x => x.id === app.editing.id)?.raw ?? '' : '';
+    if (raw.trim() && raw !== original && !confirm('Discard your changes to this script?')) return;
+    clearDraft();
+    app.view = app.editing.id ? 'script' : 'library';
+    render();
+  },
   'save-edit'() {
     const title = $('#ed-title').value.trim(), raw = $('#ed-raw').value;
     const lines = parseScript(raw);
@@ -1565,6 +1714,7 @@ const actions = {
     }
     const chars = characters(s);
     if (!chars.has(s.myChar)) s.myChar = chars.size === 1 ? [...chars.keys()][0] : '';
+    clearDraft();
     saveScripts();
     openScript(s.id);
   },
@@ -1680,17 +1830,23 @@ document.addEventListener('change', e => {
   else if (el.id === 'ed-file' && el.files[0]) {
     importFile(el.files[0]);
     el.value = '';
+  } else if (el.id === 'ed-shots' && el.files.length) {
+    importScreenshots([...el.files]);
+    el.value = '';
   }
 });
 
 document.addEventListener('dragover', e => { if (e.target.id === 'ed-raw') e.preventDefault(); });
 document.addEventListener('drop', e => {
-  if (e.target.id !== 'ed-raw' || !e.dataTransfer.files[0]) return;
+  if (e.target.id !== 'ed-raw' || !e.dataTransfer.files.length) return;
   e.preventDefault();
-  importFile(e.dataTransfer.files[0]);
+  const files = [...e.dataTransfer.files];
+  if (files.every(isImage)) importScreenshots(files);
+  else importFile(files[0]);
 });
 
 document.addEventListener('input', e => {
+  if (e.target.id === 'ed-raw' || e.target.id === 'ed-title') saveDraft();
   if (e.target.id === 'ed-raw') updatePreview();
   else if (e.target.dataset.setting && e.target.type === 'range') applySetting(e.target);
   else if (e.target.dataset.speedChar) {
@@ -1801,7 +1957,7 @@ function mergeRemote(remote) {
     }
     mine.stats = stats;
   }
-  scripts = scripts.filter(s => !((deleted[s.id] || 0) >= (s.updated || 0)));
+  scripts = scripts.filter(s => !(deleted[s.id] && deleted[s.id] >= (s.updated || 0)));
 }
 
 function scheduleSync() {
@@ -1864,6 +2020,7 @@ function renderSync() {
       <h1>Sync between devices</h1>
       <div class="card stack-sm">
         <p><b>This device is connected.</b> ${sync.busy ? 'Syncing now…' : syncConf.lastSync ? `Last synced ${ago(syncConf.lastSync)}.` : 'Not synced yet.'}</p>
+        ${syncConf.lastSync && !sync.busy ? `<p class="muted">${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'} on this device and in your GitHub copy.${pendingDraft() ? ' Your unsaved script is not included until you save it.' : ''}</p>` : ''}
         ${sync.error ? `<p class="note">${esc(sync.error)}</p>` : ''}
         <p class="muted">Changes sync on their own a few seconds after you make them, and whenever you open the app. Tap Sync now to pull the latest from your other device.</p>
         <div class="row wrap">
