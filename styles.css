@@ -324,6 +324,8 @@ button, .btn { touch-action: manipulation; }
 .pick:disabled { opacity: .55; cursor: default; }
 .pick .by { font-weight: 400; color: var(--muted); }
 .sp-embed { min-height: 152px; border-radius: 12px; overflow: hidden; }
+.app-player .row { align-items: center; gap: 14px; flex-wrap: nowrap; }
+.app-player #app-play { min-width: 92px; justify-content: center; }
 .lyrics { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .lyric { width: 100%; text-align: left; font: 1.15rem/1.5 var(--font-script); color: var(--ink); background: none; border: 0; border-radius: 10px; padding: 8px 12px; cursor: pointer; display: flex; gap: 12px; align-items: baseline; }
 .lyric .t { font: .75rem var(--font-ui); color: var(--muted); min-width: 2.6em; font-variant-numeric: tabular-nums; }

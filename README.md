@@ -117,6 +117,8 @@ Tap **+ New song** on the home screen.
 1. **The song:** paste a Spotify song link (in Spotify: Share > Copy Song Link). Once Spotify is connected you can search Spotify or pick from your playlists and liked songs instead.
 2. **The lyrics:** they're looked up automatically on LRCLIB (a free lyrics database), or tap **Find lyrics**, paste them, or use **From screenshots**. Timed lyrics highlight along with the music; untimed lyrics can be timed by tapping along (**Time the lyrics**).
 
+**Full songs on iPhone:** Spotify's player inside a web page can only play previews on iPhone (every iPhone browser blocks it from seeing your Spotify login). With Spotify connected (Premium), Sing along offers **Spotify app (full song)**: the song plays in your own Spotify app and the lyrics follow along on the page. If it says Spotify isn't open anywhere, open the Spotify app, play any song for a second, and come back.
+
 **Instrumental:** with Spotify connected, the app looks for instrumental and karaoke versions when you pick a song (or paste a link to one). Sing along then has an **Original | Instrumental** switch. Each version keeps its own timing: if the highlight is out of step on the instrumental, tap **It's early** / **It's late** to nudge it, or re-time it by tapping along.
 
 **Sing along** plays the real track in Spotify's player with the current line highlighted. Hide words as you learn (**First letters**, **Fill in as I sing**, **Hidden**), tap a line to jump there, and **Repeat this line** to loop a tricky bit. Spotify decides whether the player plays the full track or a preview, depending on whether you're signed in to Spotify in that browser.

@@ -57,15 +57,20 @@ const spotify = loadJSON(LS_SPOTIFY, {}); // { access, refresh, expires }
 const spotifyReady = () => !!(SPOTIFY_CLIENT_ID && spotify.refresh);
 const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
+// Reading and controlling playback lets the app play full songs in your own Spotify app (Premium).
+const PLAYER_SCOPES = 'user-read-playback-state user-modify-playback-state';
+const canControlApp = () => spotifyReady() && (spotify.scope || '').includes('user-modify-playback-state');
+
 async function spotifyLogin() {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
   const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
   const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
-  saveJSON(LS_SPOTIFY_AUTH, { verifier, state });
-  saveDraft(); // the song being written comes back after signing in
+  // Come back to the same place: the song being written, or the song being sung.
+  saveJSON(LS_SPOTIFY_AUTH, { verifier, state, view: app.view, scriptId: app.scriptId });
+  saveDraft();
   location.href = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
     response_type: 'code', client_id: SPOTIFY_CLIENT_ID, redirect_uri: SPOTIFY_REDIRECT, state,
-    scope: 'playlist-read-private playlist-read-collaborative user-library-read',
+    scope: `playlist-read-private playlist-read-collaborative user-library-read ${PLAYER_SCOPES}`,
     code_challenge_method: 'S256', code_challenge: challenge,
   });
 }
@@ -80,6 +85,7 @@ async function spotifyToken(body) {
   if (!res.ok) throw new Error(data.error_description ? `Spotify: ${data.error_description}` : `Spotify sign-in failed (${res.status}).`);
   Object.assign(spotify, { access: data.access_token, expires: Date.now() + (data.expires_in - 60) * 1000 });
   if (data.refresh_token) spotify.refresh = data.refresh_token;
+  if (data.scope) spotify.scope = data.scope;
   saveJSON(LS_SPOTIFY, spotify);
 }
 
@@ -98,13 +104,23 @@ async function finishSpotifyLogin() {
     toast(e.message);
   }
   const d = pendingDraft();
-  if (d?.kind === 'song') { app.editing = d; app.view = 'edit'; render(); }
+  if (saved.view === 'sing' && scripts.some(x => x.id === saved.scriptId)) { app.scriptId = saved.scriptId; app.view = 'sing'; render(); }
+  else if (d?.kind === 'song') { app.editing = d; app.view = 'edit'; render(); }
 }
 
-async function spotifyApi(path, retried = false) {
+async function spotifyApi(path, opts = {}, retried = false) {
   if (!spotify.access || Date.now() > spotify.expires) await spotifyToken({ grant_type: 'refresh_token', refresh_token: spotify.refresh });
-  const res = await fetch('https://api.spotify.com/v1' + path, { headers: { Authorization: 'Bearer ' + spotify.access } });
-  if (res.status === 401 && !retried) { spotify.expires = 0; return spotifyApi(path, true); }
+  const res = await fetch('https://api.spotify.com/v1' + path, {
+    method: opts.method || 'GET',
+    headers: { Authorization: 'Bearer ' + spotify.access, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (res.status === 401 && !retried) { spotify.expires = 0; return spotifyApi(path, opts, true); }
+  if (res.status === 404 && path.startsWith('/me/player')) {
+    const err = new Error("Spotify isn't open anywhere. Open the Spotify app on this phone, play any song for a second, then come back and tap Play.");
+    err.status = 404;
+    throw err;
+  }
   if (!res.ok) {
     const said = (await res.json().catch(() => ({}))).error?.message || '';
     // Since February 2026 Spotify only serves personal (Development Mode) apps whose owner has Premium,
@@ -115,7 +131,56 @@ async function spotifyApi(path, retried = false) {
     err.status = res.status;
     throw err;
   }
-  return res.json();
+  // Player commands answer with no body ("204 No Content"); so does currently-playing when nothing plays.
+  const text = res.status === 204 ? '' : await res.text();
+  if (!text.trim()) return null;
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+// Plays the song in your own Spotify app (full song, your account) and follows its position, so the
+// lyrics stay in time. Same shape as Spotify's embedded player controller: togglePlay, resume, seek, destroy.
+function appController(uri) {
+  let stopped = false, loaded = false, queue = Promise.resolve();
+  const run = job => (queue = queue.then(job).catch(e => toast(e.message || "Couldn't control Spotify.")));
+  const play = async body => {
+    try {
+      await spotifyApi('/me/player/play', { method: 'PUT', body });
+    } catch (e) {
+      if (e.status !== 404) throw e;
+      // No active player: wake up one of your Spotify devices (this phone's app, if it's open).
+      const { devices = [] } = (await spotifyApi('/me/player/devices')) || {};
+      const device = devices.find(d => d.is_active) || devices.find(d => !d.is_restricted);
+      if (!device) throw e;
+      await spotifyApi(`/me/player/play?device_id=${device.id}`, { method: 'PUT', body: body || { uris: [uri] } });
+    }
+  };
+  const poll = setInterval(async () => {
+    if (stopped) return;
+    const st = await spotifyApi('/me/player/currently-playing').catch(() => null);
+    if (stopped) return;
+    const mine = st?.item?.uri === uri;
+    loaded = mine;
+    Object.assign(sing, { pos: mine ? st.progress_ms || 0 : sing.pos, at: performance.now(), paused: !mine || !st?.is_playing });
+    const btn = $('#app-play');
+    if (btn) btn.textContent = sing.paused ? 'Play' : 'Pause';
+  }, 1000);
+  const ctl = {
+    togglePlay: () => (sing.paused ? ctl.resume() : run(async () => { await spotifyApi('/me/player/pause', { method: 'PUT' }); sing.paused = true; })),
+    // Resuming carries on if this song is already loaded, otherwise starts it from where the lyrics are.
+    resume: () => run(async () => {
+      const st = await spotifyApi('/me/player/currently-playing').catch(() => null);
+      await play(st?.item?.uri === uri ? undefined : { uris: [uri], position_ms: Math.round(sing.pos) });
+      loaded = true;
+      Object.assign(sing, { paused: false, at: performance.now() });
+    }),
+    seek: sec => {
+      Object.assign(sing, { pos: sec * 1000, at: performance.now() });
+      if (!loaded) return queue; // not playing our song yet: Play will start it from here
+      return run(() => spotifyApi(`/me/player/seek?position_ms=${Math.round(sec * 1000)}`, { method: 'PUT' }).catch(e => { if (e.status !== 404) throw e; }));
+    },
+    destroy: () => { stopped = true; clearInterval(poll); },
+  };
+  return ctl;
 }
 
 const trackInfo = t => t && t.id && {
@@ -370,6 +435,11 @@ Object.assign(actions, {
   'sing-time'() { startTiming(); },
   'sing-tap'() { tapTiming(); },
   'sing-play'() { sing.controller?.togglePlay(); },
+  'sing-player'(b) {
+    saveJSON(LS_PLAYER, b.dataset.p);
+    stopSing();
+    render();
+  },
   'sing-version'(b) {
     if (sing.version === b.dataset.v) return;
     sing.version = b.dataset.v;
@@ -416,7 +486,12 @@ function renderSing() {
     ${s.song?.instrumental ? `<div class="segmented" role="group" aria-label="Which version plays">
       <button class="seg${usingInst(s) ? '' : ' on'}" data-action="sing-version" data-v="original" aria-pressed="${!usingInst(s)}">Original</button>
       <button class="seg${usingInst(s) ? ' on' : ''}" data-action="sing-version" data-v="instrumental" aria-pressed="${usingInst(s)}">Instrumental</button></div>` : ''}
-    ${sp ? '<div id="sp-embed" class="sp-embed"></div>' : '<p class="note">Add the song from Spotify (Edit, at the top of the song page) to sing along with the real track. For now you can read and learn the lyrics here.</p>'}
+    ${sp ? playerChoiceHtml() : ''}
+    ${!sp ? '<p class="note">Add the song from Spotify (Edit, at the top of the song page) to sing along with the real track. For now you can read and learn the lyrics here.</p>'
+      : playsInApp() ? `<div class="card app-player"><div class="row wrap">
+          <button class="btn primary" id="app-play" data-action="sing-play">Play</button>
+          <div class="lib-main"><b>${esc(versionTrack(s).title)}</b><span class="muted small">Plays in your Spotify app, full song. Keep this page open for the lyrics.</span></div></div></div>`
+      : '<div id="sp-embed" class="sp-embed"></div>'}
     <div class="row wrap chips sing-modes">${chips}</div>
     <div class="row wrap">
       ${timed(s) ? `<button class="btn ghost" data-action="sing-loop" id="loop-btn">Repeat this line</button>` : ''}
@@ -430,6 +505,23 @@ function renderSing() {
     <div id="timing-bar"></div>
     <ol class="lyrics" id="lyrics"></ol>
   </section>`;
+}
+
+// Where the song plays: Spotify's player in this page (previews unless the browser is signed in to
+// Spotify, which iPhones block) or your own Spotify app via Spotify Connect (full songs, Premium).
+const LS_PLAYER = 'lineLearner.songPlayer';
+const playsInApp = () => canControlApp() && (loadJSON(LS_PLAYER, 'app') === 'app');
+
+function playerChoiceHtml() {
+  if (!SPOTIFY_CLIENT_ID) return '';
+  if (!canControlApp()) {
+    return `<p class="note small">Only hearing a preview? ${spotifyReady() ? 'Reconnect' : 'Connect'} Spotify to play full songs in your Spotify app (needs Premium).
+      <button class="btn ghost" data-action="song-sp-login">${spotifyReady() ? 'Reconnect Spotify' : 'Connect Spotify'}</button></p>`;
+  }
+  const inApp = playsInApp();
+  return `<div class="segmented" role="group" aria-label="Where the song plays">
+    <button class="seg${inApp ? ' on' : ''}" data-action="sing-player" data-p="app" aria-pressed="${inApp}">Spotify app (full song)</button>
+    <button class="seg${inApp ? '' : ' on'}" data-action="sing-player" data-p="embed" aria-pressed="${!inApp}">This page</button></div>`;
 }
 
 function nudgeLabel(s) {
@@ -549,6 +641,7 @@ async function mountSing() {
   renderLyrics();
   clearInterval(sing.timer);
   sing.timer = setInterval(() => updateSing(false), 200);
+  if (s.song?.spotify && playsInApp()) { sing.controller = appController(versionTrack(s).uri); return; }
   const box = $('#sp-embed');
   if (!box || !s.song?.spotify) return;
   const api = await loadIframeApi();
