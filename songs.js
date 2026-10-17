@@ -169,6 +169,30 @@ async function showDevicePicker(question) {
     : '<p class="muted small">No Spotify devices found. Open the Spotify app on this phone, play any song for a second, then try again.</p>';
 }
 
+// Waking Spotify the way iPhone allows: you tap a link that opens the Spotify app, come straight back,
+// and the song starts by itself (once playing, iPhone keeps Spotify awake).
+function showWake(uri, kind) {
+  const box = $('#device-list');
+  if (!box) return;
+  sing.wakeUntil = Date.now() + 3 * 60 * 1000;
+  const id = uri.split(':').pop();
+  const href = kind === 'phone' ? `spotify:track:${id}` : `https://open.spotify.com/track/${id}`;
+  box.innerHTML = `<div class="note small wake">
+    <p>Spotify on this ${kind} is asleep. Tap <b>Open Spotify</b>, then come straight back here and the song will start by itself.</p>
+    <div class="row wrap"><a class="btn primary" href="${href}"${kind === 'phone' ? '' : ' target="_blank" rel="noopener"'}>Open Spotify</a>
+    <button class="btn ghost" data-action="sing-devices-list">Choose another device</button></div></div>`;
+}
+function hideWake() {
+  sing.wakeUntil = 0;
+  const wake = $('#device-list .wake');
+  if (wake) $('#device-list').innerHTML = '';
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || app.view !== 'sing' || !(sing.wakeUntil > Date.now())) return;
+  sing.wakeUntil = 0;
+  setTimeout(() => sing.controller?.resume(), 500);
+});
+
 function appController(uri) {
   let stopped = false, loaded = false, queue = Promise.resolve();
   const run = job => (queue = queue.then(job).catch(e => toast(e.message || "Couldn't control Spotify.")));
@@ -184,10 +208,25 @@ function appController(uri) {
     const mine = st?.item?.uri === uri;
     loaded = mine;
     Object.assign(sing, { pos: mine ? st.progress_ms || 0 : sing.pos, at: performance.now(), paused: !mine || !st?.is_playing });
-    if (mine && st.device) showDevice(st.device);
+    // Spotify remembers the last device even after it's gone to sleep, so only name it while it's playing.
+    showDevice(mine && st.is_playing ? st.device : null);
     const btn = $('#app-play');
     if (btn) btn.textContent = sing.paused ? 'Play' : 'Pause';
   }, 1000);
+  // iPhone puts the Spotify app to sleep when it's in the background and not playing. A sleeping app either
+  // drops off the device list or can't be reached (Spotify answers 502), so try waking it once.
+  const asleep = e => !e.status || e.status === 404 || e.status >= 500;
+  const startOn = async (device, body) => {
+    const play = () => spotifyApi(`/me/player/play?device_id=${device.id}`, { method: 'PUT', body });
+    try {
+      await play();
+    } catch (e) {
+      if (!asleep(e)) throw e;
+      await spotifyApi('/me/player', { method: 'PUT', body: { device_ids: [device.id], play: false } }).catch(() => {});
+      await new Promise(r => setTimeout(r, 1200));
+      await play();
+    }
+  };
   const ctl = {
     togglePlay: () => (sing.paused ? ctl.resume() : run(async () => { await spotifyApi('/me/player/pause', { method: 'PUT' }); sing.paused = true; })),
     // Always names the device, so the song never starts on a speaker that just happened to be active.
@@ -201,12 +240,20 @@ function appController(uri) {
           await showDevicePicker(`Your Spotify account has more than one ${kind}. Which one is this ${kind}? (You only need to choose once.)`);
           return;
         }
-        throw new Error(`Open the Spotify app on this ${kind}, play any song for a second, then come back and tap Play. (Or tap "Change device".)`);
+        showWake(uri, kind); // this device's Spotify app is asleep (or not open)
+        return;
       }
-      if (!loadJSON(LS_SPOTIFY_DEVICE, null)) toast(`Playing on ${device.name}. Not right? Tap "Change device".`);
       const st = await spotifyApi('/me/player').catch(() => null);
       const sameSpot = st?.item?.uri === uri && st?.device?.id === device.id;
-      await spotifyApi(`/me/player/play?device_id=${device.id}`, { method: 'PUT', body: sameSpot ? undefined : { uris: [uri], position_ms: Math.round(sing.pos) } });
+      try {
+        await startOn(device, sameSpot ? undefined : { uris: [uri], position_ms: Math.round(sing.pos) });
+      } catch (e) {
+        if (!asleep(e)) throw e;
+        showWake(uri, kind);
+        return;
+      }
+      if (!loadJSON(LS_SPOTIFY_DEVICE, null)) toast(`Playing on ${device.name}. Not right? Tap "Change device".`);
+      hideWake();
       loaded = true;
       showDevice(device);
       Object.assign(sing, { paused: false, at: performance.now() });
@@ -473,6 +520,7 @@ Object.assign(actions, {
   'sing-time'() { startTiming(); },
   'sing-tap'() { tapTiming(); },
   'sing-play'() { sing.controller?.togglePlay(); },
+  'sing-devices-list'() { showDevicePicker('Where should songs play?').catch(e => toast(e.message)); },
   'sing-devices'() {
     if ($('#device-list')?.innerHTML) { $('#device-list').innerHTML = ''; return; }
     showDevicePicker('Where should songs play?').catch(e => toast(e.message));
