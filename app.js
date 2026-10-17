@@ -272,26 +272,77 @@ function sleep(ms, token) {
 const synth = window.speechSynthesis;
 const liveUtterances = new Set(); // keeps utterances referenced so Chrome reliably fires their end events
 
+// Browsers don't say whether a voice is female or male, so we recognise the common American voices
+// on Windows/Edge, Chrome, iPhone and Mac by name.
+const wordSet = s => new Set(s.split(/\s+/));
+const FEMALE_VOICES = wordSet('aria jenny michelle ana ava emma zira susan samantha victoria allison zoe nicky joelle noelle kathy flo grandma sandy shelley ashley cora elizabeth jane monica nancy sara amber kendra kimberly salli joanna ivy karen moira tessa fiona serena female');
+const MALE_VOICES = wordSet('guy christopher eric roger steffan andrew brian david mark alex fred tom aaron evan nathan junior ralph eddy grandpa reed rocko daniel davis jason tony justin joey matthew male');
+// Apple's novelty voices (sound effects and singing) are no good for reading a script.
+const NOVELTY_VOICES = /\b(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|deranged|hysterical)\b/i;
+const FUN_VOICES = /\b(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|junior|ralph|kathy|fred)\b/i;
+
+function voiceGender(v) {
+  const n = v.name.toLowerCase().replace(/multilingual/g, ' ');
+  if (/google us english/.test(n)) return 'f';
+  for (const w of n.split(/[^a-z]+/)) {
+    if (FEMALE_VOICES.has(w)) return 'f';
+    if (MALE_VOICES.has(w)) return 'm';
+  }
+  return '';
+}
+
+const voiceLabel = v => v.name.replace(/^(Microsoft|Google|Apple)\s+/, '').replace(/Multilingual/, '').replace(/\s+Online/, '').replace(/\s*-\s*English.*$/, '').trim();
+
+// American English voices first (then other English, then anything), most natural-sounding first.
 function voiceList() {
   if (!synth) return [];
-  const all = synth.getVoices();
-  const lang = (navigator.language || 'en').slice(0, 2).toLowerCase();
-  const local = all.filter(v => v.lang.toLowerCase().startsWith(lang));
-  const rank = v => (/natural|neural|online|google|enhanced|premium|siri/i.test(v.name) ? 0 : 1);
-  return (local.length ? local : all).slice().sort((a, b) => rank(a) - rank(b));
+  const all = synth.getVoices().filter(v => !NOVELTY_VOICES.test(v.name));
+  const lang = v => v.lang.replace('_', '-').toLowerCase();
+  const us = all.filter(v => lang(v) === 'en-us');
+  const en = all.filter(v => lang(v).startsWith('en'));
+  const rank = v => (/natural|neural|online|enhanced|premium|siri/i.test(v.name) ? 0 : FUN_VOICES.test(v.name) ? 2 : 1);
+  return (us.length ? us : en.length ? en : all).slice().sort((a, b) => rank(a) - rank(b));
+}
+
+const FEMALE_WORDS = wordSet('lady queen mother mom mum mama nurse woman girl wife sister daughter aunt grandma grandmother granny mrs ms miss madam madame duchess princess countess witch maid maiden nun abbess actress hostess waitress mistress widow bride gentlewoman niece empress goddess');
+const MALE_WORDS = wordSet('lord king father dad papa man boy husband brother son uncle grandpa grandfather mr sir duke prince count earl baron friar priest monk gentleman knight emperor waiter actor nephew groom bishop cardinal master');
+const FEMALE_NAMES = wordSet('mary patricia jennifer linda elizabeth barbara susan jessica sarah karen lisa nancy betty margaret sandra ashley kimberly emily donna michelle carol amanda dorothy melissa deborah stephanie rebecca sharon laura cynthia kathleen amy angela shirley anna brenda pamela emma nicole helen samantha katherine christine debra rachel carolyn janet catherine maria heather diane ruth julie olivia joyce virginia victoria kelly lauren christina joan evelyn judith megan andrea cheryl hannah jacqueline martha gloria teresa ann sara madison frances kathryn janice jean abigail alice judy sophia grace denise amber doris marilyn danielle beverly isabella theresa diana natalie brittany charlotte marie kayla alexis lori ava mia ella chloe zoe lily sophie lucy annie jane kate katie molly maggie sally blanche stella eliza elle wendy belle ariel jasmine cinderella glinda elphaba nessarose fiona tracy penny velma roxie maureen mimi joanne nina vanessa eponine cosette fantine meg carlotta anita rosalia juliet ophelia gertrude portia rosalind celia viola beatrice hero hermia helena titania hippolyta desdemona emilia bianca cordelia goneril regan miranda katherina cressida cleopatra imogen perdita hermione paulina lavinia tamora mariana nerissa audrey phebe calpurnia lysistrata medea antigone ismene electra nora hedda masha irina olga natasha arkadina sonya yelena dolly mame sarah adelaide golde tzeitel hodel chava yente');
+const MALE_NAMES = wordSet('james robert john michael david william richard joseph thomas charles christopher daniel matthew anthony mark donald steven paul andrew joshua kenneth kevin brian george timothy ronald edward jason jeffrey ryan jacob gary nicholas eric jonathan stephen larry justin scott brandon benjamin samuel gregory alexander frank patrick raymond jack dennis jerry tyler aaron jose adam nathan henry douglas zachary peter kyle noah ethan jeremy walter christian keith roger terry austin sean gerald carl harold dylan arthur lawrence jordan jesse bryan billy bruce gabriel joe logan albert willie alan eugene russell vincent philip bobby johnny bradley roy ralph louis harry fred tom tim mike jim bob bill sam max ben jake luke leo oliver lucas mason liam owen eli alex danny tony stanley willy biff happy marius javert valjean enjolras raoul kenickie sky nicely tevye motel perchik seymour hamlet romeo mercutio tybalt benvolio capulet montague paris balthasar sampson claudius polonius laertes horatio fortinbras rosencrantz guildenstern macbeth banquo macduff duncan malcolm fleance lennox ross othello iago cassio roderigo brabantio lear edmund edgar gloucester kent albany cornwall prospero caliban ferdinand antonio sebastian gonzalo alonso stephano trinculo petruchio lucentio baptista grumio tranio orsino malvolio toby feste benedick claudio pedro dogberry leonato oberon lysander demetrius theseus egeus bottom quince flute snout snug starveling shylock bassanio gratiano lorenzo launcelot orlando jaques touchstone frederick brutus cassius caesar antony octavius casca hal falstaff hotspur bardolph pistol poins coriolanus timon titus pericles leontes polixenes florizel posthumus cymbeline oedipus creon agamemnon orestes vladimir estragon pozzo lucky mitch hickey treplev trigorin vanya astrov tuzenbach vershinin puck');
+
+// 'f', 'm', or '' when the name gives no clue.
+function guessGender(speaker) {
+  const parts = speaker.toLowerCase().split(/[^\p{L}]+/u).filter(Boolean);
+  for (const w of parts) {
+    if (FEMALE_WORDS.has(w) || FEMALE_NAMES.has(w)) return 'f';
+    if (MALE_WORDS.has(w) || MALE_NAMES.has(w)) return 'm';
+  }
+  return '';
+}
+
+// Each character's gender (your choice, else a guess from the name; unclear names alternate) and the
+// voice picked for them automatically, spreading different voices across characters of the same gender.
+function castVoices(s) {
+  const list = voiceList();
+  const pools = { f: list.filter(v => voiceGender(v) === 'f'), m: list.filter(v => voiceGender(v) === 'm') };
+  const used = { f: 0, m: 0 };
+  let unclear = 0;
+  const cast = new Map();
+  for (const speaker of characters(s).keys()) {
+    const gender = s.genders?.[speaker] || guessGender(speaker) || (unclear++ % 2 ? 'm' : 'f');
+    const pool = pools[gender].length ? pools[gender] : list;
+    cast.set(speaker, { gender, voice: pool.length ? pool[used[gender]++ % pool.length] : null });
+  }
+  return cast;
 }
 
 function voiceFor(speaker) {
   const s = current();
-  const list = voiceList();
-  if (!list.length) return null;
   const chosen = s?.voices?.[speaker];
-  if (chosen) {
+  if (chosen && synth) {
     const v = synth.getVoices().find(x => x.voiceURI === chosen);
     if (v) return v;
   }
-  const idx = s ? [...characters(s).keys()].indexOf(speaker) : -1;
-  return list[(idx + 1) % list.length];
+  return (s && castVoices(s).get(speaker)?.voice) || voiceList()[0] || null;
 }
 
 function speakChunk(text, voice, token, rate) {
@@ -791,6 +842,7 @@ function renderScript() {
   const sections = s.lines.map((l, i) => (l.type === 'section' ? i : -1)).filter(i => i >= 0);
   const [start, end] = rangeBounds(s);
   const voices = voiceList();
+  const cast = castVoices(s);
 
   const rangeHtml = sections.length ? `<div class="row wrap">
       <label class="field inline"><span>Start at</span><select id="range-start">
@@ -843,11 +895,23 @@ function renderScript() {
     <details id="voices" class="card" ${app.voicesOpen ? 'open' : ''}>
       <summary>Voices for each character</summary>
       ${voices.length ? chars.map(([c]) => {
-        const v = voiceFor(c);
-        return `<div class="voice-row"><span>${esc(titleCase(c))}</span>
-          <select data-voice-char="${esc(c)}">${voices.map(o => `<option value="${esc(o.voiceURI)}" ${v && o.voiceURI === v.voiceURI ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>
+        const { gender, voice: auto } = cast.get(c);
+        const chosen = s.voices?.[c] || '';
+        const opt = o => `<option value="${esc(o.voiceURI)}" ${o.voiceURI === chosen ? 'selected' : ''}>${esc(voiceLabel(o))}</option>`;
+        const matching = voices.filter(o => voiceGender(o) === gender), others = voices.filter(o => voiceGender(o) !== gender);
+        return `<div class="voice-row"><span class="voice-name">${esc(titleCase(c))}</span>
+          <select data-gender-char="${esc(c)}" aria-label="${esc(titleCase(c))}: female or male">
+            <option value="f" ${gender === 'f' ? 'selected' : ''}>Female</option>
+            <option value="m" ${gender === 'm' ? 'selected' : ''}>Male</option>
+          </select>
+          <select data-voice-char="${esc(c)}" aria-label="${esc(titleCase(c))}: voice">
+            <option value="">Automatic${auto ? `: ${esc(voiceLabel(auto))}` : ''}</option>
+            ${matching.length ? `<optgroup label="${gender === 'f' ? 'Female' : 'Male'} voices">${matching.map(opt).join('')}</optgroup>` : ''}
+            ${others.length ? `<optgroup label="Other voices">${others.map(opt).join('')}</optgroup>` : ''}
+          </select>
           <button class="icon-btn" data-action="test-voice" data-char="${esc(c)}" title="Test this voice" aria-label="Test this voice">${icon('speaker')}</button></div>`;
       }).join('') : '<p class="muted">No computer voices found in this browser.</p>'}
+      <p class="muted small">Voices are picked to match each character. Change Female/Male or pick a specific voice for anyone. ${IS_IOS ? 'For more natural voices on iPhone, download "Enhanced" or "Premium" English (US) voices in Settings > Accessibility > Spoken Content > Voices.' : ''}</p>
       <p class="muted small">Tip: use the ${icon('mic')} button on any line to record it yourself (or have a friend read your cues). Recordings play instead of the computer voice.</p>
     </details>
     <h2>Script</h2>
@@ -1387,7 +1451,21 @@ document.addEventListener('change', e => {
     saveScripts();
     render();
   } else if (el.id === 'range-end') { s.rangeEnd = +el.value; s.updated = Date.now(); saveScripts(); render(); }
-  else if (el.dataset.voiceChar) { s.voices[el.dataset.voiceChar] = el.value; saveScripts(); }
+  else if (el.dataset.voiceChar) {
+    s.voices ||= {};
+    if (el.value) s.voices[el.dataset.voiceChar] = el.value;
+    else delete s.voices[el.dataset.voiceChar];
+    saveScripts();
+    preview(t => speakText(`Hello. I'll be reading ${titleCase(el.dataset.voiceChar)}.`, voiceFor(el.dataset.voiceChar), t));
+  } else if (el.dataset.genderChar) {
+    const c = el.dataset.genderChar;
+    (s.genders ||= {})[c] = el.value;
+    delete s.voices?.[c];
+    s.updated = Date.now();
+    saveScripts();
+    render();
+    preview(t => speakText(`Hello. I'll be reading ${titleCase(c)}.`, voiceFor(c), t));
+  }
   else if (el.dataset.setting) applySetting(el);
   else if (el.id === 'ed-file' && el.files[0]) {
     importFile(el.files[0]);
