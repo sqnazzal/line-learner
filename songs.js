@@ -105,8 +105,16 @@ async function spotifyApi(path, retried = false) {
   if (!spotify.access || Date.now() > spotify.expires) await spotifyToken({ grant_type: 'refresh_token', refresh_token: spotify.refresh });
   const res = await fetch('https://api.spotify.com/v1' + path, { headers: { Authorization: 'Bearer ' + spotify.access } });
   if (res.status === 401 && !retried) { spotify.expires = 0; return spotifyApi(path, true); }
-  if (res.status === 403) throw new Error("Spotify didn't allow that. Anyone signing in needs to be added under User Management in your Spotify developer app.");
-  if (!res.ok) { const err = new Error(`Spotify answered with an error (${res.status}).`); err.status = res.status; throw err; }
+  if (!res.ok) {
+    const said = (await res.json().catch(() => ({}))).error?.message || '';
+    // Since February 2026 Spotify only serves personal (Development Mode) apps whose owner has Premium,
+    // and only to the few users added in the app's User Management.
+    const err = new Error(res.status === 403
+      ? `Spotify refused${said ? ` ("${said}")` : ''}. Spotify only allows personal apps like this one when the app's owner has Spotify Premium, and only for people added under User Management.`
+      : `Spotify answered with an error (${res.status}${said ? `: ${said}` : ''}).`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
@@ -235,7 +243,7 @@ Object.assign(actions, {
     const q = $('#sp-q').value.trim();
     if (!q) return;
     songBusy('Searching Spotify…', async () => {
-      const data = await spotifyApi(`/search?type=track&limit=12&q=${enc(q)}`);
+      const data = await spotifyApi(`/search?type=track&limit=10&q=${enc(q)}`); // 10 is Spotify's maximum
       Object.assign(songUi, { resultKind: 'tracks', results: (data.tracks?.items || []).map(trackInfo).filter(Boolean) });
     });
   },
@@ -248,16 +256,23 @@ Object.assign(actions, {
   'song-sp-playlists'() {
     songBusy('Loading your playlists…', async () => {
       const data = await spotifyApi('/me/playlists?limit=50');
-      Object.assign(songUi, { resultKind: 'playlists', results: (data.items || []).filter(Boolean).map(p => ({ id: p.id, name: p.name, count: p.tracks?.total ?? p.items?.total ?? '' })) });
+      Object.assign(songUi, { resultKind: 'playlists', results: (data.items || []).filter(Boolean).map(p => ({ id: p.id, name: p.name, count: p.items?.total ?? p.tracks?.total ?? '' })) });
     });
   },
   'song-sp-open-playlist'(b, i) {
     const p = songUi.results[i];
     songBusy(`Loading ${p.name}…`, async () => {
       let data;
-      try { data = await spotifyApi(`/playlists/${p.id}/tracks?limit=100`); }
-      catch (e) { if (e.status !== 404 && e.status !== 403) throw e; data = await spotifyApi(`/playlists/${p.id}/items?limit=100`); }
-      Object.assign(songUi, { resultKind: 'tracks', results: (data.items || []).map(i => trackInfo(i.track || i.item)).filter(Boolean) });
+      try {
+        data = await spotifyApi(`/playlists/${p.id}/items?limit=50`);
+      } catch (e) {
+        if (e.status === 403 || e.status === 404) throw new Error("Spotify only lets apps open playlists you made or collaborate on. Try Liked songs or Search instead.");
+        throw e;
+      }
+      // Each entry's song is now in "item" ("track" can be a plain true/false).
+      const tracks = (data.items || []).map(i => trackInfo(typeof i.item === 'object' ? i.item : i.track)).filter(Boolean);
+      Object.assign(songUi, { resultKind: 'tracks', results: tracks });
+      if (!tracks.length) toast('No songs found in that playlist.');
     });
   },
   'song-pick-track'(b, i) { useTrack(songUi.results[i]); },
