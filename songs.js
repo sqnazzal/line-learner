@@ -136,7 +136,29 @@ async function trackFromLink(link) {
 }
 
 // ---------- Song editor (a panel on the normal editor) ----------
-const songUi = { results: [], resultKind: '', lyrics: [], busy: '' };
+const songUi = { results: [], resultKind: '', lyrics: [], busy: '', inst: [] };
+
+// Instrumental and karaoke versions are usually released by karaoke labels under a different artist, so
+// search for both words and rank by how well the length and names match the original.
+const INST_WORDS = /instrumental|karaoke|backing track|minus one|sing ?along|accompaniment|playback/i;
+async function findInstrumentals(track) {
+  const artist = track.artist.split(',')[0];
+  const queries = [`${track.title} ${artist} instrumental`, `${track.title} karaoke`, `${track.title} instrumental`];
+  const seen = new Set(), found = [];
+  for (const q of queries) {
+    const data = await spotifyApi(`/search?type=track&limit=10&q=${enc(q)}`);
+    for (const t of (data.tracks?.items || []).map(trackInfo).filter(Boolean)) {
+      if (seen.has(t.id) || t.id === track.id) continue;
+      seen.add(t.id);
+      const name = `${t.title} ${t.artist}`.toLowerCase();
+      if (!INST_WORDS.test(name) || !name.includes(track.title.toLowerCase().replace(/\s*[(-].*$/, '').trim())) continue;
+      const score = (artist && name.includes(artist.toLowerCase()) ? 2 : 0) + (/instrumental/.test(name) ? 1 : 0)
+        - (track.duration && t.duration ? Math.abs(track.duration - t.duration) / 20 : 0);
+      found.push({ ...t, score });
+    }
+  }
+  return found.sort((a, b) => b.score - a.score).slice(0, 8);
+}
 
 function songPanelHtml(e) {
   const t = e.song?.spotify;
@@ -159,9 +181,18 @@ function songPanelHtml(e) {
     || '<li class="muted small">Nothing found.</li>'}</ul>` : '';
   const lyricHits = songUi.lyrics.length ? `<ul class="pick-list">${songUi.lyrics.map((h, i) => `<li><button class="pick" data-action="song-pick-lyrics" data-i="${i}">
       <b>${esc(h.trackName)} <span class="by">by ${esc(h.artistName)}</span></b><span class="muted small">${esc(h.albumName || '')}${h.duration ? ' · ' + fmtTime(h.duration) : ''}${h.syncedLyrics ? ' · timed ✓' : ''}</span></button></li>`).join('')}</ul>` : '';
+  const inst = e.song?.instrumental;
+  const instHtml = !t ? '' : `<b>Instrumental to sing with <span class="muted small">(optional)</span></b>
+    ${inst ? `<div class="track">${inst.image ? `<img src="${esc(inst.image)}" alt="" width="44" height="44">` : ''}
+        <div class="lib-main"><b>${esc(inst.title)}</b><span class="muted small">${esc(inst.artist)}${inst.duration ? ' · ' + fmtTime(inst.duration) : ''}</span></div>
+        <button class="btn ghost" data-action="song-clear-inst">Remove</button></div>`
+      : `${spotifyReady() ? '<div><button class="btn ghost" data-action="song-find-inst">Find an instrumental or karaoke version</button></div>' : ''}
+        ${songUi.inst.length ? `<ul class="pick-list">${songUi.inst.map((r, i) => `<li><button class="pick" data-action="song-pick-inst" data-i="${i}"><b>${esc(r.title)} <span class="by">by ${esc(r.artist)}</span></b><span class="muted small">${r.duration ? fmtTime(r.duration) : ''}${t.duration && r.duration ? ` (original ${fmtTime(t.duration)})` : ''}</span></button></li>`).join('')}</ul>` : ''}
+        <div class="row wrap"><input id="inst-link" type="search" class="search" placeholder="Or paste a Spotify link to an instrumental" aria-label="Instrumental Spotify link"><button class="btn" data-action="song-inst-link">Use</button></div>`}`;
   return `<div class="card stack-sm song-panel">
     <b>The song on Spotify</b>
     ${trackHtml}${findTrack}${results}
+    ${instHtml}
     <b>The lyrics</b>
     ${t && !t.artist ? `<p class="note small">Spotify didn't say who sings this${SPOTIFY_CLIENT_ID && !spotifyReady() ? ' (it does once you connect Spotify on this device)' : ''}. Add the artist after the song name so the right lyrics are found.</p>` : ''}
     <div class="row wrap"><input id="ly-q" type="search" class="search" value="${esc(t ? `${t.title} ${t.artist.split(',')[0]}`.trim() + (t.artist ? '' : ' ') : '')}" placeholder="Song name and artist" aria-label="Find lyrics"><button class="btn" data-action="song-find-lyrics">Find lyrics</button></div>
@@ -197,8 +228,12 @@ async function useTrack(track) {
   const title = $('#ed-title');
   if (title && !title.value.trim()) title.value = track.artist ? `${track.title} (${track.artist.split(',')[0]})` : track.title;
   songUi.resultKind = '';
+  songUi.inst = [];
   saveDraft();
   refreshSongPanel();
+  if (spotifyReady() && track.artist && !app.editing.song.instrumental) {
+    findInstrumentals(track).then(list => { songUi.inst = list; refreshSongPanel(); }).catch(() => {});
+  }
   // Without the artist a title-only search can land on a different song with the same name, so wait for it.
   if (!track.artist) { $('#ly-q')?.focus(); return; }
   if (!$('#ed-raw').value.trim()) {
@@ -220,9 +255,16 @@ function saveSong() {
     s = { id: uid(), voices: {}, stats: {} };
     scripts.push(s);
   }
+  const prev = e.song || {};
+  const sameLines = (prev.instTimes || []).length === times.length; // the instrumental's own timing still fits
   Object.assign(s, {
-    kind: 'song', title: title || e.song?.spotify?.title || 'Untitled song', raw, lines, myChar: 'YOU', updated: Date.now(),
-    song: { spotify: e.song?.spotify || null, times },
+    kind: 'song', title: title || prev.spotify?.title || 'Untitled song', raw, lines, myChar: 'YOU', updated: Date.now(),
+    song: {
+      spotify: prev.spotify || null, times,
+      instrumental: prev.instrumental || null,
+      instTimes: sameLines ? prev.instTimes : null,
+      offsets: prev.offsets || {},
+    },
   });
   clearDraft();
   saveScripts();
@@ -239,7 +281,22 @@ Object.assign(actions, {
     render();
   },
   'song-sp-login'() { spotifyLogin(); },
-  'song-clear-track'() { app.editing.song = { ...app.editing.song, spotify: null }; saveDraft(); refreshSongPanel(); },
+  'song-clear-track'() { app.editing.song = { ...app.editing.song, spotify: null, instrumental: null }; songUi.inst = []; saveDraft(); refreshSongPanel(); },
+  'song-find-inst'() {
+    songBusy('Looking for instrumental versions…', async () => {
+      songUi.inst = await findInstrumentals(app.editing.song.spotify);
+      if (!songUi.inst.length) toast('No instrumental found on Spotify. If you know one, paste its link.');
+    });
+  },
+  'song-pick-inst'(b, i) { app.editing.song.instrumental = songUi.inst[i]; songUi.inst = []; saveDraft(); refreshSongPanel(); },
+  'song-inst-link'() {
+    const link = $('#inst-link').value.trim();
+    songBusy('Getting the instrumental…', async () => {
+      app.editing.song.instrumental = await trackFromLink(link);
+      saveDraft();
+    });
+  },
+  'song-clear-inst'() { app.editing.song.instrumental = null; saveDraft(); refreshSongPanel(); },
   'song-sp-link'() {
     const link = $('#sp-link').value.trim();
     songBusy('Getting the song…', async () => useTrack(await trackFromLink(link)));
@@ -313,15 +370,41 @@ Object.assign(actions, {
   'sing-time'() { startTiming(); },
   'sing-tap'() { tapTiming(); },
   'sing-play'() { sing.controller?.togglePlay(); },
+  'sing-version'(b) {
+    if (sing.version === b.dataset.v) return;
+    sing.version = b.dataset.v;
+    stopSing();
+    render();
+  },
+  'sing-nudge'(b) {
+    const s = current(), key = versionKey(s);
+    s.song.offsets = { ...(s.song.offsets || {}) };
+    s.song.offsets[key] = Math.round(((s.song.offsets[key] || 0) + +b.dataset.d) * 10) / 10;
+    s.updated = Date.now();
+    saveScripts();
+    renderLyrics();
+    $('#nudge-label').textContent = nudgeLabel(s);
+  },
 });
 
 // ---------- Sing along ----------
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-const sing = { mode: 'all', controller: null, pos: 0, at: 0, paused: true, idx: -1, loop: null, timer: 0, timing: false, tapIdx: 0, newTimes: null };
+const sing = { mode: 'all', version: 'original', controller: null, pos: 0, at: 0, paused: true, idx: -1, loop: null, timer: 0, timing: false, tapIdx: 0, newTimes: null };
 const SING_MODES = { all: 'Show all', initials: 'First letters', reveal: 'Fill in as I sing', hidden: 'Hidden' };
 
 const songLines = s => s.lines.filter(l => l.type === 'line');
-const songTimes = s => (sing.timing ? sing.newTimes : s.song?.times) || [];
+const usingInst = s => sing.version === 'instrumental' && !!s.song?.instrumental;
+const versionTrack = s => (usingInst(s) ? s.song.instrumental : s.song?.spotify);
+const versionKey = s => (usingInst(s) ? 'instrumental' : 'original');
+
+// Line start times for the version playing: an instrumental can have its own timing (its intro is often
+// a different length), and each version can be nudged earlier or later.
+function songTimes(s) {
+  if (sing.timing) return sing.newTimes || [];
+  const base = (usingInst(s) && s.song.instTimes) || s.song?.times || [];
+  const off = s.song?.offsets?.[versionKey(s)] || 0;
+  return off ? base.map(t => (t == null ? t : Math.max(0, t + off))) : base;
+}
 const timed = s => songTimes(s).some(t => t != null);
 
 function renderSing() {
@@ -330,15 +413,28 @@ function renderSing() {
   const chips = Object.entries(SING_MODES).map(([k, v]) => `<button class="chip${sing.mode === k ? ' on' : ''}" data-action="sing-mode" data-mode="${k}">${v}</button>`).join('');
   return `<section class="stack sing">
     <div class="row between wrap"><button class="btn ghost" data-action="back">${icon('back')} Song</button><span class="mode-tag">Sing along</span></div>
+    ${s.song?.instrumental ? `<div class="segmented" role="group" aria-label="Which version plays">
+      <button class="seg${usingInst(s) ? '' : ' on'}" data-action="sing-version" data-v="original" aria-pressed="${!usingInst(s)}">Original</button>
+      <button class="seg${usingInst(s) ? ' on' : ''}" data-action="sing-version" data-v="instrumental" aria-pressed="${usingInst(s)}">Instrumental</button></div>` : ''}
     ${sp ? '<div id="sp-embed" class="sp-embed"></div>' : '<p class="note">Add the song from Spotify (Edit, at the top of the song page) to sing along with the real track. For now you can read and learn the lyrics here.</p>'}
     <div class="row wrap chips sing-modes">${chips}</div>
     <div class="row wrap">
       ${timed(s) ? `<button class="btn ghost" data-action="sing-loop" id="loop-btn">Repeat this line</button>` : ''}
-      ${sp ? `<button class="btn ghost" data-action="sing-time">${timed(s) ? 'Re-time lyrics' : 'Time the lyrics'}</button>` : ''}
+      ${sp ? `<button class="btn ghost" data-action="sing-time">${timed(s) ? 'Re-time lyrics' : 'Time the lyrics'}${s.song?.instrumental ? ` (${usingInst(s) ? 'instrumental' : 'original'})` : ''}</button>` : ''}
     </div>
+    ${timed(s) && sp ? `<div class="row wrap nudge"><span class="muted small">Highlight out of step?</span>
+      <button class="chip" data-action="sing-nudge" data-d="0.5">It's early</button>
+      <button class="chip" data-action="sing-nudge" data-d="-0.5">It's late</button>
+      <span class="muted small" id="nudge-label">${nudgeLabel(s)}</span></div>` : ''}
+    ${usingInst(s) && !s.song.instTimes && timed(s) ? '<p class="muted small">Using the original timing for the instrumental. If its intro is a different length, nudge the highlight or re-time it for the instrumental.</p>' : ''}
     <div id="timing-bar"></div>
     <ol class="lyrics" id="lyrics"></ol>
   </section>`;
+}
+
+function nudgeLabel(s) {
+  const off = s.song?.offsets?.[versionKey(s)] || 0;
+  return off ? `Shifted ${Math.abs(off)}s ${off > 0 ? 'later' : 'earlier'}` : '';
 }
 
 function lyricHtml(text, i) {
@@ -415,9 +511,14 @@ function tapTiming() {
   if (count) count.textContent = Math.min(sing.tapIdx + 1, songLines(s).length);
   renderLyrics();
   if (sing.tapIdx >= songLines(s).length) {
-    s.song = { ...(s.song || {}), times: sing.newTimes };
-    let n = 0;
-    s.raw = s.lines.map(l => (l.type === 'line' ? `[${fmtLrc(sing.newTimes[n++])}] ${l.text}` : `[${l.text}]`)).join('\n');
+    const offsets = { ...(s.song?.offsets || {}), [versionKey(s)]: 0 };
+    if (usingInst(s)) {
+      s.song = { ...s.song, instTimes: sing.newTimes, offsets };
+    } else {
+      s.song = { ...(s.song || {}), times: sing.newTimes, offsets };
+      let n = 0;
+      s.raw = s.lines.map(l => (l.type === 'line' ? `[${fmtLrc(sing.newTimes[n++])}] ${l.text}` : `[${l.text}]`)).join('\n');
+    }
     s.updated = Date.now();
     sing.timing = false;
     saveScripts();
@@ -452,7 +553,7 @@ async function mountSing() {
   if (!box || !s.song?.spotify) return;
   const api = await loadIframeApi();
   if (app.view !== 'sing' || !$('#sp-embed')) return;
-  api.createController($('#sp-embed'), { uri: s.song.spotify.uri, width: '100%', height: 152 }, controller => {
+  api.createController($('#sp-embed'), { uri: versionTrack(s).uri, width: '100%', height: 152 }, controller => {
     sing.controller = controller;
     controller.addListener('playback_update', e => {
       Object.assign(sing, { pos: e.data.position, at: performance.now(), paused: e.data.isPaused || e.data.isBuffering });

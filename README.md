@@ -117,6 +117,8 @@ Tap **+ New song** on the home screen.
 1. **The song:** paste a Spotify song link (in Spotify: Share > Copy Song Link). Once Spotify is connected you can search Spotify or pick from your playlists and liked songs instead.
 2. **The lyrics:** they're looked up automatically on LRCLIB (a free lyrics database), or tap **Find lyrics**, paste them, or use **From screenshots**. Timed lyrics highlight along with the music; untimed lyrics can be timed by tapping along (**Time the lyrics**).
 
+**Instrumental:** with Spotify connected, the app looks for instrumental and karaoke versions when you pick a song (or paste a link to one). Sing along then has an **Original | Instrumental** switch. Each version keeps its own timing: if the highlight is out of step on the instrumental, tap **It's early** / **It's late** to nudge it, or re-time it by tapping along.
+
 **Sing along** plays the real track in Spotify's player with the current line highlighted. Hide words as you learn (**First letters**, **Fill in as I sing**, **Hidden**), tap a line to jump there, and **Repeat this line** to loop a tricky bit. Spotify decides whether the player plays the full track or a preview, depending on whether you're signed in to Spotify in that browser.
 
 Connecting a Spotify account needs a Spotify developer app: set its Redirect URI to `https://sqnazzal.github.io/line-learner/`, put its Client ID in `SPOTIFY_CLIENT_ID` at the top of `songs.js`, and add anyone else who signs in under User Management. Since February 2026 Spotify only runs personal developer apps like this when the app's owner has Spotify Premium, allows 5 users per app, and only lets apps open playlists you own or collaborate on. Pasting a song link works without any of this.
