@@ -1871,6 +1871,14 @@ function renderSync() {
           <button class="btn ghost" data-action="sync-disconnect">Disconnect this device</button>
         </div>
       </div>
+      <details class="card">
+        <summary>Change key</summary>
+        <div class="stack-sm">
+          <p class="muted small">GitHub only shows a key once, so to change it you make a new one: open <a href="${TOKEN_URL}" target="_blank" rel="noopener">GitHub's new access key page</a> (or find "Line Learner" at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> and tap Regenerate token), copy the key, and paste it here.</p>
+          <label class="field"><span>New GitHub access key</span><input id="sync-new-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ghp_…"></label>
+          <div class="row"><button class="btn" data-action="sync-change-key" ${sync.busy ? 'disabled' : ''}>Save new key</button></div>
+        </div>
+      </details>
       <p class="muted small">Your scripts and progress are kept in a secret Gist on your GitHub account. It isn't listed anywhere, but anyone with its link could read it, so don't share that link. Voices and recordings stay on each device.</p>
     </section>`;
   }
@@ -1951,6 +1959,23 @@ Object.assign(actions, {
     } else {
       toast(`Connected. ${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'} synced.`);
     }
+    if (app.view === 'sync') render();
+    showSyncStatus();
+  },
+  // Tries the new key; if GitHub refuses it, the old one stays in place.
+  async 'sync-change-key'() {
+    const token = $('#sync-new-token').value.trim();
+    if (!token) { toast('Paste the new key first.'); return; }
+    const old = syncConf.token;
+    syncConf.token = token;
+    await runSync();
+    if (sync.error) {
+      syncConf.token = old;
+      toast("GitHub didn't accept that key, so the old one is still in use.");
+    } else {
+      toast('New key saved.');
+    }
+    saveJSON(LS_SYNC, syncConf);
     if (app.view === 'sync') render();
     showSyncStatus();
   },
