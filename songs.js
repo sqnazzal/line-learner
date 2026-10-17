@@ -5,7 +5,7 @@
 // Loaded after app.js and uses its helpers.
 
 // Your Spotify app's Client ID, from developer.spotify.com/dashboard. It isn't secret.
-const SPOTIFY_CLIENT_ID = '';
+const SPOTIFY_CLIENT_ID = '9ba62f10431b4c3c8812fc288e3b71de';
 
 // ---------- Lyrics text ----------
 // Lyrics are kept as text, optionally in LRC format: "[01:23.45] a line" marks when each line starts.
