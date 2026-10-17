@@ -148,11 +148,25 @@ async function spotifyDevices() {
   return ((await spotifyApi('/me/player/devices')) || {}).devices || [];
 }
 
+// Your pick if you've made one; otherwise the only device of this kind (phone or computer). With several
+// phones on the account we can't tell which one this is, so we ask rather than guess.
 function chooseDevice(devices) {
   const saved = loadJSON(LS_SPOTIFY_DEVICE, null);
-  return devices.find(d => saved && (d.id === saved.id || d.name === saved.name))
-    || devices.find(d => d.type === THIS_DEVICE_TYPE && d.is_active)
-    || devices.find(d => d.type === THIS_DEVICE_TYPE);
+  const picked = saved && devices.find(d => d.id === saved.id || d.name === saved.name);
+  if (picked) return picked;
+  const sameKind = devices.filter(d => d.type === THIS_DEVICE_TYPE && !d.is_restricted);
+  return sameKind.length === 1 ? sameKind[0] : null;
+}
+
+async function showDevicePicker(question) {
+  const box = $('#device-list');
+  if (!box) return;
+  const devices = await spotifyDevices();
+  const current = loadJSON(LS_SPOTIFY_DEVICE, null);
+  box.innerHTML = devices.length
+    ? `<p class="small"><b>${esc(question)}</b></p><ul class="pick-list">${devices.map(d => `<li><button class="pick" data-action="sing-pick-device" data-id="${esc(d.id)}" data-name="${esc(d.name)}"${d.is_restricted ? ' disabled' : ''}>
+        <b>${esc(d.name)}${current?.id === d.id ? ' ✓' : ''}</b><span class="muted small">${esc(d.type)}${d.is_active ? ' · playing now' : ''}</span></button></li>`).join('')}</ul>`
+    : '<p class="muted small">No Spotify devices found. Open the Spotify app on this phone, play any song for a second, then try again.</p>';
 }
 
 function appController(uri) {
@@ -179,10 +193,17 @@ function appController(uri) {
     // Always names the device, so the song never starts on a speaker that just happened to be active.
     // Carries on if our song is already loaded there, otherwise starts it from the current lyric line.
     resume: () => run(async () => {
-      const device = chooseDevice(await spotifyDevices());
+      const devices = await spotifyDevices();
+      const device = chooseDevice(devices);
+      const kind = THIS_DEVICE_TYPE === 'Smartphone' ? 'phone' : 'computer';
       if (!device) {
-        throw new Error(`Open the Spotify app on this ${THIS_DEVICE_TYPE === 'Smartphone' ? 'phone' : 'computer'}, play any song for a second, then come back and tap Play. (Or tap "Change device".)`);
+        if (devices.filter(d => d.type === THIS_DEVICE_TYPE).length > 1) {
+          await showDevicePicker(`Your Spotify account has more than one ${kind}. Which one is this ${kind}? (You only need to choose once.)`);
+          return;
+        }
+        throw new Error(`Open the Spotify app on this ${kind}, play any song for a second, then come back and tap Play. (Or tap "Change device".)`);
       }
+      if (!loadJSON(LS_SPOTIFY_DEVICE, null)) toast(`Playing on ${device.name}. Not right? Tap "Change device".`);
       const st = await spotifyApi('/me/player').catch(() => null);
       const sameSpot = st?.item?.uri === uri && st?.device?.id === device.id;
       await spotifyApi(`/me/player/play?device_id=${device.id}`, { method: 'PUT', body: sameSpot ? undefined : { uris: [uri], position_ms: Math.round(sing.pos) } });
@@ -452,27 +473,17 @@ Object.assign(actions, {
   'sing-time'() { startTiming(); },
   'sing-tap'() { tapTiming(); },
   'sing-play'() { sing.controller?.togglePlay(); },
-  async 'sing-devices'() {
-    const box = $('#device-list');
-    if (!box) return;
-    if (box.innerHTML) { box.innerHTML = ''; return; }
-    try {
-      const devices = await spotifyDevices();
-      const current = chooseDevice(devices);
-      box.innerHTML = devices.length
-        ? `<ul class="pick-list">${devices.map(d => `<li><button class="pick" data-action="sing-pick-device" data-id="${esc(d.id)}" data-name="${esc(d.name)}"${d.is_restricted ? ' disabled' : ''}>
-            <b>${esc(d.name)}${current?.id === d.id ? ' ✓' : ''}</b><span class="muted small">${esc(d.type)}${d.is_active ? ' · active now' : ''}</span></button></li>`).join('')}</ul>`
-        : '<p class="muted small">No Spotify devices found. Open the Spotify app on this phone, then try again.</p>';
-    } catch (e) {
-      toast(e.message);
-    }
+  'sing-devices'() {
+    if ($('#device-list')?.innerHTML) { $('#device-list').innerHTML = ''; return; }
+    showDevicePicker('Where should songs play?').catch(e => toast(e.message));
   },
   'sing-pick-device'(b) {
     saveJSON(LS_SPOTIFY_DEVICE, { id: b.dataset.id, name: b.dataset.name });
     $('#device-list').innerHTML = '';
     toast(`Songs will play on ${b.dataset.name}.`);
+    if (sing.paused) sing.controller?.resume();
     // Move what's playing there now, if it's our song.
-    if (!sing.paused) spotifyApi('/me/player', { method: 'PUT', body: { device_ids: [b.dataset.id], play: true } }).catch(e => toast(e.message));
+    else spotifyApi('/me/player', { method: 'PUT', body: { device_ids: [b.dataset.id], play: true } }).catch(e => toast(e.message));
   },
   'sing-player'(b) {
     saveJSON(LS_PLAYER, b.dataset.p);

@@ -2328,4 +2328,21 @@ showSyncStatus();
 runSync();
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && Date.now() - (syncConf.lastSync || 0) > 30000) runSync();
+  if (document.visibilityState === 'visible') checkForUpdate();
 });
+
+// GitHub Pages lets browsers keep using the page for up to 10 minutes after an update. When a newer
+// version is out, reload (only on the home, script or library screens, so nothing in progress is cut off).
+async function checkForUpdate() {
+  if (location.protocol === 'file:' || new URLSearchParams(location.search).has('code')) return;
+  if (!['library', 'script', 'browse', 'sync'].includes(app.view)) return;
+  try {
+    const mine = (document.querySelector('script[src*="app.js?v="]')?.getAttribute('src') || '').split('v=')[1];
+    const html = await (await fetch(location.pathname, { cache: 'no-store' })).text();
+    const live = (html.match(/app\.js\?v=(\d+)/) || [])[1];
+    if (!mine || !live || live === mine || sessionStorage.getItem('lineLearner.reloadedFor') === live) return;
+    sessionStorage.setItem('lineLearner.reloadedFor', live); // never loop if the browser serves the old page again
+    location.reload();
+  } catch { /* offline: carry on with this version */ }
+}
+checkForUpdate();
