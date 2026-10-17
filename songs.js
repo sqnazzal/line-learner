@@ -139,38 +139,55 @@ async function spotifyApi(path, opts = {}, retried = false) {
 
 // Plays the song in your own Spotify app (full song, your account) and follows its position, so the
 // lyrics stay in time. Same shape as Spotify's embedded player controller: togglePlay, resume, seek, destroy.
+// Which of your Spotify devices plays the song. Unless you pick one, it's this device's own Spotify app
+// (so it comes out of whatever this phone is connected to, like AirPods), never a speaker that happens to be active.
+const LS_SPOTIFY_DEVICE = 'lineLearner.spotifyDevice';
+const THIS_DEVICE_TYPE = IS_IOS || /Android|Mobi/i.test(navigator.userAgent) ? 'Smartphone' : 'Computer';
+
+async function spotifyDevices() {
+  return ((await spotifyApi('/me/player/devices')) || {}).devices || [];
+}
+
+function chooseDevice(devices) {
+  const saved = loadJSON(LS_SPOTIFY_DEVICE, null);
+  return devices.find(d => saved && (d.id === saved.id || d.name === saved.name))
+    || devices.find(d => d.type === THIS_DEVICE_TYPE && d.is_active)
+    || devices.find(d => d.type === THIS_DEVICE_TYPE);
+}
+
 function appController(uri) {
   let stopped = false, loaded = false, queue = Promise.resolve();
   const run = job => (queue = queue.then(job).catch(e => toast(e.message || "Couldn't control Spotify.")));
-  const play = async body => {
-    try {
-      await spotifyApi('/me/player/play', { method: 'PUT', body });
-    } catch (e) {
-      if (e.status !== 404) throw e;
-      // No active player: wake up one of your Spotify devices (this phone's app, if it's open).
-      const { devices = [] } = (await spotifyApi('/me/player/devices')) || {};
-      const device = devices.find(d => d.is_active) || devices.find(d => !d.is_restricted);
-      if (!device) throw e;
-      await spotifyApi(`/me/player/play?device_id=${device.id}`, { method: 'PUT', body: body || { uris: [uri] } });
-    }
+  const showDevice = d => {
+    sing.device = d || null;
+    const el = $('#app-device');
+    if (el) el.textContent = d ? `Playing on ${d.name}` : '';
   };
   const poll = setInterval(async () => {
     if (stopped) return;
-    const st = await spotifyApi('/me/player/currently-playing').catch(() => null);
+    const st = await spotifyApi('/me/player').catch(() => null);
     if (stopped) return;
     const mine = st?.item?.uri === uri;
     loaded = mine;
     Object.assign(sing, { pos: mine ? st.progress_ms || 0 : sing.pos, at: performance.now(), paused: !mine || !st?.is_playing });
+    if (mine && st.device) showDevice(st.device);
     const btn = $('#app-play');
     if (btn) btn.textContent = sing.paused ? 'Play' : 'Pause';
   }, 1000);
   const ctl = {
     togglePlay: () => (sing.paused ? ctl.resume() : run(async () => { await spotifyApi('/me/player/pause', { method: 'PUT' }); sing.paused = true; })),
-    // Resuming carries on if this song is already loaded, otherwise starts it from where the lyrics are.
+    // Always names the device, so the song never starts on a speaker that just happened to be active.
+    // Carries on if our song is already loaded there, otherwise starts it from the current lyric line.
     resume: () => run(async () => {
-      const st = await spotifyApi('/me/player/currently-playing').catch(() => null);
-      await play(st?.item?.uri === uri ? undefined : { uris: [uri], position_ms: Math.round(sing.pos) });
+      const device = chooseDevice(await spotifyDevices());
+      if (!device) {
+        throw new Error(`Open the Spotify app on this ${THIS_DEVICE_TYPE === 'Smartphone' ? 'phone' : 'computer'}, play any song for a second, then come back and tap Play. (Or tap "Change device".)`);
+      }
+      const st = await spotifyApi('/me/player').catch(() => null);
+      const sameSpot = st?.item?.uri === uri && st?.device?.id === device.id;
+      await spotifyApi(`/me/player/play?device_id=${device.id}`, { method: 'PUT', body: sameSpot ? undefined : { uris: [uri], position_ms: Math.round(sing.pos) } });
       loaded = true;
+      showDevice(device);
       Object.assign(sing, { paused: false, at: performance.now() });
     }),
     seek: sec => {
@@ -435,6 +452,28 @@ Object.assign(actions, {
   'sing-time'() { startTiming(); },
   'sing-tap'() { tapTiming(); },
   'sing-play'() { sing.controller?.togglePlay(); },
+  async 'sing-devices'() {
+    const box = $('#device-list');
+    if (!box) return;
+    if (box.innerHTML) { box.innerHTML = ''; return; }
+    try {
+      const devices = await spotifyDevices();
+      const current = chooseDevice(devices);
+      box.innerHTML = devices.length
+        ? `<ul class="pick-list">${devices.map(d => `<li><button class="pick" data-action="sing-pick-device" data-id="${esc(d.id)}" data-name="${esc(d.name)}"${d.is_restricted ? ' disabled' : ''}>
+            <b>${esc(d.name)}${current?.id === d.id ? ' ✓' : ''}</b><span class="muted small">${esc(d.type)}${d.is_active ? ' · active now' : ''}</span></button></li>`).join('')}</ul>`
+        : '<p class="muted small">No Spotify devices found. Open the Spotify app on this phone, then try again.</p>';
+    } catch (e) {
+      toast(e.message);
+    }
+  },
+  'sing-pick-device'(b) {
+    saveJSON(LS_SPOTIFY_DEVICE, { id: b.dataset.id, name: b.dataset.name });
+    $('#device-list').innerHTML = '';
+    toast(`Songs will play on ${b.dataset.name}.`);
+    // Move what's playing there now, if it's our song.
+    if (!sing.paused) spotifyApi('/me/player', { method: 'PUT', body: { device_ids: [b.dataset.id], play: true } }).catch(e => toast(e.message));
+  },
   'sing-player'(b) {
     saveJSON(LS_PLAYER, b.dataset.p);
     stopSing();
@@ -490,7 +529,9 @@ function renderSing() {
     ${!sp ? '<p class="note">Add the song from Spotify (Edit, at the top of the song page) to sing along with the real track. For now you can read and learn the lyrics here.</p>'
       : playsInApp() ? `<div class="card app-player"><div class="row wrap">
           <button class="btn primary" id="app-play" data-action="sing-play">Play</button>
-          <div class="lib-main"><b>${esc(versionTrack(s).title)}</b><span class="muted small">Plays in your Spotify app, full song. Keep this page open for the lyrics.</span></div></div></div>`
+          <div class="lib-main"><b>${esc(versionTrack(s).title)}</b><span class="muted small">Plays in your Spotify app, full song. Keep this page open for the lyrics.</span>
+            <span class="row wrap"><span class="small" id="app-device"></span><button class="link-btn small" data-action="sing-devices">Change device</button></span></div></div>
+          <div id="device-list"></div></div>`
       : '<div id="sp-embed" class="sp-embed"></div>'}
     <div class="row wrap chips sing-modes">${chips}</div>
     <div class="row wrap">
