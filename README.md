@@ -21,6 +21,7 @@ Open **<https://sqnazzal.github.io/line-learner/>** in **Safari** (Safari is the
 - Tap **Play** to start; iPhones only allow sound that starts from a tap.
 - The screen stays on while a scene plays. If the phone locks, the speech stops, so keep the screen on.
 - Headphones with a mic work well for Listen mode on the go.
+- Tap the sun/moon button at the top to switch between Light, Dark, and matching your phone.
 - Turn on **Sync** (below) to have the same scripts and progress on your phone and PC.
 
 ## Sync between phone and PC

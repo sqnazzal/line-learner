@@ -825,6 +825,9 @@ const ICONS = {
   bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/>',
   check: '<path d="M5 12l5 5 9-10"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',
 };
 const icon = name => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 const bar = frac => `<div class="bar"><div style="width:${Math.round(frac * 100)}%"></div></div>`;
@@ -1888,7 +1891,32 @@ function renderSync() {
   </section>`;
 }
 
+// ---------- Light / dark ----------
+const LS_THEME = 'lineLearner.theme';
+const THEMES = { auto: 'Match device', light: 'Light', dark: 'Dark' };
+
+function savedTheme() {
+  try { return THEMES[localStorage.getItem(LS_THEME)] ? localStorage.getItem(LS_THEME) : 'auto'; } catch { return 'auto'; }
+}
+
+function applyTheme(theme) {
+  if (theme === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  const b = $('#theme-btn');
+  if (!b) return;
+  b.innerHTML = icon(theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'contrast');
+  b.title = `Colors: ${THEMES[theme]}. Tap to change.`;
+  b.setAttribute('aria-label', b.title);
+}
+
 Object.assign(actions, {
+  theme() {
+    const order = Object.keys(THEMES);
+    const next = order[(order.indexOf(savedTheme()) + 1) % order.length];
+    try { localStorage.setItem(LS_THEME, next); } catch { /* still applies for this visit */ }
+    applyTheme(next);
+    toast(`Colors: ${THEMES[next]}`);
+  },
   'ai-save'() {
     const key = $('#ai-key').value.trim();
     if (!key) { toast('Paste your OpenAI key first.'); return; }
@@ -1964,6 +1992,7 @@ ROMEO: Neither, fair saint, if either thee dislike.`;
 if (synth) synth.onvoiceschanged = () => { if (app.view === 'script') render(); };
 recordings.keys().then(keys => { recorded = new Set(keys); }).catch(() => {}).finally(render);
 render();
+applyTheme(savedTheme());
 showSyncStatus();
 runSync();
 document.addEventListener('visibilitychange', () => {
