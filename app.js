@@ -47,7 +47,7 @@ function saveJSON(key, val) {
 
 let scripts = loadJSON(LS_SCRIPTS, []);
 const settings = { ...DEFAULT_SETTINGS, ...loadJSON(LS_SETTINGS, {}) };
-const saveScripts = () => saveJSON(LS_SCRIPTS, scripts);
+const saveScripts = () => { saveJSON(LS_SCRIPTS, scripts); scheduleSync(); };
 const saveSettings = () => saveJSON(LS_SETTINGS, settings);
 
 // Recordings live in IndexedDB, keyed by a hash of speaker + line text so they survive script edits.
@@ -1034,6 +1034,7 @@ function leave() {
   stopRun();
   stopRecording();
   previewToken.cancel();
+  if (sync.pending) { sync.pending = false; scheduleSync(); }
 }
 
 function startPlayer(mode, order) {
@@ -1141,6 +1142,7 @@ async function rehearseLine(item, token) {
       if (score >= settings.passScore) P.run.solid++;
     }
     st.best = Math.max(st.best, score);
+    st.at = Date.now();
     s.stats[key] = st;
     saveScripts();
   };
@@ -1278,6 +1280,8 @@ const actions = {
     if (!confirm(`Delete "${s.title}"? This can't be undone.`)) return;
     leave();
     scripts = scripts.filter(x => x !== s);
+    deleted[s.id] = Date.now();
+    saveJSON(LS_DELETED, deleted);
     saveScripts();
     // Remove recordings no other script still uses.
     const keep = new Set(scripts.flatMap(x => x.lines.filter(l => l.type === 'line').map(lineKey)));
@@ -1375,13 +1379,14 @@ function applySetting(el) {
 
 document.addEventListener('change', e => {
   const el = e.target, s = current();
-  if (el.id === 'my-char') { s.myChar = el.value; saveScripts(); render(); }
+  if (el.id === 'my-char') { s.myChar = el.value; s.updated = Date.now(); saveScripts(); render(); }
   else if (el.id === 'range-start') {
     s.rangeStart = +el.value;
     if ((s.rangeEnd ?? Infinity) <= s.rangeStart) delete s.rangeEnd;
+    s.updated = Date.now();
     saveScripts();
     render();
-  } else if (el.id === 'range-end') { s.rangeEnd = +el.value; saveScripts(); render(); }
+  } else if (el.id === 'range-end') { s.rangeEnd = +el.value; s.updated = Date.now(); saveScripts(); render(); }
   else if (el.dataset.voiceChar) { s.voices[el.dataset.voiceChar] = el.value; saveScripts(); }
   else if (el.dataset.setting) applySetting(el);
   else if (el.id === 'ed-file' && el.files[0]) {
@@ -1418,9 +1423,209 @@ document.addEventListener('keydown', e => {
   else if (k === 'enter') actions['done-speaking']();
 });
 
+// ---------- Sync between devices (through a secret GitHub Gist) ----------
+// Script edits: the newest version wins. Progress merges line by line. Deletions carry over.
+// Voices and recordings stay on each device.
+const LS_SYNC = 'lineLearner.sync';
+const LS_DELETED = 'lineLearner.deleted';
+const GIST_FILE = 'line-learner.json';
+const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=Line%20Learner';
+const syncConf = loadJSON(LS_SYNC, {}); // { token, gistId, lastSync }
+let deleted = loadJSON(LS_DELETED, {}); // script id -> when it was deleted
+const sync = { busy: false, error: '', pending: false, timer: 0 };
+
+async function gh(path, opts = {}) {
+  const res = await fetch('https://api.github.com' + path, {
+    ...opts,
+    cache: 'no-store',
+    headers: {
+      Authorization: 'Bearer ' + syncConf.token,
+      Accept: 'application/vnd.github+json',
+      ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+    },
+  });
+  if (res.ok) return res.json();
+  const err = new Error(res.status === 401 || res.status === 403
+    ? "GitHub didn't accept your access key. Make sure it has the gist permission and hasn't expired."
+    : `GitHub answered with an error (${res.status}). Try again in a moment.`);
+  err.status = res.status;
+  throw err;
+}
+
+const syncPayload = () => JSON.stringify({
+  app: 'line-learner', version: 1, saved: Date.now(), deleted,
+  scripts: scripts.map(({ voices, ...s }) => s),
+});
+
+async function findOrCreateGist() {
+  for (let page = 1; page <= 10; page++) {
+    const list = await gh(`/gists?per_page=100&page=${page}`);
+    const hit = list.find(g => g.files[GIST_FILE]);
+    if (hit) return hit.id;
+    if (list.length < 100) break;
+  }
+  const created = await gh('/gists', {
+    method: 'POST',
+    body: JSON.stringify({ description: 'Line Learner scripts (synced by the app)', public: false, files: { [GIST_FILE]: { content: syncPayload() } } }),
+  });
+  return created.id;
+}
+
+async function readRemote() {
+  const g = await gh('/gists/' + syncConf.gistId);
+  const f = g.files[GIST_FILE];
+  if (!f) return null;
+  const text = f.truncated ? await (await fetch(f.raw_url, { cache: 'no-store' })).text() : f.content;
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+function mergeStats(a = {}, b = {}) {
+  const out = { ...a };
+  for (const [k, theirs] of Object.entries(b)) {
+    const mine = out[k];
+    const newer = !mine || (theirs.at || 0) > (mine.at || 0) ? theirs : mine;
+    out[k] = { ...newer, best: Math.max(theirs.best || 0, mine?.best || 0), tries: Math.max(theirs.tries || 0, mine?.tries || 0) };
+  }
+  return out;
+}
+
+// Merges in place so a script that is open keeps pointing at the same object.
+function mergeRemote(remote) {
+  if (!remote || !Array.isArray(remote.scripts)) return;
+  for (const [id, t] of Object.entries(remote.deleted || {})) deleted[id] = Math.max(deleted[id] || 0, t);
+  for (const r of remote.scripts) {
+    const mine = scripts.find(s => s.id === r.id);
+    if (!mine) { scripts.push({ ...r, voices: {} }); continue; }
+    const stats = mergeStats(mine.stats, r.stats);
+    if ((r.updated || 0) > (mine.updated || 0)) {
+      const voices = mine.voices || {};
+      for (const k of Object.keys(mine)) delete mine[k];
+      Object.assign(mine, r, { voices });
+    }
+    mine.stats = stats;
+  }
+  scripts = scripts.filter(s => !((deleted[s.id] || 0) >= (s.updated || 0)));
+}
+
+function scheduleSync() {
+  if (!syncConf.token) return;
+  clearTimeout(sync.timer);
+  sync.timer = setTimeout(runSync, 4000);
+}
+
+async function runSync() {
+  if (!syncConf.token || sync.busy) return;
+  if (P.running) { sync.pending = true; return; }
+  sync.busy = true;
+  sync.error = '';
+  showSyncStatus();
+  try {
+    syncConf.gistId ||= await findOrCreateGist();
+    let remote;
+    try {
+      remote = await readRemote();
+    } catch (e) {
+      if (e.status !== 404) throw e;
+      syncConf.gistId = await findOrCreateGist(); // the Gist was deleted on GitHub
+      remote = await readRemote();
+    }
+    mergeRemote(remote);
+    saveJSON(LS_SCRIPTS, scripts);
+    saveJSON(LS_DELETED, deleted);
+    await gh('/gists/' + syncConf.gistId, { method: 'PATCH', body: JSON.stringify({ files: { [GIST_FILE]: { content: syncPayload() } } }) });
+    syncConf.lastSync = Date.now();
+    saveJSON(LS_SYNC, syncConf);
+    if (app.view === 'script' && !current()) app.view = 'library';
+    if (['library', 'script', 'sync'].includes(app.view) && !app.rec) render();
+  } catch (e) {
+    sync.error = e.status ? e.message : "Couldn't reach GitHub. Check your connection; I'll try again next time.";
+    if (app.view === 'sync') render();
+  } finally {
+    sync.busy = false;
+    showSyncStatus();
+  }
+}
+
+function ago(t) {
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  return new Date(t).toLocaleDateString();
+}
+
+function showSyncStatus() {
+  const b = $('#sync-btn');
+  if (!b) return;
+  b.textContent = !syncConf.token ? 'Sync' : sync.busy ? 'Syncing…' : sync.error ? 'Sync problem' : 'Synced';
+  b.classList.toggle('problem', !!(syncConf.token && sync.error));
+}
+
+function renderSync() {
+  if (syncConf.token) {
+    return `<section class="stack">
+      <h1>Sync between devices</h1>
+      <div class="card stack-sm">
+        <p><b>This device is connected.</b> ${sync.busy ? 'Syncing now…' : syncConf.lastSync ? `Last synced ${ago(syncConf.lastSync)}.` : 'Not synced yet.'}</p>
+        ${sync.error ? `<p class="note">${esc(sync.error)}</p>` : ''}
+        <p class="muted">Changes sync on their own a few seconds after you make them, and whenever you open the app. Tap Sync now to pull the latest from your other device.</p>
+        <div class="row wrap">
+          <button class="btn primary" data-action="sync-now" ${sync.busy ? 'disabled' : ''}>Sync now</button>
+          <button class="btn ghost" data-action="sync-disconnect">Disconnect this device</button>
+        </div>
+      </div>
+      <p class="muted small">Your scripts and progress are kept in a secret Gist on your GitHub account. It isn't listed anywhere, but anyone with its link could read it, so don't share that link. Voices and recordings stay on each device.</p>
+    </section>`;
+  }
+  return `<section class="stack">
+    <h1>Sync between devices</h1>
+    <p class="lede">Keep the same scripts and progress on your phone and computer. You set this up once on each device.</p>
+    ${sync.error ? `<p class="note">${esc(sync.error)}</p>` : ''}
+    <div class="card stack-sm">
+      <ol class="steps-list">
+        <li>Open <a href="${TOKEN_URL}" target="_blank" rel="noopener">GitHub's new access key page</a> and sign in. It comes pre-filled with only the <b>gist</b> box ticked, which is all Line Learner needs.</li>
+        <li>Choose an expiration (or "No expiration"), then tap <b>Generate token</b> at the bottom.</li>
+        <li>Copy the key (it starts with <code>ghp_</code>) and paste it here:</li>
+      </ol>
+      <label class="field"><span>GitHub access key</span><input id="sync-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ghp_…"></label>
+      <div class="row"><button class="btn primary" data-action="sync-connect" ${sync.busy ? 'disabled' : ''}>${sync.busy ? 'Connecting…' : 'Connect'}</button></div>
+    </div>
+    <p class="muted small">Then do the same on your other device. Making a second key there is easiest; the app finds your existing scripts automatically. The key is saved only in this browser.</p>
+  </section>`;
+}
+
+Object.assign(actions, {
+  'sync-view'() { leave(); app.view = 'sync'; render(); },
+  'sync-now'() { runSync(); },
+  async 'sync-connect'() {
+    const token = $('#sync-token').value.trim();
+    if (!token) { toast('Paste your GitHub access key first.'); return; }
+    Object.assign(syncConf, { token, gistId: null, lastSync: null });
+    sync.error = '';
+    render();
+    await runSync();
+    if (sync.error) {
+      delete syncConf.token;
+      saveJSON(LS_SYNC, syncConf);
+    } else {
+      toast(`Connected. ${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'} synced.`);
+    }
+    if (app.view === 'sync') render();
+    showSyncStatus();
+  },
+  'sync-disconnect'() {
+    if (!confirm('Disconnect this device? Your scripts stay here and in your GitHub account.')) return;
+    for (const k of Object.keys(syncConf)) delete syncConf[k];
+    saveJSON(LS_SYNC, syncConf);
+    sync.error = '';
+    render();
+    showSyncStatus();
+  },
+});
+
 // ---------- Boot ----------
 function render() {
-  const view = { library: renderLibrary, edit: renderEdit, script: renderScript, player: renderPlayer }[app.view];
+  const view = { library: renderLibrary, edit: renderEdit, script: renderScript, player: renderPlayer, sync: renderSync }[app.view];
   $('#app').innerHTML = view();
   if (app.view === 'player') refreshPlayer();
   if (app.view === 'edit') updatePreview();
@@ -1446,3 +1651,8 @@ ROMEO: Neither, fair saint, if either thee dislike.`;
 if (synth) synth.onvoiceschanged = () => { if (app.view === 'script') render(); };
 recordings.keys().then(keys => { recorded = new Set(keys); }).catch(() => {}).finally(render);
 render();
+showSyncStatus();
+runSync();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && Date.now() - (syncConf.lastSync || 0) > 30000) runSync();
+});

@@ -21,7 +21,17 @@ Open **<https://sqnazzal.github.io/line-learner/>** in **Safari** (Safari is the
 - Tap **Play** to start; iPhones only allow sound that starts from a tap.
 - The screen stays on while a scene plays. If the phone locks, the speech stops, so keep the screen on.
 - Headphones with a mic work well for Listen mode on the go.
-- Your scripts and progress on the phone are separate from the ones on your PC. Import the PDF on whichever device you're practicing on.
+- Turn on **Sync** (below) to have the same scripts and progress on your phone and PC.
+
+## Sync between phone and PC
+
+Tap **Sync** at the top right and follow the steps. You create a GitHub access key that can only touch Gists, paste it in, and you're done. Do this once on each device.
+
+- Your scripts and progress are stored in one secret Gist on your GitHub account. It isn't listed anywhere, but anyone with its link could read it, so don't share that link.
+- Syncing happens on its own a few seconds after a change, and whenever you open the app. **Sync now** pulls the latest right away.
+- If you edit the same script on both devices, the most recent edit wins. Practice progress merges line by line, so practice on either device counts.
+- Voices and recordings stay on each device.
+- On the PC, use the same web address as the phone (<https://sqnazzal.github.io/line-learner/>). The `Start Line Learner.cmd` version keeps its own separate copy unless you connect Sync there too.
 
 ## Ways to practice
 
