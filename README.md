@@ -97,3 +97,15 @@ Scripts, progress and recordings are saved in your browser for `localhost:8765`.
 - `serve.ps1`, `Start Line Learner.cmd`: tiny local web server (PowerShell, built into Windows)
 - `sample-script.txt`: an example scene
 - `vendor/pdfjs`: Mozilla's PDF.js 3.11.174 (Apache 2.0 license), used to read PDF scripts
+
+## Free script library
+
+**Browse free scripts & monologues** on the home screen offers 31 classic plays (Shakespeare, Wilde, Ibsen, Chekhov, Shaw, Molière, Rostand and more) and 44 well-known audition monologues, searchable and filterable by gender and tone. Tap **Add** and it's ready to practice. All are public domain; translated plays use older public-domain translations, so check which translation your production or audition uses.
+
+The library lives in `library/`. To rebuild it (for example after adding a play to the list in `tools/build-library.html`), run:
+
+```
+powershell -ExecutionPolicy Bypass -File tools\build-library.ps1
+```
+
+It downloads the source texts from Project Gutenberg into `tools/raw/` (not committed), converts them with `tools/convert.js`, and writes `library/plays/*.txt`, `library/plays.json` and `library/monologues.json`.

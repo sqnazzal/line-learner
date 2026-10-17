@@ -95,7 +95,7 @@ const cleanName = n => n.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim().t
 
 function isNameLike(name) {
   const parts = name.trim().split(/\s+/);
-  return parts.length <= 3 && parts.every(p => /^[\p{Lu}\p{N}]/u.test(p)) && !SECTION_RE.test(name);
+  return parts.length <= 4 && parts.every(p => /^[\p{Lu}\p{N}]/u.test(p)) && !SECTION_RE.test(name);
 }
 
 function parseScript(raw) {
@@ -861,7 +861,8 @@ function renderLibrary() {
       <p class="lede">Paste a scene or monologue and pick your part. Listen to it like an audio track, then run it out loud while the app reads your cues and checks your lines.</p>
       <div class="row wrap">
         <button class="btn primary" data-action="new">+ New script</button>
-        <button class="btn" data-action="sample">Try a sample scene</button>
+        <button class="btn" data-action="browse">Browse free scripts &amp; monologues</button>
+        <button class="btn ghost" data-action="sample">Try a sample scene</button>
       </div>
     </div>
     ${supportNote()}
@@ -1017,6 +1018,89 @@ function putImportedText(text, title, append) {
   if (!$('#ed-title').value) $('#ed-title').value = title;
   updatePreview();
   saveDraft();
+}
+
+// ---------- Free script library (public-domain plays and monologues in library/) ----------
+const lib = { plays: null, monologues: null, error: '', tab: 'monologues', q: '', gender: '', tone: '', open: null };
+
+async function loadLibrary() {
+  if (lib.plays || lib.loading) return;
+  lib.loading = true;
+  try {
+    const [plays, monologues] = await Promise.all(['library/plays.json', 'library/monologues.json'].map(async u => {
+      const res = await fetch(u, { cache: 'no-cache' });
+      if (!res.ok) throw new Error(res.status);
+      return res.json();
+    }));
+    Object.assign(lib, { plays, monologues, error: '' });
+  } catch {
+    lib.error = location.protocol === 'file:'
+      ? 'The free library needs the app opened from its web address (or Start Line Learner.cmd), not as a file.'
+      : "Couldn't load the free library. Check your connection and try again.";
+  } finally {
+    lib.loading = false;
+    if (app.view === 'browse') render();
+  }
+}
+
+const minutesFor = words => Math.max(0.5, Math.round(words / 130 * 2) / 2); // about 130 spoken words a minute
+const libMatch = (q, ...fields) => !q || fields.join(' ').toLowerCase().replace(/[’‘]/g, "'").includes(q);
+
+function renderBrowse() {
+  loadLibrary();
+  const q = lib.q.trim().toLowerCase().replace(/[’‘]/g, "'");
+  const tab = (id, label) => `<button class="seg${lib.tab === id ? ' on' : ''}" data-action="lib-tab" data-tab="${id}" aria-pressed="${lib.tab === id}">${label}</button>`;
+  const chip = (key, val, label) => `<button class="chip${lib[key] === val ? ' on' : ''}" data-action="lib-filter" data-key="${key}" data-val="${val}">${label}</button>`;
+  return `<section class="stack">
+    <div class="row between wrap"><h1>Free scripts</h1><button class="btn ghost" data-action="home">${icon('back')} Your scripts</button></div>
+    <p class="lede">Classic plays and audition monologues that are free to use. Add one and it's ready to listen to and rehearse.</p>
+    <div class="row wrap">
+      <div class="segmented" role="group" aria-label="What to show">${tab('monologues', 'Monologues')}${tab('plays', 'Full plays')}</div>
+      <input id="lib-q" class="search" type="search" value="${esc(lib.q)}" placeholder="Search by play, character, author or words" aria-label="Search the free library">
+    </div>
+    ${lib.tab === 'monologues' ? `<div class="row wrap chips">${chip('gender', '', 'Everyone')}${chip('gender', 'f', 'Female')}${chip('gender', 'm', 'Male')}<span class="chip-gap"></span>${chip('tone', '', 'Any tone')}${chip('tone', 'Dramatic', 'Dramatic')}${chip('tone', 'Comedic', 'Comedic')}</div>` : ''}
+    <div id="lib-results">${libResultsHtml(q)}</div>
+    <p class="muted small">These are public-domain texts. Plays by Chekhov, Ibsen, Molière and Rostand are older English translations, so the wording may differ from the edition your production or audition uses. Modern plays are under copyright: import your own copy with PDF or screenshots.</p>
+  </section>`;
+}
+
+function libResultsHtml(q) {
+  if (lib.error) return `<p class="note">${esc(lib.error)}</p>`;
+  if (!lib.plays) return '<p class="muted">Loading the library…</p>';
+  if (lib.tab === 'plays') {
+    const plays = lib.plays.filter(p => libMatch(q, p.title, p.author, p.genre, p.cast.join(' ')));
+    if (!plays.length) return '<p class="muted">No plays match that search.</p>';
+    return `<ul class="lib-list">${plays.map(p => `<li class="card lib-card">
+      <div class="lib-main"><b>${esc(p.title)}</b><span class="muted small">${esc(p.author)} · ${esc(p.genre)} · ${p.speeches.toLocaleString()} speeches</span>
+      <span class="small">${esc(p.cast.slice(0, 8).map(titleCase).join(', '))}</span></div>
+      <button class="btn primary" data-action="lib-add-play" data-slug="${esc(p.slug)}">Add</button></li>`).join('')}</ul>`;
+  }
+  const monos = lib.monologues
+    .map((m, i) => ({ ...m, i }))
+    .filter(m => (!lib.gender || m.gender === lib.gender) && (!lib.tone || m.tone === lib.tone))
+    .filter(m => libMatch(q, m.character, m.play, m.author, m.tone, m.text))
+    // Best matches first: the famous opening words, the character or the play, before a word deep in the speech.
+    .sort((a, b) => (libMatch(q, b.firstWords, b.character, b.play) ? 1 : 0) - (libMatch(q, a.firstWords, a.character, a.play) ? 1 : 0));
+  if (!monos.length) return '<p class="muted">No monologues match. Try another word or filter.</p>';
+  return `<ul class="lib-list">${monos.map(m => `<li class="card lib-card">
+    <div class="lib-main">
+      <b>${esc(titleCase(m.character))}</b><span class="muted small">${esc(m.play)} · ${esc(m.author)}</span>
+      <span class="small">“${esc(m.firstWords.replace(/[\s.,;:!?]+$/, ''))}…”</span>
+      <span class="row wrap tags"><span class="tag">${m.gender === 'f' ? 'Female' : 'Male'}</span><span class="tag">${esc(m.tone)}</span><span class="tag">About ${minutesFor(m.words)} min</span></span>
+      ${lib.open === m.i ? `<p class="lib-preview">${fmt(m.text)}</p>` : ''}
+    </div>
+    <div class="lib-actions">
+      <button class="btn primary" data-action="lib-add-mono" data-i="${m.i}">Add</button>
+      <button class="btn ghost" data-action="lib-preview" data-i="${m.i}">${lib.open === m.i ? 'Hide' : 'Read'}</button>
+    </div></li>`).join('')}</ul>`;
+}
+
+function addLibraryScript(title, raw, myChar) {
+  const s = makeScript(title, raw);
+  if (myChar) s.myChar = myChar;
+  scripts.push(s);
+  saveScripts();
+  openScript(s.id);
 }
 
 // ---------- Unsaved script drafts ----------
@@ -1642,6 +1726,31 @@ const actions = {
     if (d && !d.id) toast('Picked up your unsaved script where you left off.');
     else $('#ed-title').focus();
   },
+  browse() { leave(); app.view = 'browse'; render(); window.scrollTo(0, 0); },
+  'lib-tab'(b) { lib.tab = b.dataset.tab; lib.open = null; render(); },
+  'lib-filter'(b) { lib[b.dataset.key] = b.dataset.val; render(); },
+  'lib-preview'(b, i) { lib.open = lib.open === i ? null : i; $('#lib-results').innerHTML = libResultsHtml(lib.q.trim().toLowerCase()); },
+  'lib-add-mono'(b, i) {
+    const m = lib.monologues[i];
+    addLibraryScript(`${titleCase(m.character)}: ${m.firstWords.split(' ').slice(0, 5).join(' ')}… (${m.play})`,
+      `# ${m.play} (${m.author})\n\n${m.character}: ${m.text}\n`, m.character);
+    toast('Added. Try Build up to learn it a sentence at a time.');
+  },
+  async 'lib-add-play'(b) {
+    const p = lib.plays.find(x => x.slug === b.dataset.slug);
+    b.disabled = true;
+    b.textContent = 'Adding…';
+    try {
+      const res = await fetch(`library/plays/${p.slug}.txt`, { cache: 'no-cache' });
+      if (!res.ok) throw new Error(res.status);
+      addLibraryScript(`${p.title} (${p.author})`, await res.text());
+      toast('Added. Choose your character, and pick a scene with "Start at".');
+    } catch {
+      b.disabled = false;
+      b.textContent = 'Add';
+      toast("Couldn't download that play. Check your connection and try again.");
+    }
+  },
   'resume-draft'() {
     const d = pendingDraft();
     if (!d) return;
@@ -1846,6 +1955,12 @@ document.addEventListener('drop', e => {
 });
 
 document.addEventListener('input', e => {
+  if (e.target.id === 'lib-q') {
+    lib.q = e.target.value;
+    lib.open = null;
+    $('#lib-results').innerHTML = libResultsHtml(lib.q.trim().toLowerCase().replace(/[’‘]/g, "'"));
+    return;
+  }
   if (e.target.id === 'ed-raw' || e.target.id === 'ed-title') saveDraft();
   if (e.target.id === 'ed-raw') updatePreview();
   else if (e.target.dataset.setting && e.target.type === 'range') applySetting(e.target);
@@ -2148,7 +2263,7 @@ Object.assign(actions, {
 
 // ---------- Boot ----------
 function render() {
-  const view = { library: renderLibrary, edit: renderEdit, script: renderScript, player: renderPlayer, sync: renderSync }[app.view];
+  const view = { library: renderLibrary, edit: renderEdit, script: renderScript, player: renderPlayer, sync: renderSync, browse: renderBrowse }[app.view];
   $('#app').innerHTML = view();
   if (app.view === 'player') refreshPlayer();
   if (app.view === 'edit') updatePreview();

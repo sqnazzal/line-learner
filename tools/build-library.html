@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Build library</title></head>
+<body>
+<!-- Converts the Gutenberg texts in tools/raw into library files. Served by serve.ps1 from the repo root
+     and run in headless Chrome by tools/build-library.ps1; the result is printed into #out as JSON. -->
+<pre id="out">pending</pre>
+<script src="convert.js"></script>
+<script>
+const PLAYS = [
+  [1524, 'Hamlet', 'William Shakespeare', 'Tragedy'],
+  [1513, 'Romeo and Juliet', 'William Shakespeare', 'Tragedy'],
+  [1533, 'Macbeth', 'William Shakespeare', 'Tragedy'],
+  [1531, 'Othello', 'William Shakespeare', 'Tragedy'],
+  [1532, 'King Lear', 'William Shakespeare', 'Tragedy'],
+  [1522, 'Julius Caesar', 'William Shakespeare', 'Tragedy'],
+  [1534, 'Antony and Cleopatra', 'William Shakespeare', 'Tragedy'],
+  [1514, "A Midsummer Night's Dream", 'William Shakespeare', 'Comedy'],
+  [1526, 'Twelfth Night', 'William Shakespeare', 'Comedy'],
+  [1515, 'The Merchant of Venice', 'William Shakespeare', 'Comedy'],
+  [1519, 'Much Ado About Nothing', 'William Shakespeare', 'Comedy'],
+  [1523, 'As You Like It', 'William Shakespeare', 'Comedy'],
+  [1508, 'The Taming of the Shrew', 'William Shakespeare', 'Comedy'],
+  [1540, 'The Tempest', 'William Shakespeare', 'Romance'],
+  [844, 'The Importance of Being Earnest', 'Oscar Wilde', 'Comedy'],
+  [885, 'An Ideal Husband', 'Oscar Wilde', 'Comedy'],
+  [790, "Lady Windermere's Fan", 'Oscar Wilde', 'Comedy'],
+  [2542, "A Doll's House", 'Henrik Ibsen', 'Drama'],
+  [4093, 'Hedda Gabler', 'Henrik Ibsen', 'Drama'],
+  [1754, 'The Sea-Gull', 'Anton Chekhov', 'Drama'],
+  [1756, 'Uncle Vanya', 'Anton Chekhov', 'Drama'],
+  [1755, 'Ivanoff', 'Anton Chekhov', 'Drama'],
+  [1753, 'Swan Song', 'Anton Chekhov', 'Drama'],
+  [3825, 'Pygmalion', 'George Bernard Shaw', 'Comedy'],
+  [3618, 'Arms and the Man', 'George Bernard Shaw', 'Comedy'],
+  [383, 'She Stoops to Conquer', 'Oliver Goldsmith', 'Comedy'],
+  [1929, 'The School for Scandal', 'Richard Brinsley Sheridan', 'Comedy'],
+  [779, 'Doctor Faustus', 'Christopher Marlowe', 'Tragedy'],
+  [1254, 'Cyrano de Bergerac', 'Edmond Rostand', 'Drama'],
+  [1240, 'The Playboy of the Western World', 'J. M. Synge', 'Comedy'],
+  [2027, 'Tartuffe', 'Molière', 'Comedy'],
+];
+
+// Classic audition monologues: [play title, character as named in that edition, words the speech contains, gender, tone].
+const MONOLOGUES = [
+  ['Romeo and Juliet', 'JULIET', 'Gallop apace', 'f', 'Dramatic'],
+  ['Romeo and Juliet', 'JULIET', 'The clock struck nine', 'f', 'Comedic'],
+  ['Romeo and Juliet', 'JULIET', 'God knows when we shall meet again', 'f', 'Dramatic'],
+  ['Romeo and Juliet', 'NURSE', 'Even or odd, of all days', 'f', 'Comedic'],
+  ["A Midsummer Night's Dream", 'HELENA', 'How happy some', 'f', 'Dramatic'],
+  ["A Midsummer Night's Dream", 'TITANIA', 'forgeries of jealousy', 'f', 'Dramatic'],
+  ['Twelfth Night', 'VIOLA', 'I left no ring with her', 'f', 'Comedic'],
+  ['As You Like It', 'PHOEBE', 'Think not I love him', 'f', 'Comedic'],
+  ['As You Like It', 'ROSALIND', 'And why, I pray you', 'f', 'Comedic'],
+  ['The Merchant of Venice', 'PORTIA', 'quality of mercy', 'f', 'Dramatic'],
+  ['Macbeth', 'LADY MACBETH', 'The raven himself is hoarse', 'f', 'Dramatic'],
+  ['Macbeth', 'LADY MACBETH', 'Glamis thou art', 'f', 'Dramatic'],
+  ['Hamlet', 'OPHELIA', 'what a noble mind', 'f', 'Dramatic'],
+  ['Hamlet', 'QUEEN', 'There is a willow', 'f', 'Dramatic'],
+  ['Othello', 'EMILIA', 'their husbands', 'f', 'Dramatic'],
+  ['The Taming of the Shrew', 'KATHERINA', 'unknit that threatening', 'f', 'Dramatic'],
+  ['The Importance of Being Earnest', 'LADY BRACKNELL', 'tampers with natural ignorance', 'f', 'Comedic'],
+  ['The Sea-Gull', 'NINA', 'I was afraid you might hate me', 'f', 'Dramatic'],
+  ["A Doll's House", 'NORA', 'our home has been nothing but a playroom', 'f', 'Dramatic'],
+  ['Pygmalion', 'LIZA', 'I want a little kindness', 'f', 'Dramatic'],
+  ['Hamlet', 'HAMLET', 'To be, or not to be', 'm', 'Dramatic'],
+  ['Hamlet', 'HAMLET', 'rogue and peasant slave', 'm', 'Dramatic'],
+  ['Hamlet', 'HAMLET', 'too too solid flesh', 'm', 'Dramatic'],
+  ['Hamlet', 'HAMLET', 'Speak the speech, I pray you', 'm', 'Comedic'],
+  ['Hamlet', 'POLONIUS', 'Neither a borrower', 'm', 'Comedic'],
+  ['Romeo and Juliet', 'ROMEO', 'what light through yonder window', 'm', 'Dramatic'],
+  ['Romeo and Juliet', 'MERCUTIO', 'Queen Mab', 'm', 'Comedic'],
+  ['Macbeth', 'MACBETH', 'Is this a dagger', 'm', 'Dramatic'],
+  ['Macbeth', 'MACBETH', 'She should have died hereafter', 'm', 'Dramatic'],
+  ['The Merchant of Venice', 'SHYLOCK', 'To bait fish withal', 'm', 'Dramatic'],
+  ['Julius Caesar', 'ANTONY', 'Friends, Romans, countrymen', 'm', 'Dramatic'],
+  ['Julius Caesar', 'BRUTUS', 'It must be by his death', 'm', 'Dramatic'],
+  ['As You Like It', 'JAQUES', 'All the world’s a stage', 'm', 'Dramatic'],
+  ['Much Ado About Nothing', 'BENEDICK', 'This can be no trick', 'm', 'Comedic'],
+  ["A Midsummer Night's Dream", 'PUCK', 'If we shadows have offended', 'm', 'Comedic'],
+  ["A Midsummer Night's Dream", 'BOTTOM', 'When my cue comes', 'm', 'Comedic'],
+  ['The Tempest', 'PROSPERO', 'Our revels now are ended', 'm', 'Dramatic'],
+  ['King Lear', 'EDMUND', 'Thou, Nature, art my goddess', 'm', 'Dramatic'],
+  ['King Lear', 'LEAR', 'Blow, winds, and crack your cheeks', 'm', 'Dramatic'],
+  ['Twelfth Night', 'DUKE', 'If music be the food of love', 'm', 'Dramatic'],
+  ['The Taming of the Shrew', 'PETRUCHIO', 'Thus have I politicly begun', 'm', 'Comedic'],
+  ['Doctor Faustus', 'FAUSTUS', 'Was this the face', 'm', 'Dramatic'],
+  ['Cyrano de Bergerac', 'CYRANO', 'Ah no! young blade', 'm', 'Comedic'],
+  ['The Importance of Being Earnest', 'ALGERNON', 'anything romantic in proposing', 'm', 'Comedic'],
+];
+
+const norm = s => s.toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, ' ');
+
+function findMonologue(plays, [title, who, phrase, gender, tone]) {
+  const play = plays.find(p => p.title === title);
+  const line = play?.text.split('\n').find(l => l.startsWith(who + ': ') && norm(l).includes(norm(phrase)));
+  if (!line) return { title, who, phrase, missing: true };
+  const text = line.slice(who.length + 2);
+  const words = text.replace(/\([^)]*\)/g, ' ').split(/\s+/).filter(Boolean).length;
+  return { play: title, author: play.author, character: who, gender, tone, words, firstWords: text.replace(/\([^)]*\)\s*/g, '').split(/\s+/).slice(0, 8).join(' '), text };
+}
+
+(async () => {
+  const out = [];
+  for (const [id, title, author, genre] of PLAYS) {
+    const raw = await (await fetch(`raw/pg${id}.txt`)).text();
+    const text = gutenbergToScript(raw);
+    const speeches = text.split('\n').filter(l => /^[^#(].*?: /.test(l));
+    const cast = new Map();
+    for (const l of speeches) { const n = l.slice(0, l.indexOf(': ')); cast.set(n, (cast.get(n) || 0) + 1); }
+    out.push({ id, title, author, genre, text, speeches: speeches.length, cast: [...cast].sort((a, b) => b[1] - a[1]) });
+  }
+  document.getElementById('out').textContent = JSON.stringify({ plays: out, monologues: MONOLOGUES.map(m => findMonologue(out, m)) });
+})().catch(e => { document.getElementById('out').textContent = 'ERR ' + e.stack; });
+</script>
+</body>
+</html>

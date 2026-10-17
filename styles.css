@@ -167,7 +167,7 @@ details.card[open] > summary { margin-bottom: 12px; }
 /* Forms */
 .field { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 .field.inline { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 10px; }
-input:not([type]), textarea, select {
+input:not([type]), input[type="search"], input[type="password"], textarea, select {
   font: 400 1rem var(--font-ui);
   color: var(--ink);
   background: var(--surface);
@@ -313,6 +313,23 @@ em.dir { font-style: italic; }
 @keyframes pulse { 50% { opacity: .65; } }
 
 button, .btn { touch-action: manipulation; }
+
+/* Free script library */
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 3px; background: var(--surface); }
+.seg { font: 600 .9rem var(--font-ui); border: 0; background: none; color: var(--muted); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+.seg.on { background: var(--accent); color: var(--accent-ink); }
+.search { flex: 1 1 220px; min-width: 0; }
+.chips { gap: 6px; }
+.chip { font: 600 .85rem var(--font-ui); border: 1px solid var(--border); background: var(--surface); color: var(--ink); padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.chip-gap { width: 10px; }
+.lib-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.lib-card { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; }
+.lib-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lib-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.tags { gap: 6px; margin-top: 2px; }
+.tag { font-size: .75rem; font-weight: 600; color: var(--muted); background: var(--surface-2); border-radius: 99px; padding: 1px 8px; }
+.lib-preview { font-family: var(--font-script); line-height: 1.6; margin-top: 8px; max-height: 50vh; overflow-y: auto; }
 
 @media (max-width: 640px) {
   .icon-btn { width: 42px; height: 42px; }
