@@ -158,12 +158,13 @@ function songPanelHtml(e) {
     : `<li><button class="pick" data-action="song-pick-track" data-i="${i}"><b>${esc(r.title)}</b><span class="muted small">${esc(r.artist)}</span></button></li>`).join('')
     || '<li class="muted small">Nothing found.</li>'}</ul>` : '';
   const lyricHits = songUi.lyrics.length ? `<ul class="pick-list">${songUi.lyrics.map((h, i) => `<li><button class="pick" data-action="song-pick-lyrics" data-i="${i}">
-      <b>${esc(h.trackName)}</b><span class="muted small">${esc(h.artistName)}${h.duration ? ' · ' + fmtTime(h.duration) : ''}${h.syncedLyrics ? ' · timed ✓' : ''}</span></button></li>`).join('')}</ul>` : '';
+      <b>${esc(h.trackName)} <span class="by">by ${esc(h.artistName)}</span></b><span class="muted small">${esc(h.albumName || '')}${h.duration ? ' · ' + fmtTime(h.duration) : ''}${h.syncedLyrics ? ' · timed ✓' : ''}</span></button></li>`).join('')}</ul>` : '';
   return `<div class="card stack-sm song-panel">
     <b>The song on Spotify</b>
     ${trackHtml}${findTrack}${results}
     <b>The lyrics</b>
-    <div class="row wrap"><input id="ly-q" type="search" class="search" value="${esc(t ? `${t.title} ${t.artist.split(',')[0]}` : '')}" placeholder="Song name and artist" aria-label="Find lyrics"><button class="btn" data-action="song-find-lyrics">Find lyrics</button></div>
+    ${t && !t.artist ? `<p class="note small">Spotify didn't say who sings this${SPOTIFY_CLIENT_ID && !spotifyReady() ? ' (it does once you connect Spotify on this device)' : ''}. Add the artist after the song name so the right lyrics are found.</p>` : ''}
+    <div class="row wrap"><input id="ly-q" type="search" class="search" value="${esc(t ? `${t.title} ${t.artist.split(',')[0]}`.trim() + (t.artist ? '' : ' ') : '')}" placeholder="Song name and artist" aria-label="Find lyrics"><button class="btn" data-action="song-find-lyrics">Find lyrics</button></div>
     ${songUi.busy ? `<p class="muted small">${esc(songUi.busy)}</p>` : ''}
     ${lyricHits}
     <p class="muted small">Or paste them below (or use From screenshots). Timed lyrics highlight along with the music; untimed ones can be timed by tapping along.</p>
@@ -198,6 +199,8 @@ async function useTrack(track) {
   songUi.resultKind = '';
   saveDraft();
   refreshSongPanel();
+  // Without the artist a title-only search can land on a different song with the same name, so wait for it.
+  if (!track.artist) { $('#ly-q')?.focus(); return; }
   if (!$('#ed-raw').value.trim()) {
     await songBusy('Looking for the lyrics…', async () => {
       const hit = track.artist ? await lyricsFor(track) : null;
@@ -287,13 +290,19 @@ Object.assign(actions, {
   'song-find-lyrics'() {
     const q = $('#ly-q').value.trim();
     if (!q) { toast('Type the song name and artist.'); return; }
+    const t = app.editing.song?.spotify;
+    if (t && !t.artist && q.toLowerCase() === t.title.toLowerCase()) { toast(`Add the artist after "${t.title}" so the right song is found.`); $('#ly-q').focus(); return; }
     songBusy('Searching for lyrics…', async () => {
       songUi.lyrics = ((await lyricsSearch(q)) || []).filter(h => lyricsText(h)).slice(0, 8);
       if (!songUi.lyrics.length) toast('No lyrics found. Try different words, or paste them.');
     });
   },
   'song-pick-lyrics'(b, i) {
-    setSongLyrics(lyricsText(songUi.lyrics[i]));
+    const hit = songUi.lyrics[i];
+    // The lyrics match tells us the artist Spotify's public link left out.
+    const t = app.editing.song?.spotify;
+    if (t && !t.artist) t.artist = hit.artistName;
+    setSongLyrics(lyricsText(hit));
     songUi.lyrics = [];
     refreshSongPanel();
   },
