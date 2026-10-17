@@ -44,6 +44,16 @@ Tap **Sync** at the top right and follow the steps. You create a GitHub access k
 
 **Stuck mid-rehearsal?** Say **"line"** (just like calling for a line in a real rehearsal) and it will feed it to you.
 
+### Natural AI voices (optional)
+
+For voices that sound like real actors, open a script, expand **Voices for each character**, and paste an OpenAI key (from <https://platform.openai.com/api-keys>, with a few dollars of credit added under Billing).
+
+- Each character gets a female or male AI voice with an American accent. You can pick a different one, and add a note on how they sound ("warm and elderly", "nervous teenager").
+- Stage directions in a line, like *(angrily)* or *(whispering)*, are acted out.
+- Each line is made once and saved on the device, so replays are free and work offline. **Prepare all lines now** makes the whole script ahead of time.
+- Your script text is sent to OpenAI to make the audio. The key is saved only on that device (enter it on each device). Setting a monthly spending limit in your OpenAI account is a good idea.
+- If OpenAI can't be reached, the app falls back to the device's built-in voices.
+
 ### Record real voices
 
 Click the mic icon on any line to record it. Recordings play instead of the computer voice. Record your own lines to hear yourself saying them, or have a castmate record their cues so you practice with the real rhythm.

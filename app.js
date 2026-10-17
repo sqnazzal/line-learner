@@ -51,20 +51,23 @@ const saveScripts = () => { saveJSON(LS_SCRIPTS, scripts); scheduleSync(); };
 const saveSettings = () => saveJSON(LS_SETTINGS, settings);
 
 // Recordings live in IndexedDB, keyed by a hash of speaker + line text so they survive script edits.
+// AI-generated line audio is cached there too ('tts'), so each line is only paid for once.
 let dbPromise;
 function openDb() {
   return dbPromise ||= new Promise((resolve, reject) => {
-    const req = indexedDB.open('line-learner', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('recordings');
+    const req = indexedDB.open('line-learner', 2);
+    req.onupgradeneeded = () => {
+      for (const name of ['recordings', 'tts']) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
-async function idb(mode, fn) {
+async function idb(mode, fn, store = 'recordings') {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction('recordings', mode);
-    const req = fn(tx.objectStore('recordings'));
+    const tx = db.transaction(store, mode);
+    const req = fn(tx.objectStore(store));
     tx.oncomplete = () => resolve(req.result);
     tx.onerror = () => reject(tx.error);
   });
@@ -74,6 +77,10 @@ const recordings = {
   put: (key, blob) => idb('readwrite', st => st.put(blob, key)),
   del: key => idb('readwrite', st => st.delete(key)),
   keys: () => idb('readonly', st => st.getAllKeys()),
+};
+const ttsCache = {
+  get: key => idb('readonly', st => st.get(key), 'tts'),
+  put: (key, blob) => idb('readwrite', st => st.put(blob, key), 'tts'),
 };
 let recorded = new Set();
 
@@ -369,11 +376,11 @@ function speakChunk(text, voice, token, rate) {
 }
 
 // Long utterances can stall in some browsers, so speak a sentence or two at a time.
-function chunksOf(text) {
+function chunksOf(text, max = 180) {
   const out = [];
   let buf = '';
   for (const s of sentences(text)) {
-    if (buf && (buf + ' ' + s).length > 180) { out.push(buf); buf = s; }
+    if (buf && (buf + ' ' + s).length > max) { out.push(buf); buf = s; }
     else buf = buf ? buf + ' ' + s : s;
   }
   if (buf) out.push(buf);
@@ -416,12 +423,13 @@ function playBlob(blob, token, rate = 1) {
     if (token.cancelled) return resolve();
     const url = URL.createObjectURL(blob);
     const audio = sharedAudio;
-    let settled = false, off = () => {};
+    let settled = false, off = () => {}, guard = 0;
     const finish = () => {
       if (settled) return;
       settled = true;
+      clearTimeout(guard);
       audio.pause();
-      audio.onended = audio.onerror = null;
+      audio.onended = audio.onerror = audio.onloadedmetadata = null;
       URL.revokeObjectURL(url);
       if (stopSharedAudio === finish) stopSharedAudio = null;
       off();
@@ -430,6 +438,13 @@ function playBlob(blob, token, rate = 1) {
     stopSharedAudio = finish;
     off = token.onCancel(finish);
     audio.onended = audio.onerror = finish;
+    // Never wait forever on audio that won't finish: allow its length plus a margin.
+    guard = setTimeout(finish, 15000);
+    audio.onloadedmetadata = () => {
+      if (!isFinite(audio.duration)) return;
+      clearTimeout(guard);
+      guard = setTimeout(finish, (audio.duration / rate) * 1000 + 3000);
+    };
     audio.src = url;
     audio.playbackRate = rate;
     audio.play().catch(finish);
@@ -467,7 +482,153 @@ async function sayLine(item, token, text = item.text) {
 
 // Each character's speed slider scales the overall reading speed (1 = same as everyone else).
 const speedOf = speaker => current()?.speeds?.[speaker] ?? 1;
-const speakAs = (speaker, text, token) => speakText(text, voiceFor(speaker), token, settings.rate * speedOf(speaker));
+
+// Speaks a character's line with their natural AI voice when that's set up, otherwise the device voice.
+async function speakAs(speaker, text, token) {
+  const s = current();
+  const rate = settings.rate * speedOf(speaker);
+  if (s && aiReady()) {
+    try {
+      const voice = aiVoiceFor(s, speaker), instructions = aiInstructions(s, speaker, text);
+      for (const piece of chunksOf(spokenText(text), 3000)) {
+        if (token.cancelled) return;
+        const blob = await aiAudio(voice, instructions, piece);
+        if (token.cancelled) return;
+        await playBlob(blob, token, rate);
+      }
+      return;
+    } catch (e) {
+      aiFailed(e);
+    }
+  }
+  return speakText(text, voiceFor(speaker), token, rate);
+}
+
+// ---------- Natural AI voices (OpenAI text to speech) ----------
+const LS_AI = 'lineLearner.ai';
+const AI_MODEL = 'gpt-4o-mini-tts';
+const AI_VOICES = { f: ['marin', 'coral', 'nova', 'shimmer', 'sage', 'alloy'], m: ['cedar', 'ash', 'onyx', 'echo', 'verse', 'ballad'] };
+const AI_ALL = [...AI_VOICES.f, ...AI_VOICES.m];
+const ai = loadJSON(LS_AI, {}); // { key, on } : the key stays on this device and never syncs
+const aiInflight = new Map();
+let aiWarned = false;
+
+const aiReady = () => !!(ai.key && ai.on);
+const capital = w => w[0].toUpperCase() + w.slice(1);
+
+// Same gender casting as the device voices, spreading the AI voices across characters.
+function aiCast(s) {
+  const used = { f: 0, m: 0 };
+  const cast = new Map();
+  for (const [speaker, { gender }] of castVoices(s)) cast.set(speaker, AI_VOICES[gender][used[gender]++ % AI_VOICES[gender].length]);
+  return cast;
+}
+
+function aiVoiceFor(s, speaker) {
+  const chosen = s.aiVoices?.[speaker];
+  return AI_ALL.includes(chosen) ? chosen : aiCast(s).get(speaker) || 'marin';
+}
+
+// Tells the voice how to perform: the character's note, an American accent, and the line's own stage directions.
+function aiInstructions(s, speaker, text) {
+  const style = s.aiStyles?.[speaker];
+  const dirs = (text.match(/\([^)]*\)|\[[^\]]*\]/g) || []).map(d => d.slice(1, -1).trim()).filter(Boolean).join('; ');
+  return `Voice: ${style || 'a natural, expressive stage actor'}. Accent: General American. `
+    + 'This is a line of dialogue in a play: say it with the emotion and timing the words call for, like a real actor, not a narrator.'
+    + (dirs ? ` Stage direction for this line: ${dirs}.` : '');
+}
+
+async function aiAudio(voice, instructions, input) {
+  const raw = [AI_MODEL, voice, instructions, input].join('|');
+  const key = `${hash(raw)}-${hash('~' + raw)}-${input.length}`;
+  const cached = await ttsCache.get(key).catch(() => null);
+  if (cached) return cached;
+  if (aiInflight.has(key)) return aiInflight.get(key);
+  const job = (async () => {
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + ai.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: AI_MODEL, voice, input, instructions, response_format: 'mp3' }),
+    });
+    if (!res.ok) {
+      let detail = '';
+      try { detail = (await res.json()).error?.message || ''; } catch { /* no details */ }
+      const err = new Error(res.status === 401 ? "OpenAI didn't accept your key. Check it in Voices for each character."
+        : res.status === 429 ? 'OpenAI says you are out of credit or over your limit.'
+        : `OpenAI couldn't make the voice (${res.status}). ${detail}`);
+      err.status = res.status;
+      throw err;
+    }
+    const blob = await res.blob();
+    ttsCache.put(key, blob).catch(() => {});
+    return blob;
+  })();
+  aiInflight.set(key, job);
+  try { return await job; } finally { aiInflight.delete(key); }
+}
+
+function aiFailed(e) {
+  if (aiWarned) return;
+  aiWarned = true;
+  toast((e.status ? e.message : "Couldn't reach OpenAI.") + ' Using the device voice for now.');
+}
+
+// Starts generating upcoming lines in the background so they're ready when their turn comes.
+function aiPrefetch(s, indices) {
+  if (!aiReady()) return;
+  for (const i of indices) {
+    const l = s.lines[i];
+    if (!l || l.type !== 'line' || (settings.useRecordings && recorded.has(lineKey(l)))) continue;
+    const voice = aiVoiceFor(s, l.speaker), instructions = aiInstructions(s, l.speaker, l.text);
+    for (const piece of chunksOf(spokenText(l.text), 3000)) aiAudio(voice, instructions, piece).catch(() => {});
+  }
+}
+
+async function aiPrepareAll() {
+  const s = current();
+  const lines = s.lines.filter(l => l.type === 'line');
+  const prog = app.aiProgress = { done: 0, total: lines.length, stop: false };
+  render();
+  for (const l of lines) {
+    if (prog.stop) break;
+    try {
+      const voice = aiVoiceFor(s, l.speaker), instructions = aiInstructions(s, l.speaker, l.text);
+      for (const piece of chunksOf(spokenText(l.text), 3000)) await aiAudio(voice, instructions, piece);
+    } catch (e) {
+      toast(e.status ? e.message : "Couldn't reach OpenAI. Check your connection and try again.");
+      break;
+    }
+    prog.done++;
+    const el = $('#ai-progress');
+    if (el) el.textContent = `Preparing voices: ${prog.done} of ${prog.total}`;
+  }
+  if (prog.done === prog.total) toast('All lines are ready. They play instantly, even offline.');
+  app.aiProgress = null;
+  if (app.view === 'script') render();
+}
+
+function aiPanelHtml() {
+  if (!ai.key) {
+    return `<div class="ai-card stack-sm">
+      <b>Natural AI voices</b>
+      <p class="muted small">Human-sounding voices from OpenAI that act out stage directions like (angrily) or (whispering). Each line costs a little the first time it's read, then replays free, even offline.</p>
+      <ol class="steps-list small">
+        <li>Sign in at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> and add a few dollars of credit under Billing.</li>
+        <li>Tap <b>Create new secret key</b>, copy it, and paste it here.</li>
+      </ol>
+      <div class="row wrap"><input id="ai-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-…" aria-label="OpenAI key"><button class="btn primary" data-action="ai-save">Save key</button></div>
+      <p class="muted small">The key is saved only on this device. Tip: set a monthly spending limit in your OpenAI account.</p>
+    </div>`;
+  }
+  const prog = app.aiProgress;
+  return `<div class="ai-card stack-sm">
+    <label class="check-row"><input type="checkbox" id="ai-on" ${ai.on ? 'checked' : ''}><b>Use natural AI voices</b></label>
+    ${ai.on ? `<div class="row wrap">${prog
+      ? `<span id="ai-progress" class="muted small">Preparing voices: ${prog.done} of ${prog.total}</span><button class="btn ghost" data-action="ai-stop">Stop</button>`
+      : '<button class="btn" data-action="ai-prepare">Prepare all lines now</button><span class="muted small">Makes every line ahead of time, so practice starts instantly and works offline.</span>'}</div>` : ''}
+    <div><button class="link-btn small" data-action="ai-remove">Remove key from this device</button></div>
+  </div>`;
+}
 const speedLabel = v => (v === 1 ? 'Normal' : `${v.toFixed(2)}x`);
 const sayHello = speaker => preview(t => speakAs(speaker, `Hello. I'll be reading ${titleCase(speaker)}.`, t));
 
@@ -901,24 +1062,40 @@ function renderScript() {
     </div>
     <details id="voices" class="card" ${app.voicesOpen ? 'open' : ''}>
       <summary>Voices for each character</summary>
-      ${voices.length ? chars.map(([c]) => {
+      ${aiPanelHtml()}
+      ${voices.length || aiReady() ? chars.map(([c]) => {
         const { gender, voice: auto } = cast.get(c);
-        const chosen = s.voices?.[c] || '';
-        const opt = o => `<option value="${esc(o.voiceURI)}" ${o.voiceURI === chosen ? 'selected' : ''}>${esc(voiceLabel(o))}</option>`;
-        const matching = voices.filter(o => voiceGender(o) === gender), others = voices.filter(o => voiceGender(o) !== gender);
-        return `<div class="voice-row"><span class="voice-name">${esc(titleCase(c))}</span>
-          <select data-gender-char="${esc(c)}" aria-label="${esc(titleCase(c))}: female or male">
-            <option value="f" ${gender === 'f' ? 'selected' : ''}>Female</option>
-            <option value="m" ${gender === 'm' ? 'selected' : ''}>Male</option>
-          </select>
-          <select data-voice-char="${esc(c)}" aria-label="${esc(titleCase(c))}: voice">
+        const label = esc(titleCase(c));
+        let voicePicker;
+        if (aiReady()) {
+          const chosen = s.aiVoices?.[c] || '';
+          const opt = v => `<option value="${v}" ${v === chosen ? 'selected' : ''}>${capital(v)}</option>`;
+          const other = gender === 'f' ? 'm' : 'f';
+          voicePicker = `<select data-ai-voice-char="${esc(c)}" aria-label="${label}: voice">
+            <option value="">Automatic: ${capital(aiCast(s).get(c))}</option>
+            <optgroup label="${gender === 'f' ? 'Female' : 'Male'} voices">${AI_VOICES[gender].map(opt).join('')}</optgroup>
+            <optgroup label="${other === 'f' ? 'Female' : 'Male'} voices">${AI_VOICES[other].map(opt).join('')}</optgroup>
+          </select>`;
+        } else {
+          const chosen = s.voices?.[c] || '';
+          const opt = o => `<option value="${esc(o.voiceURI)}" ${o.voiceURI === chosen ? 'selected' : ''}>${esc(voiceLabel(o))}</option>`;
+          const matching = voices.filter(o => voiceGender(o) === gender), others = voices.filter(o => voiceGender(o) !== gender);
+          voicePicker = `<select data-voice-char="${esc(c)}" aria-label="${label}: voice">
             <option value="">Automatic${auto ? `: ${esc(voiceLabel(auto))}` : ''}</option>
             ${matching.length ? `<optgroup label="${gender === 'f' ? 'Female' : 'Male'} voices">${matching.map(opt).join('')}</optgroup>` : ''}
             ${others.length ? `<optgroup label="Other voices">${others.map(opt).join('')}</optgroup>` : ''}
+          </select>`;
+        }
+        return `<div class="voice-row"><span class="voice-name">${label}</span>
+          <select data-gender-char="${esc(c)}" aria-label="${label}: female or male">
+            <option value="f" ${gender === 'f' ? 'selected' : ''}>Female</option>
+            <option value="m" ${gender === 'm' ? 'selected' : ''}>Male</option>
           </select>
+          ${voicePicker}
           <button class="icon-btn" data-action="test-voice" data-char="${esc(c)}" title="Test this voice" aria-label="Test this voice">${icon('speaker')}</button>
+          ${aiReady() ? `<input class="voice-style" data-style-char="${esc(c)}" value="${esc(s.aiStyles?.[c] || '')}" placeholder="How they sound (optional), e.g. warm and elderly, nervous teenager" aria-label="${label}: how they sound">` : ''}
           <label class="voice-speed"><span>Speed</span>
-            <input type="range" min="0.5" max="1.5" step="0.05" value="${speedOf(c)}" data-speed-char="${esc(c)}" aria-label="${esc(titleCase(c))}: speed">
+            <input type="range" min="0.5" max="1.5" step="0.05" value="${speedOf(c)}" data-speed-char="${esc(c)}" aria-label="${label}: speed">
             <output>${speedLabel(speedOf(c))}</output>
           </label></div>`;
       }).join('') : '<p class="muted">No computer voices found in this browser.</p>'}
@@ -1141,6 +1318,7 @@ async function run(from) {
     const item = s.lines[P.order[p]];
     Object.assign(P, { orderPos: p, result: null, transcript: '', reveal: settings.hint, status: 'idle' });
     refreshPlayer();
+    aiPrefetch(s, P.order.slice(p, p + 4));
     if (item.type === 'section') await sleep(700, token);
     else if (item.type === 'direction') {
       if (settings.readDirections) { P.status = 'speaking'; refreshPlayer(); await speakText(item.text, voiceList()[0], token); }
@@ -1470,10 +1648,26 @@ document.addEventListener('change', e => {
     sayHello(el.dataset.voiceChar);
   } else if (el.dataset.speedChar) {
     sayHello(el.dataset.speedChar);
+  } else if (el.dataset.aiVoiceChar || el.dataset.styleChar) {
+    const c = el.dataset.aiVoiceChar || el.dataset.styleChar;
+    const field = el.dataset.aiVoiceChar ? 'aiVoices' : 'aiStyles';
+    const value = el.value.trim();
+    s[field] ||= {};
+    if (value) s[field][c] = value;
+    else delete s[field][c];
+    s.updated = Date.now();
+    saveScripts();
+    sayHello(c);
+  } else if (el.id === 'ai-on') {
+    ai.on = el.checked;
+    aiWarned = false;
+    saveJSON(LS_AI, ai);
+    render();
   } else if (el.dataset.genderChar) {
     const c = el.dataset.genderChar;
     (s.genders ||= {})[c] = el.value;
     delete s.voices?.[c];
+    delete s.aiVoices?.[c];
     s.updated = Date.now();
     saveScripts();
     render();
@@ -1695,6 +1889,25 @@ function renderSync() {
 }
 
 Object.assign(actions, {
+  'ai-save'() {
+    const key = $('#ai-key').value.trim();
+    if (!key) { toast('Paste your OpenAI key first.'); return; }
+    Object.assign(ai, { key, on: true });
+    aiWarned = false;
+    saveJSON(LS_AI, ai);
+    app.voicesOpen = true;
+    render();
+    const first = characters(current()).keys().next().value;
+    if (first) sayHello(first);
+  },
+  'ai-remove'() {
+    if (!confirm('Remove your OpenAI key from this device? Lines already made will keep playing.')) return;
+    for (const k of Object.keys(ai)) delete ai[k];
+    saveJSON(LS_AI, ai);
+    render();
+  },
+  'ai-prepare'() { aiPrepareAll(); },
+  'ai-stop'() { if (app.aiProgress) app.aiProgress.stop = true; },
   'sync-view'() { leave(); app.view = 'sync'; render(); },
   'sync-now'() { runSync(); },
   async 'sync-connect'() {
