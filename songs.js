@@ -519,7 +519,17 @@ Object.assign(actions, {
   'sing-line'(b) { seekToLine(+b.dataset.li); },
   'sing-time'() { startTiming(); },
   'sing-tap'() { tapTiming(); },
-  'sing-play'() { sing.controller?.togglePlay(); },
+  'sing-play'() {
+    if (!sing.controller) { toast(current()?.song?.spotify ? 'The player is still loading.' : 'Add the song from Spotify (Edit) to play it here.'); return; }
+    sing.controller.togglePlay();
+  },
+  'sing-step'(b) {
+    const n = songLines(current()).length;
+    const to = Math.min(n - 1, Math.max(0, (sing.idx < 0 ? 0 : sing.idx) + +b.dataset.d));
+    setFollow(true);
+    seekToLine(to);
+  },
+  'sing-follow'() { sing.scrolledAt = 0; setFollow(true); },
   'sing-devices-list'() { showDevicePicker('Where should songs play?').catch(e => toast(e.message)); },
   'sing-devices'() {
     if ($('#device-list')?.innerHTML) { $('#device-list').innerHTML = ''; return; }
@@ -557,7 +567,7 @@ Object.assign(actions, {
 
 // ---------- Sing along ----------
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-const sing = { mode: 'all', version: 'original', controller: null, pos: 0, at: 0, paused: true, idx: -1, loop: null, timer: 0, timing: false, tapIdx: 0, newTimes: null };
+const sing = { mode: 'all', version: 'original', follow: true, scrolledAt: 0, controller: null, pos: 0, at: 0, paused: true, idx: -1, loop: null, timer: 0, timing: false, tapIdx: 0, newTimes: null };
 const SING_MODES = { all: 'Show all', initials: 'First letters', reveal: 'Fill in as I sing', hidden: 'Hidden' };
 
 const songLines = s => s.lines.filter(l => l.type === 'line');
@@ -604,6 +614,7 @@ function renderSing() {
     ${usingInst(s) && !s.song.instTimes && timed(s) ? '<p class="muted small">Using the original timing for the instrumental. If its intro is a different length, nudge the highlight or re-time it for the instrumental.</p>' : ''}
     <div id="timing-bar"></div>
     <ol class="lyrics" id="lyrics"></ol>
+    ${singBarHtml(s)}
   </section>`;
 }
 
@@ -653,6 +664,9 @@ function updateSing(force) {
   const s = current();
   if (app.view !== 'sing' || !s) return;
   const times = songTimes(s), pos = estimatePos() / 1000;
+  updateBar(s, pos);
+  // Pick following back up a few seconds after you stop scrolling.
+  if (!sing.follow && Date.now() - sing.scrolledAt > FOLLOW_RESUME_MS) setFollow(true);
   let idx = sing.idx;
   if (sing.timing) idx = sing.tapIdx - 1;
   else if (timed(s)) { idx = -1; times.forEach((t, i) => { if (t != null && t <= pos + 0.15) idx = i; }); }
@@ -671,7 +685,52 @@ function updateSing(force) {
   });
   const loopBtn = $('#loop-btn');
   if (loopBtn) loopBtn.textContent = sing.loop != null ? 'Stop repeating' : 'Repeat this line';
-  if (idx >= 0 && idx !== prev) $(`#lyrics li[data-li="${idx}"]`)?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  if (idx >= 0 && idx !== prev && sing.follow) scrollToLine(idx);
+}
+
+const scrollToLine = idx => $(`#lyrics li[data-li="${idx}"]`)?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+
+// ---------- The player bar at the bottom: always within reach while you scroll ----------
+const FOLLOW_RESUME_MS = 6000;
+
+function singBarHtml(s) {
+  const n = songLines(s).length;
+  return `<div class="sing-bar" role="group" aria-label="Song controls">
+    <button class="ctrl" data-action="sing-step" data-d="-1" aria-label="Previous line">${icon('prev')}</button>
+    <button class="ctrl big" data-action="sing-play" id="bar-play" aria-label="Play">${icon('play')}</button>
+    <button class="ctrl" data-action="sing-step" data-d="1" aria-label="Next line">${icon('next')}</button>
+    <div class="bar-info"><span id="bar-line">Line 1 of ${n}</span><span class="muted small" id="bar-time">0:00</span></div>
+    <button class="btn primary bar-follow" data-action="sing-follow" id="bar-follow" hidden>Follow along</button>
+  </div>`;
+}
+
+function updateBar(s, pos) {
+  const playBtn = $('#bar-play');
+  if (!playBtn) return;
+  const playing = !sing.paused;
+  if (playBtn.dataset.playing !== String(playing)) {
+    playBtn.dataset.playing = String(playing);
+    playBtn.innerHTML = icon(playing ? 'pause' : 'play');
+    playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  }
+  $('#bar-line').textContent = `Line ${Math.max(1, sing.idx + 1)} of ${songLines(s).length}`;
+  $('#bar-time').textContent = fmtTime(Math.max(0, pos));
+}
+
+function setFollow(on) {
+  sing.follow = on;
+  const btn = $('#bar-follow');
+  if (btn) btn.hidden = on;
+  if (on && sing.idx >= 0) scrollToLine(sing.idx);
+}
+
+// Your own scrolling (finger or mouse wheel) pauses following; the app's own scrolling doesn't.
+for (const type of ['touchmove', 'wheel']) {
+  window.addEventListener(type, () => {
+    if (app.view !== 'sing') return;
+    sing.scrolledAt = Date.now();
+    if (sing.follow) setFollow(false);
+  }, { passive: true });
 }
 
 function seekToLine(i) {
@@ -737,7 +796,7 @@ function loadIframeApi() {
 
 async function mountSing() {
   const s = current();
-  Object.assign(sing, { idx: -1, loop: null, timing: false, pos: 0, paused: true });
+  Object.assign(sing, { idx: -1, loop: null, timing: false, pos: 0, paused: true, follow: true, scrolledAt: 0 });
   renderLyrics();
   clearInterval(sing.timer);
   sing.timer = setInterval(() => updateSing(false), 200);

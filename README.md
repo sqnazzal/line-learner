@@ -121,6 +121,8 @@ Tap **+ New song** on the home screen.
 
 **Instrumental:** with Spotify connected, the app looks for instrumental and karaoke versions when you pick a song (or paste a link to one). Sing along then has an **Original | Instrumental** switch. Each version keeps its own timing: if the highlight is out of step on the instrumental, tap **It's early** / **It's late** to nudge it, or re-time it by tapping along.
 
+A **player bar** stays at the bottom of the screen while you sing: Play/Pause, previous and next line, and where you are. Scrolling the lyrics yourself stops the page from jumping to the current line; tap **Follow along** (or wait a few seconds) to pick it back up.
+
 **Sing along** plays the real track in Spotify's player with the current line highlighted. Hide words as you learn (**First letters**, **Fill in as I sing**, **Hidden**), tap a line to jump there, and **Repeat this line** to loop a tricky bit. Spotify decides whether the player plays the full track or a preview, depending on whether you're signed in to Spotify in that browser.
 
 Connecting a Spotify account needs a Spotify developer app: set its Redirect URI to `https://sqnazzal.github.io/line-learner/`, put its Client ID in `SPOTIFY_CLIENT_ID` at the top of `songs.js`, and add anyone else who signs in under User Management. Since February 2026 Spotify only runs personal developer apps like this when the app's owner has Spotify Premium, allows 5 users per app, and only lets apps open playlists you own or collaborate on. Pasting a song link works without any of this.

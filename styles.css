@@ -343,6 +343,21 @@ a.btn { text-decoration: none; }
 .lyrics li.now .lyric { background: var(--accent-soft); color: var(--ink); font-weight: 700; }
 .lyrics li.looping .lyric { outline: 2px dashed var(--accent); }
 .timing { display: flex; flex-direction: column; gap: 10px; }
+.sing { padding-bottom: 120px; } /* room for the player bar */
+.sing-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, .08);
+}
+.sing-bar .ctrl { width: 44px; height: 44px; flex-shrink: 0; }
+.sing-bar .ctrl.big { width: 56px; height: 56px; }
+.bar-info { display: flex; flex-direction: column; min-width: 0; flex: 1; font-variant-numeric: tabular-nums; }
+.bar-info span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-follow { flex-shrink: 0; }
 .big-tap { padding: 16px 22px; font-size: 1.05rem; }
 
 /* Free script library */
