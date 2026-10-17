@@ -109,3 +109,14 @@ powershell -ExecutionPolicy Bypass -File tools\build-library.ps1
 ```
 
 It downloads the source texts from Project Gutenberg into `tools/raw/` (not committed), converts them with `tools/convert.js`, and writes `library/plays/*.txt`, `library/plays.json` and `library/monologues.json`.
+
+## Songs
+
+Tap **+ New song** on the home screen.
+
+1. **The song:** paste a Spotify song link (in Spotify: Share > Copy Song Link). Once Spotify is connected you can search Spotify or pick from your playlists and liked songs instead.
+2. **The lyrics:** they're looked up automatically on LRCLIB (a free lyrics database), or tap **Find lyrics**, paste them, or use **From screenshots**. Timed lyrics highlight along with the music; untimed lyrics can be timed by tapping along (**Time the lyrics**).
+
+**Sing along** plays the real track in Spotify's player with the current line highlighted. Hide words as you learn (**First letters**, **Fill in as I sing**, **Hidden**), tap a line to jump there, and **Repeat this line** to loop a tricky bit. Spotify decides whether the player plays the full track or a preview, depending on whether you're signed in to Spotify in that browser.
+
+Connecting a Spotify account needs a Spotify developer app: set its Redirect URI to `https://sqnazzal.github.io/line-learner/`, put its Client ID in `SPOTIFY_CLIENT_ID` at the top of `songs.js`, and add anyone else who signs in under User Management (Spotify allows a limited number of users for personal apps).

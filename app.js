@@ -850,7 +850,7 @@ function renderLibrary() {
     const mine = s.lines.filter(l => isMine(s, l));
     const solid = mine.filter(l => isSolid(s, l)).length;
     return `<li><button class="card script-card" data-action="open" data-id="${s.id}">
-      <span class="card-title">${esc(s.title)}</span>
+      <span class="card-title">${s.kind === 'song' ? '<span class="tag">Song</span> ' : ''}${esc(s.title)}</span>
       <span class="muted">${s.myChar ? `As ${esc(titleCase(s.myChar))}: ${solid} of ${mine.length} lines solid` : 'Pick your character to start'}</span>
       ${mine.length ? bar(solid / mine.length) : ''}
     </button></li>`;
@@ -861,6 +861,7 @@ function renderLibrary() {
       <p class="lede">Paste a scene or monologue and pick your part. Listen to it like an audio track, then run it out loud while the app reads your cues and checks your lines.</p>
       <div class="row wrap">
         <button class="btn primary" data-action="new">+ New script</button>
+        <button class="btn" data-action="new-song">+ New song</button>
         <button class="btn" data-action="browse">Browse free scripts &amp; monologues</button>
         <button class="btn ghost" data-action="sample">Try a sample scene</button>
       </div>
@@ -886,6 +887,21 @@ function renderLibrary() {
 
 function renderEdit() {
   const e = app.editing;
+  if (e.kind === 'song') {
+    return `<section class="stack">
+      <h1>${e.id ? 'Edit song' : 'New song'}</h1>
+      <label class="field"><span>Title</span><input id="ed-title" value="${esc(e.title)}" placeholder="e.g. Defying Gravity (Wicked)"></label>
+      ${songPanelHtml(e)}
+      <label class="field"><span>Lyrics</span><textarea id="ed-raw" rows="14" spellcheck="false" placeholder="One line of the song per line">${esc(e.raw)}</textarea></label>
+      <p id="ed-preview" class="muted"></p>
+      <div class="row wrap">
+        <label class="btn">From screenshots<input type="file" id="ed-shots" accept="image/*" multiple hidden></label>
+        <span class="spacer"></span>
+        <button class="btn ghost" data-action="cancel-edit">Cancel</button>
+        <button class="btn primary" data-action="save-edit">Save</button>
+      </div>
+    </section>`;
+  }
   return `<section class="stack">
     <h1>${e.id ? 'Edit script' : 'New script'}</h1>
     <label class="field"><span>Title</span><input id="ed-title" value="${esc(e.title)}" placeholder="e.g. Romeo and Juliet, balcony scene"></label>
@@ -920,6 +936,12 @@ function updatePreview() {
   if (!el) return;
   const raw = $('#ed-raw').value;
   if (!raw.trim()) { el.textContent = ''; return; }
+  if (app.editing?.kind === 'song') {
+    const { times } = parseSong(raw);
+    const timedCount = times.filter(t => t != null).length;
+    el.innerHTML = `Found <b>${times.length}</b> lines${timedCount ? `, ${timedCount === times.length ? 'all' : timedCount} timed to the music` : ''}.`;
+    return;
+  }
   const lines = parseScript(raw);
   const n = lines.filter(l => l.type === 'line').length;
   const chars = [...characters({ lines })].map(([c, k]) => `${esc(titleCase(c))} (${k})`).join(', ');
@@ -1154,13 +1176,19 @@ async function imageToDataUrl(file, max = 2400) {
   return c.toDataURL('image/jpeg', 0.85);
 }
 
-async function readScreenshots(images) {
+const LYRICS_PROMPT = `These are screenshots of song lyrics or sheet music, in order. Transcribe only the sung words:
+- One sung line per line, with a blank line between verses or sections.
+- Keep a section label like [Chorus] or [Verse 2] on its own line if the screenshot shows one.
+- Leave out chord symbols, musical notation, page numbers, and any phone or app interface.
+- Keep every word exactly as written. Reply with only the lyrics.`;
+
+async function readScreenshots(images, prompt = SHOT_PROMPT) {
   const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + ai.key, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: VISION_MODEL,
-      input: [{ role: 'user', content: [{ type: 'input_text', text: SHOT_PROMPT }, ...images.map(url => ({ type: 'input_image', image_url: url, detail: 'high' }))] }],
+      input: [{ role: 'user', content: [{ type: 'input_text', text: prompt },...images.map(url => ({ type: 'input_image', image_url: url, detail: 'high' }))] }],
     }),
   });
   if (!res.ok) {
@@ -1189,7 +1217,7 @@ async function importScreenshots(files) {
     for (let i = 0; i < files.length; i += 6) {
       const batch = files.slice(i, i + 6);
       toast(files.length === 1 ? 'Reading screenshot…' : `Reading screenshots ${i + 1} to ${i + batch.length} of ${files.length}…`);
-      parts.push(await readScreenshots(await Promise.all(batch.map(f => imageToDataUrl(f)))));
+      parts.push(await readScreenshots(await Promise.all(batch.map(f => imageToDataUrl(f))), app.editing?.kind === 'song' ? LYRICS_PROMPT : SHOT_PROMPT));
     }
     const text = parts.filter(Boolean).join('\n\n').trim();
     if (!text) throw new Error("I couldn't find any script text in those screenshots.");
@@ -1261,6 +1289,7 @@ function renderScript() {
       ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${solid} of ${mine.length} lines solid</span></div>` : ''}
     </div>
     <div class="modes">
+      ${s.kind === 'song' ? `<button class="mode" data-action="sing">${icon('headphones')}<b>Sing along</b><span>${s.song?.spotify ? 'Play the real song with the lyrics highlighted, and hide words as you learn them.' : 'Learn the lyrics. Add the Spotify song (Edit) to sing with the track.'}</span></button>` : ''}
       <button class="mode" data-action="listen">${icon('headphones')}<b>Listen</b><span>Hear the scene like an audio track. It pauses for you to say your lines.</span></button>
       <button class="mode" data-action="rehearse" ${s.myChar ? '' : 'disabled'}>${icon('mic')}<b>Rehearse</b><span>Your cues are read aloud. Say your lines and the mic checks them.</span></button>
       <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line needs' : 'lines need'} work` : 'Nothing shaky right now') : 'Pick your character first'}</span></button>
@@ -1491,6 +1520,7 @@ function leave() {
   stopRun();
   stopRecording();
   previewToken.cancel();
+  window.stopSing?.();
   if (sync.pending) { sync.pending = false; scheduleSync(); }
 }
 
@@ -1720,10 +1750,10 @@ const actions = {
   new() {
     leave();
     const d = pendingDraft();
-    app.editing = d && !d.id ? d : { id: null, title: '', raw: '' };
+    app.editing = d && !d.id && d.kind !== 'song' ? d : { id: null, title: '', raw: '' };
     app.view = 'edit';
     render();
-    if (d && !d.id) toast('Picked up your unsaved script where you left off.');
+    if (d && !d.id && d.kind !== 'song') toast('Picked up your unsaved script where you left off.');
     else $('#ed-title').focus();
   },
   browse() { leave(); app.view = 'browse'; render(); window.scrollTo(0, 0); },
@@ -1778,7 +1808,7 @@ const actions = {
     const s = current();
     leave();
     const d = pendingDraft();
-    app.editing = d?.id === s.id ? d : { id: s.id, title: s.title, raw: s.raw };
+    app.editing = d?.id === s.id ? d : { id: s.id, title: s.title, raw: s.raw, ...(s.kind === 'song' ? { kind: 'song', song: s.song || {} } : {}) };
     app.view = 'edit';
     render();
   },
@@ -1809,6 +1839,7 @@ const actions = {
     render();
   },
   'save-edit'() {
+    if (app.editing.kind === 'song') return saveSong();
     const title = $('#ed-title').value.trim(), raw = $('#ed-raw').value;
     const lines = parseScript(raw);
     if (!lines.some(l => l.type === 'line')) { toast("I couldn't find any lines yet. Check the format tips."); return; }
@@ -2262,12 +2293,15 @@ Object.assign(actions, {
 });
 
 // ---------- Boot ----------
+// songs.js adds its Sing along view here.
+const VIEWS = { library: renderLibrary, edit: renderEdit, script: renderScript, player: renderPlayer, sync: renderSync, browse: renderBrowse };
+
 function render() {
-  const view = { library: renderLibrary, edit: renderEdit, script: renderScript, player: renderPlayer, sync: renderSync, browse: renderBrowse }[app.view];
-  $('#app').innerHTML = view();
+  $('#app').innerHTML = VIEWS[app.view]();
   if (app.view === 'player') refreshPlayer();
   if (app.view === 'edit') updatePreview();
-  $('#crumb').textContent = app.view === 'script' || app.view === 'player' ? current()?.title ?? '' : '';
+  if (app.view === 'sing') mountSing();
+  $('#crumb').textContent = ['script', 'player', 'sing'].includes(app.view) ? current()?.title ?? '' : '';
 }
 
 const SAMPLE = `# Act 2, Scene 2: The balcony
