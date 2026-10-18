@@ -6,7 +6,7 @@
 // only the controls. Deleting a sign-in account itself happens in the Firebase console.
 // Loaded after groups.js and uses its helpers.
 
-const ADMIN_UID = ''; // Shannon's account ID (Group screen > Account ID); must match isAdmin() in firestore.rules
+const ADMIN_UID = 'tEUc6ZFsyENufRbOSoVtCaF7sV62'; // Shannon's account ID (Group screen > Account ID); must match isAdmin() in firestore.rules
 const FIREBASE_USERS_URL = 'https://console.firebase.google.com/project/line-learner-45bd1/authentication/users';
 const isAdmin = () => !!ADMIN_UID && fb.user?.uid === ADMIN_UID;
 

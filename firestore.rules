@@ -5,7 +5,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     // The app's admin (Shannon). Must match ADMIN_UID in admin.js.
-    function isAdmin() { return signedIn() && request.auth.uid == 'ADMIN_UID_HERE'; }
+    function isAdmin() { return signedIn() && request.auth.uid == 'tEUc6ZFsyENufRbOSoVtCaF7sV62'; }
     // Blocked people can't use groups, sharing or the shared voices.
     function notBlocked() { return !exists(/databases/$(database)/documents/blocked/$(request.auth.uid)); }
     function memberOf(gid) {

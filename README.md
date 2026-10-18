@@ -128,6 +128,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | **GitHub** | Hosting, and the optional GitHub sync | This repository; Pages builds from `main` |
 
 - **Security rules:** `firestore.rules` is the source of truth. After changing it, paste it into Firestore > Rules and **Publish**.
+- **Admin:** signed in as Shannon (account ID in `admin.js` `ADMIN_UID` and `isAdmin()` in `firestore.rules`), the Group screen shows **Admin**: everyone who has signed in, block/unblock, remove from groups, reset a shared-voices allowance, delete synced scripts, manage or delete groups and shared items. Deleting a sign-in account itself is done in Firebase > Authentication > Users.
 - **Shared voices server:** code in `server/voices-worker.js`; settings, allowances and how it decides in `server/README.md`.
 - **Free script library:** lives in `library/`. To rebuild it (for example after adding a play to `tools/build-library.html`), run `powershell -ExecutionPolicy Bypass -File tools\build-library.ps1`. It downloads the Project Gutenberg texts into `tools/raw/` (not committed), converts them with `tools/convert.js`, and writes `library/plays/*.txt`, `library/plays.json` and `library/monologues.json`.
 - **Publishing a change:** push to `main`; GitHub Pages rebuilds in about a minute. Bump the `?v=` numbers in `index.html` so phones load the new files (the app also checks for updates and reloads itself on safe screens).
@@ -141,6 +142,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | `track.js` | Listen, screen off (building and saving audio tracks) |
 | `songs.js` | Songs: lyrics, Spotify, Sing along |
 | `groups.js` | Google sign-in, groups, sharing, Google sync |
+| `admin.js` | The admin screen (Shannon only) |
 | `help.js` | The Help & troubleshooting screen |
 | `firestore.rules` | Firebase security rules |
 | `server/` | The shared voices Cloudflare Worker and its setup guide |
