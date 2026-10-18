@@ -33,6 +33,18 @@ service cloud.firestore {
       allow list, write: if isAdmin();
     }
 
+    // Send feedback: anyone can send a note (signed in or not); only the admin can read or delete them.
+    match /feedback/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['kind', 'message', 'contact', 'details', 'screenshot', 'at', 'uid', 'name'])
+        && request.resource.data.kind in ['bug', 'idea', 'other']
+        && request.resource.data.message is string && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 5000
+        && request.resource.data.contact is string && request.resource.data.contact.size() <= 200
+        && request.resource.data.details is string && request.resource.data.details.size() <= 6000
+        && (!('screenshot' in request.resource.data) || (request.resource.data.screenshot is string && request.resource.data.screenshot.size() <= 900000))
+        && (!('uid' in request.resource.data) || (signedIn() && request.resource.data.uid == request.auth.uid));
+      allow read, delete: if isAdmin();
+    }
+
     // Invite codes point to a group. They can be looked up one at a time (to join) but never listed.
     match /invites/{code} {
       allow get: if (signedIn() && notBlocked()) || isAdmin();

@@ -20,8 +20,24 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => el.classList.remove('show'), 3500);
+  toast.timer = setTimeout(() => el.classList.remove('show'), Math.min(12000, 3500 + Math.max(0, msg.length - 70) * 45));
 }
+$('#toast')?.addEventListener('click', e => e.currentTarget.classList.remove('show'));
+
+// The last few unexpected errors, so a bug report can include them. An error in the app's own code also
+// gets a friendly note (at most once a minute) pointing to Send feedback.
+const recentErrors = [];
+function noteError(text) {
+  recentErrors.push(`${new Date().toLocaleTimeString()} ${typeof app === 'undefined' ? '' : app.view}: ${String(text).slice(0, 300)}`);
+  if (recentErrors.length > 8) recentErrors.shift();
+}
+addEventListener('error', e => {
+  noteError(`${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno})`);
+  if (!e.filename?.startsWith(location.origin) || Date.now() - (noteError.shown || 0) < 60000) return;
+  noteError.shown = Date.now();
+  toast("Something flubbed a line (that's on us). Try that again, and if it keeps happening, tap Send feedback at the bottom.");
+});
+addEventListener('unhandledrejection', e => noteError(e.reason?.stack?.split('\n')[0] || e.reason?.message || e.reason));
 
 // ---------- Storage ----------
 const LS_SCRIPTS = 'lineLearner.scripts';
@@ -38,19 +54,26 @@ const DEFAULT_SETTINGS = {
   loop: false,
   skipCuts: false,         // reading pages: leave out printed lines crossed out by hand
   listenHears: true,       // Listen mode: hear you say your line and move on when you finish
+  textSize: 'normal',      // normal | large | huge (bigger words for a phone on a stand)
 };
 
 function loadJSON(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
 }
 function saveJSON(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { toast('Could not save: ' + e.message); }
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { toast(`Out of room backstage: couldn't save (${e.message}). Download a backup on the Sync screen, then delete saved tracks or scripts you're done with.`); }
 }
 
 let scripts = loadJSON(LS_SCRIPTS, []);
 const settings = { ...DEFAULT_SETTINGS, ...loadJSON(LS_SETTINGS, {}) };
 const saveScripts = () => { saveJSON(LS_SCRIPTS, scripts); scheduleSync(); };
 const saveSettings = () => saveJSON(LS_SETTINGS, settings);
+const applyTextSize = () => { document.documentElement.dataset.textSize = settings.textSize; };
+applyTextSize();
+
+// Where you stopped in each script's Listen or Rehearse run, so a long scene can pick up from there.
+const LS_RESUME = 'lineLearner.resume';
+const resumeAt = loadJSON(LS_RESUME, {});
 
 // Recordings live in IndexedDB, keyed by a hash of speaker + line text so they survive script edits.
 // AI-generated line audio is cached there too ('tts'), so each line is only paid for once.
@@ -859,8 +882,8 @@ function setTranscript(text) {
 
 // How to switch the microphone on for this site, in words for the browser you're using.
 function micHelp() {
-  if (IS_IOS) return 'The microphone is blocked. In Safari, tap the "aA" button in the address bar > Website Settings > Microphone > Allow (in Chrome: the site\'s settings, or iPhone Settings > Chrome > Microphone). Then press play.';
-  return 'The microphone is blocked. Click the icon at the left of the address bar, set Microphone to Allow, then press play.';
+  if (IS_IOS) return 'Missed our entrance: the microphone is blocked. In Safari, tap the "aA" button in the address bar > Website Settings > Microphone > Allow (in Chrome: the site\'s settings, or iPhone Settings > Chrome > Microphone). Then press play.';
+  return 'Missed our entrance: the microphone is blocked. Click the icon at the left of the address bar, set Microphone to Allow, then press play.';
 }
 
 // Asks for the microphone as soon as you start (while your tap still counts), so the browser's question
@@ -874,16 +897,16 @@ async function ensureMic() {
     stream.getTracks().forEach(t => t.stop());
     return true;
   } catch (e) {
-    toast(e?.name === 'NotFoundError' ? 'No microphone found. Plug one in (or use your phone), then try again.' : micHelp());
+    toast(e?.name === 'NotFoundError' ? 'No microphone in the wings. Plug one in (or check your headphones are connected), then try again.' : micHelp());
     return false;
   }
 }
 
 function micError(code) {
   if (code === 'not-allowed' || code === 'service-not-allowed') return micHelp();
-  if (code === 'network') return 'Checking your lines needs an internet connection. Reconnect, then press play.';
-  if (code === 'audio-capture') return 'No microphone found. Plug one in, then press play.';
-  return `The microphone stopped (${code}). Press play to try again.`;
+  if (code === 'network') return 'Lost the signal backstage. Checking your lines needs the internet: reconnect, then press play.';
+  if (code === 'audio-capture') return 'No microphone in the wings. Plug one in (or check your headphones are connected), then press play.';
+  return `The microphone dropped its cue (${code}). Press play to try again.`;
 }
 
 // ---------- Recording your own voice ----------
@@ -898,7 +921,7 @@ async function toggleRecord(key) {
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch {
-    toast('Microphone blocked. Allow it in the address bar and try again.');
+    toast(micHelp());
     return;
   }
   const chunks = [];
@@ -924,7 +947,8 @@ function stopRecording() {
 
 // ---------- Script helpers ----------
 const app = { view: 'library', scriptId: null, editing: null, rec: null, voicesOpen: false };
-const current = () => scripts.find(s => s.id === app.scriptId);
+let sampleScript = null; // "Try a sample scene": kept in memory only, never in your scripts
+const current = () => scripts.find(s => s.id === app.scriptId) || (sampleScript?.id === app.scriptId ? sampleScript : undefined);
 const lineKey = l => hash(l.speaker + '|' + spokenText(l.text));
 const isMine = (s, l) => l.type === 'line' && l.speaker === s.myChar;
 const statOf = (s, l) => s.stats[lineKey(l)];
@@ -1742,6 +1766,15 @@ function statDot(st) {
   return `<span class="dot ${cls}" title="Last run ${st.last}%, best ${st.best}%"></span>`;
 }
 
+function resumeHtml(s) {
+  const r = resumeAt[s.id];
+  if (!r || s.kind === 'song' || !s.lines[r.line]) return '';
+  return `<div class="card resume-card">
+    <span><b>Pick up where you left off?</b> <span class="muted">Line ${r.pos} of ${r.total} in ${r.mode === 'listen' ? 'Listen' : 'Rehearse'}, ${ago(r.at)}.</span></span>
+    <button class="btn primary" data-action="resume-run">${icon('play')} Pick up</button>
+  </div>`;
+}
+
 function renderScript() {
   const s = current();
   const chars = [...characters(s)];
@@ -1785,20 +1818,21 @@ function renderScript() {
   return `<section class="stack">
     <div class="row between wrap">
       <h1>${esc(s.title)}</h1>
-      <div class="row wrap">${typeof shareButtonHtml === 'function' ? shareButtonHtml(s) : ''}<button class="btn ghost" data-action="edit-script">Edit</button><button class="btn ghost" data-action="delete-script">Delete</button></div>
+      ${s.sample ? '' : `<div class="row wrap">${typeof shareButtonHtml === 'function' ? shareButtonHtml(s) : ''}<button class="btn ghost" data-action="edit-script">Edit</button><button class="btn ghost" data-action="delete-script">Delete</button></div>`}
     </div>
-    ${typeof sharePanelHtml === 'function' ? sharePanelHtml(s) : ''}
+    ${s.sample ? '<p class="muted">A sample scene to try things out. It isn\'t saved to your scripts, so play with it freely.</p>' : typeof sharePanelHtml === 'function' ? sharePanelHtml(s) : ''}
     ${supportNote()}
     <div class="card stack-sm">
-      <label class="field inline"><span>Category</span><select data-cat-id="${s.id}" aria-label="Category">${categoryOptions(catOf(s))}</select></label>
+      ${s.sample ? '' : `<label class="field inline"><span>Category</span><select data-cat-id="${s.id}" aria-label="Category">${categoryOptions(catOf(s))}</select></label>`}
       <label class="field inline"><span>I'm playing</span><select id="my-char">
         <option value="">Choose a character…</option>
         ${chars.map(([c, n]) => `<option value="${esc(c)}" ${c === s.myChar ? 'selected' : ''}>${esc(titleCase(c))} (${n} ${n === 1 ? 'line' : 'lines'})</option>`).join('')}
       </select></label>
-      ${s.kind !== 'song' && chars.length > 1 ? '<div><button class="link-btn small" data-action="fix-names">Fix or merge character names</button></div>' : ''}
+      ${s.kind !== 'song' && !s.sample && chars.length > 1 ? '<div><button class="link-btn small" data-action="fix-names">Fix or merge character names</button></div>' : ''}
       ${rangeHtml}
       ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${solid} of ${mine.length} lines solid</span></div>` : ''}
     </div>
+    ${resumeHtml(s)}
     <div class="modes">
       ${s.kind === 'song' ? `<button class="mode" data-action="sing">${icon('headphones')}<b>Sing along</b><span>${s.song?.spotify ? 'Play the real song with the lyrics highlighted, and hide words as you learn them.' : 'Learn the lyrics. Add the Spotify song (Edit) to sing with the track.'}</span></button>` : ''}
       <button class="mode" data-action="listen">${icon('headphones')}<b>Listen</b><span>Hear the scene like an audio track. It pauses for you to say your lines.</span></button>
@@ -1869,7 +1903,11 @@ function newPlayer(mode, order) {
 }
 let P = newPlayer('listen', []);
 
-const pill = () => (STATUS_TEXT[P.status] ? `<span class="pill ${P.status}">${STATUS_TEXT[P.status]}</span>` : '');
+const pill = () => (STATUS_TEXT[P.status] ? `<span class="pill ${P.status}">${(P.status === 'good' && P.goodText) || STATUS_TEXT[P.status]}</span>` : '');
+
+// A little variety when a line lands, and a special word for one that used to give you trouble.
+const GOOD_WORDS = ['Nailed it', 'Right on cue', 'Off book!', 'Solid', 'Bravo'];
+const goodWord = wasShaky => (wasShaky ? "That line's looking solid" : GOOD_WORDS[Math.floor(Math.random() * GOOD_WORDS.length)]);
 
 function renderPlayer() {
   const s = current();
@@ -1958,12 +1996,17 @@ function buildUpStageHtml(s) {
 
 function doneHtml(s) {
   const weak = s.myChar ? weakCount(s) : 0;
-  let msg;
-  if (P.mode === 'buildup') msg = "You've built the whole speech. Now try it in Rehearse with hints turned off.";
+  const { solid, lines } = P.run;
+  let title = "That's a wrap!", msg;
+  if (P.mode === 'buildup') { title = "That's the whole speech!"; msg = 'Now try it in Rehearse with hints turned off.'; }
   else if (P.mode === 'listen') msg = 'Play it again, or switch to Rehearse and say your lines out loud.';
-  else msg = `You got <b>${P.run.solid}</b> of <b>${P.run.lines}</b> lines on the first try.`;
+  else if (P.drill) {
+    title = solid === lines ? 'Nothing shaky left!' : "That's a wrap on the drill!";
+    msg = solid === lines ? `All <b>${lines}</b> of those lines landed. Nice work.` : `<b>${solid}</b> of <b>${lines}</b> shaky lines landed this time. The rest will get there.`;
+  } else if (lines && solid === lines) msg = `Every line on the first try (<b>${lines}</b> of <b>${lines}</b>). Take a bow.`;
+  else msg = `You got <b>${solid}</b> of <b>${lines}</b> lines on the first try.${lines && solid / lines >= 0.7 ? ' Looking good.' : ' Every run makes the next one easier.'}`;
   return `<div class="card stage-card done-card">
-    <h2>${P.mode === 'buildup' ? 'Speech complete' : 'Scene complete'}</h2>
+    <h2>${title}</h2>
     <p>${msg}</p>
     <div class="row wrap">
       <button class="btn primary" data-action="restart">${P.mode === 'buildup' ? 'Build it again' : 'Run it again'}</button>
@@ -1980,6 +2023,7 @@ function settingsHtml() {
   return `<details class="card settings">
     <summary>Practice settings</summary>
     <div class="settings-grid">
+      <label><span>Text size</span>${sel('textSize', [['normal', 'Normal'], ['large', 'Large'], ['huge', 'Extra large (phone on a stand)']])}</label>
       <label><span>Reading speed</span>${rng('rate', 0.6, 1.5, 0.05)}</label>
       <label><span>Your lines in Listen mode</span>${sel('myLines', [['gapThenSpeak', 'Pause for me, then read them'], ['gap', 'Pause for me only'], ['speak', 'Read them aloud'], ['skip', 'Skip them']])}</label>
       <label><span>Hints when it's your line</span>${sel('hint', [['hidden', 'No words, just blanks'], ['first', 'First few words'], ['initials', 'First letter of each word'], ['full', 'Show the whole line']])}</label>
@@ -2019,6 +2063,7 @@ function beginRun() {
 function finishRun() {
   P.running = false;
   P.status = 'done';
+  saveResume();
   keepAwake(false);
   refreshPlayer();
 }
@@ -2031,6 +2076,7 @@ function pauseRun(note = '') {
 }
 
 function leave() {
+  if (app.view === 'player') saveResume();
   stopRun();
   stopRecording();
   previewToken.cancel();
@@ -2038,18 +2084,40 @@ function leave() {
   if (sync.pending) { sync.pending = false; scheduleSync(); }
 }
 
-async function startPlayer(mode, order) {
+async function startPlayer(mode, order, from = 0, drill = false) {
   const s = current();
-  if (mode !== 'listen' && !s.myChar) { toast('Pick your character first.'); return; }
+  if (mode !== 'listen' && !s.myChar) { toast('Who are you playing? Pick your character under "I\'m playing" first.'); return false; }
   order ||= rangeOrder(s);
-  if (!order.length) { toast('Nothing to practice here yet.'); return; }
+  if (!order.length) { toast('Empty stage: nothing to practice here yet. Tap Edit to add some lines.'); return false; }
   // Every mode settles microphone permission before anything plays, so it never pops up mid-scene.
-  if (!(await ensureMic())) return;
+  if (!(await ensureMic())) return false;
   leave();
   P = newPlayer(mode, order);
+  P.drill = drill;
   app.view = 'player';
   render();
-  run(0);
+  headphoneControls();
+  run(from);
+  return true;
+}
+
+// Play/pause and skip buttons on headphones (and the lock screen) work the player while it's open.
+function headphoneControls() {
+  if (!('mediaSession' in navigator)) return;
+  const set = (a, fn) => { try { navigator.mediaSession.setActionHandler(a, fn); } catch { /* not supported here */ } };
+  set('play', () => app.view === 'player' && !P.running && togglePlay());
+  set('pause', () => app.view === 'player' && P.running && togglePlay());
+  set('nexttrack', () => app.view === 'player' && jump(1));
+  set('previoustrack', () => app.view === 'player' && jump(-1));
+}
+
+// Remembers the line you're on in a long Listen or Rehearse run (not drills), so you can pick up there.
+function saveResume() {
+  const s = current();
+  if (!s || P.drill || !['listen', 'rehearse'].includes(P.mode) || P.order.length < 30) return;
+  if (P.status === 'done' || P.orderPos < 3) delete resumeAt[s.id];
+  else resumeAt[s.id] = { mode: P.mode, line: P.order[P.orderPos], pos: P.orderPos + 1, total: P.order.length, at: Date.now() };
+  saveJSON(LS_RESUME, resumeAt);
 }
 
 async function startBuildUp(i) {
@@ -2070,6 +2138,7 @@ async function run(from) {
     const item = s.lines[P.order[p]];
     Object.assign(P, { orderPos: p, result: null, transcript: '', reveal: settings.hint, status: 'idle' });
     refreshPlayer();
+    saveResume();
     aiPrefetch(s, P.order.slice(p, p + 4));
     if (item.type === 'section') await sleep(700, token);
     else if (item.type === 'direction') {
@@ -2138,10 +2207,11 @@ async function attempt(expected, token) {
   return { score: P.result.score };
 }
 
-const IDLE_NOTE = "Paused because I didn't hear anything. Press play when you're ready.";
+const IDLE_NOTE = "Holding for you: I didn't hear anything. If you were talking, check the microphone (and your headphones). Press play when you're ready.";
 
 async function rehearseLine(item, token) {
   const s = current(), key = lineKey(item);
+  const wasShaky = (s.stats[key]?.tries || 0) > 0 && s.stats[key].last < settings.passScore;
   let tries = 0, idle = 0, first = null;
   // The first attempt in a run is what counts toward "solid"; best keeps your best ever.
   const note = score => {
@@ -2175,6 +2245,7 @@ async function rehearseLine(item, token) {
     if (r.score >= settings.passScore) {
       chime(true);
       P.status = 'good';
+      P.goodText = goodWord(wasShaky);
       refreshPlayer();
       await sleep(900, token);
       return;
@@ -2215,6 +2286,7 @@ async function runBuildUp(fromK) {
       if (r.score != null && r.score >= settings.passScore) {
         chime(true);
         P.status = 'good';
+        P.goodText = goodWord(false);
         refreshPlayer();
         await sleep(900, token);
         break;
@@ -2302,7 +2374,7 @@ const actions = {
     } catch {
       b.disabled = false;
       b.textContent = 'Add';
-      toast("Couldn't download that play. Check your connection and try again.");
+      toast('That play missed its train. Check your connection and try again.');
     }
   },
   'backup-download'() { downloadBackup(); },
@@ -2400,12 +2472,13 @@ const actions = {
     clearDraft();
     render();
   },
+  // The sample opens without joining your scripts, so it never clutters the list or syncs.
   sample() {
-    const s = makeScript('Romeo and Juliet: the balcony (sample)', SAMPLE);
-    s.myChar = 'JULIET';
-    scripts.push(s);
-    saveScripts();
-    openScript(s.id);
+    if (!sampleScript) {
+      sampleScript = makeScript('Romeo and Juliet: the balcony (sample)', SAMPLE);
+      Object.assign(sampleScript, { id: 'sample', myChar: 'JULIET', sample: true });
+    }
+    openScript(sampleScript.id);
   },
   open(b) { openScript(b.dataset.id); },
   'edit-script'() {
@@ -2465,7 +2538,11 @@ const actions = {
   },
   listen() { startPlayer('listen'); },
   rehearse() { startPlayer('rehearse'); },
-  weak() { startPlayer('rehearse', weakOrder(current())); },
+  weak() { startPlayer('rehearse', weakOrder(current()), 0, true); },
+  'resume-run'() {
+    const r = resumeAt[current().id], order = rangeOrder(current());
+    startPlayer(r.mode, order, Math.max(0, order.indexOf(r.line)));
+  },
   'from-here'(b, i) {
     const s = current();
     const [a, z] = rangeBounds(s);
@@ -2524,6 +2601,7 @@ function applySetting(el) {
   const key = el.dataset.setting;
   settings[key] = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value;
   saveSettings();
+  if (key === 'textSize') applyTextSize();
   if (el.type === 'range') el.nextElementSibling.textContent = settingLabel(key);
   if (key === 'hint' && !P.result) { P.reveal = settings.hint; refreshPlayer(); }
 }

@@ -86,7 +86,7 @@ kbd { font: .8em var(--font-ui); border: 1px solid var(--border); border-bottom-
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
 }
-.brand { font: 700 1.05rem var(--font-ui); background: none; border: 0; color: var(--ink); cursor: pointer; padding: 4px 0; }
+.brand { font: 700 1.05rem var(--font-ui); background: none; border: 0; color: var(--ink); cursor: pointer; padding: 4px 0; white-space: nowrap; flex-shrink: 0; }
 .crumb { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .sync-btn {
   flex-shrink: 0;
@@ -293,6 +293,30 @@ em.dir { font-style: italic; }
 .step.now { background: var(--accent); }
 
 .controls { display: flex; justify-content: center; align-items: center; gap: 18px; }
+/* Keeps play/pause in reach when a long line pushes it down (a phone on a stand can't be scrolled mid-scene). */
+.player .controls {
+  position: sticky; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 4;
+  align-self: center; padding: 8px 14px; border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(8px);
+}
+
+/* Bigger words for reading at arm's length (Practice settings > Text size). */
+:root[data-text-size="large"] .script-text { font-size: clamp(1.6rem, 5.4vw, 2.1rem); }
+:root[data-text-size="large"] .context { font-size: 1.25rem; }
+:root[data-text-size="huge"] .script-text { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.4; }
+:root[data-text-size="huge"] .context { font-size: 1.5rem; }
+:root[data-text-size="huge"] .card-head .who, :root[data-text-size="huge"] .pill { font-size: 1rem; }
+:root[data-text-size="large"] .lyric { font-size: 1.45rem; }
+:root[data-text-size="huge"] .lyric { font-size: 1.8rem; }
+
+.feedback textarea { width: 100%; }
+.fb-thumb { max-height: 120px; max-width: 60%; border-radius: 8px; border: 1px solid var(--border); }
+.fb-shot { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); margin-top: 6px; }
+.fb-details { white-space: pre-wrap; word-break: break-word; font-size: .8rem; background: var(--surface-2); padding: 8px 10px; border-radius: 8px; }
+.fb-message { white-space: pre-wrap; margin: 0; }
+
+.resume-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.resume-card .btn svg { width: 16px; height: 16px; }
 .ctrl {
   display: grid; place-items: center;
   width: 52px; height: 52px; border-radius: 50%;
@@ -314,11 +338,12 @@ em.dir { font-style: italic; }
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
   background: var(--ink); color: var(--bg);
-  padding: 10px 18px; border-radius: 999px;
+  padding: 10px 18px; border-radius: 16px; line-height: 1.4; text-align: center; z-index: 10;
   opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
-  max-width: calc(100% - 32px);
+  width: max-content; max-width: min(520px, calc(100% - 32px));
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }
+body[data-view="player"] .toast, body[data-view="sing"] .toast { bottom: calc(110px + env(safe-area-inset-bottom, 0px)); } /* above the play controls */
 
 @keyframes pulse { 50% { opacity: .65; } }
 
@@ -344,7 +369,7 @@ body[data-view="sing"] .site-footer { padding-bottom: 130px; } /* clear of the p
 .site-footer .link-btn { font-size: .85rem; }
 .tip-link { font-size: .85rem; font-weight: 600; text-decoration: none; }
 .tip-link:hover { text-decoration: underline; }
-.footer-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; }
+.footer-links { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 18px; }
 .credit { font-weight: 600; color: var(--ink); margin-top: 6px; }
 .disclaimer { display: block; max-width: 60ch; line-height: 1.5; }
 .account-line { max-width: 60ch; }

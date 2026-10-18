@@ -16,6 +16,7 @@ Open it at **<https://sqnazzal.github.io/line-learner/>**. Nothing to install.
 - **Computer:** use **Chrome** or **Edge** (Firefox can read lines but can't check them by microphone).
 - The first time you practice, allow the **microphone**. Checking your lines needs an internet connection.
 - Stuck at any point? **Help & troubleshooting** (bottom of every page) has steps for each kind of device.
+- Found a bug or have an idea? **Send feedback / Report a bug** (bottom of every page) sends a note, with an optional screenshot, straight to Shannon.
 
 ## Adding a script
 
@@ -62,7 +63,9 @@ On a script, choose who you're playing (**I'm playing**) and, optionally, a scen
 | **Drill weak lines** | Only the lines you missed last time, each with its cue. |
 
 - **Stuck?** Say **"line"** and it feeds you the line.
-- **Practice settings** (under the player): reading speed, how much of your line shows as a hint, how strict the check is, how long it waits after you stop talking, and more.
+- **Long scenes:** leave mid-scene and the script page offers **Pick up where you left off**.
+- **Headphones:** wired or Bluetooth work; on many phones their play/pause and skip buttons work the player.
+- **Practice settings** (under the player): text size (up to **Extra large** for a phone on a stand), reading speed, how much of your line shows as a hint, how strict the check is, how long it waits after you stop talking, and more.
 - **Keyboard** (computer): `Space` play/pause, `←` `→` lines, `H` hint, `L` hear the line, `Enter` done speaking.
 - **Record real voices:** tap the mic icon on any line to record it (yours, or a castmate reading cues). Recordings play instead of the computer voice.
 
@@ -128,7 +131,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | **GitHub** | Hosting, and the optional GitHub sync | This repository; Pages builds from `main` |
 
 - **Security rules:** `firestore.rules` is the source of truth. After changing it, paste it into Firestore > Rules and **Publish**.
-- **Admin:** signed in as Shannon (account ID in `admin.js` `ADMIN_UID` and `isAdmin()` in `firestore.rules`), the Group screen shows **Admin**: everyone who has signed in, block/unblock, remove from groups, reset a shared-voices allowance, delete synced scripts, manage or delete groups and shared items. Deleting a sign-in account itself is done in Firebase > Authentication > Users.
+- **Admin:** signed in as Shannon (account ID in `admin.js` `ADMIN_UID` and `isAdmin()` in `firestore.rules`), the Group screen shows **Admin**: the **Feedback** inbox (notes sent with Send feedback), everyone who has signed in, block/unblock, remove from groups, reset a shared-voices allowance, delete synced scripts, manage or delete groups and shared items. Deleting a sign-in account itself is done in Firebase > Authentication > Users.
 - **Shared voices server:** code in `server/voices-worker.js`; settings, allowances and how it decides in `server/README.md`.
 - **Free script library:** lives in `library/`. To rebuild it (for example after adding a play to `tools/build-library.html`), run `powershell -ExecutionPolicy Bypass -File tools\build-library.ps1`. It downloads the Project Gutenberg texts into `tools/raw/` (not committed), converts them with `tools/convert.js`, and writes `library/plays/*.txt`, `library/plays.json` and `library/monologues.json`.
 - **Publishing a change:** push to `main`; GitHub Pages rebuilds in about a minute. Bump the `?v=` numbers in `index.html` so phones load the new files (the app also checks for updates and reloads itself on safe screens).

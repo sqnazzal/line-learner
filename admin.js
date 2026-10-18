@@ -16,6 +16,20 @@ Object.assign(fb, {
     const { F, db } = fb.api;
     return F.setDoc(F.doc(db, 'profiles', fb.user.uid), { name: fb.user.name, email: fb.user.email, lastSeen: Date.now() }, { merge: true });
   },
+  // Send feedback (anyone, signed in or not). Only the admin can read the inbox.
+  async sendFeedback(note) {
+    await fb.load();
+    const { F, db } = fb.api;
+    return F.addDoc(F.collection(db, 'feedback'), { ...note, at: Date.now(), ...(fb.user ? { uid: fb.user.uid, name: fb.user.name } : {}) });
+  },
+  async adminFeedback() {
+    const { F, db } = fb.api;
+    return (await F.getDocs(F.collection(db, 'feedback'))).docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.at - a.at);
+  },
+  adminDeleteFeedback(id) {
+    const { F, db } = fb.api;
+    return F.deleteDoc(F.doc(db, 'feedback', id));
+  },
   async adminLoad() {
     const { F, db } = fb.api;
     const [profiles, groups, blocked] = await Promise.all(['profiles', 'groups', 'blocked'].map(c => F.getDocs(F.collection(db, c))));
@@ -68,6 +82,7 @@ async function loadAdmin() {
   adm.error = '';
   try {
     adm.data = await fb.adminLoad();
+    adm.feedback = await fb.adminFeedback().catch(() => null); // null until the rules with 'feedback' are published
     adm.usage = {};
     try { for (const row of (await voicesAdmin('/admin/usage'))?.rows || []) adm.usage[row.uid] = row.usd; } catch { /* server not updated yet */ }
   } catch (e) {
@@ -122,12 +137,30 @@ function renderAdmin() {
   return `<section class="stack admin">
     ${head}
     <p class="muted">You're the app's admin. Changes here affect other people right away. <button class="link-btn" data-action="admin-reload">Refresh</button></p>
+    ${feedbackHtml()}
     <h2>People (${profiles.length})</h2>
     <ul class="lib-list">${people || '<li class="muted">No one has signed in yet.</li>'}</ul>
     <p class="muted small"><b>Block</b> stops someone using groups, sharing and the shared voices (their own scripts on their own device are unaffected). To delete someone's Google sign-in completely, use <a href="${FIREBASE_USERS_URL}" target="_blank" rel="noopener">Firebase > Authentication > Users</a> after removing and blocking them here.</p>
     <h2>Groups (${groups.length})</h2>
     <ul class="lib-list">${groupRows || '<li class="muted">No groups yet.</li>'}</ul>
   </section>`;
+}
+
+const FEEDBACK_TAGS = { bug: 'Bug', idea: 'Idea', other: 'Other' };
+
+function feedbackHtml() {
+  const list = adm.feedback;
+  if (!list) return '<h2 id="admin-feedback">Feedback</h2><p class="note">Firebase refused: publish the latest firestore.rules (it adds the feedback inbox).</p>';
+  const rows = list.map(f => `<li class="card admin-row stack-sm">
+    <div class="row between wrap"><span><span class="tag">${FEEDBACK_TAGS[f.kind] || 'Other'}</span> <b>${esc(f.name || f.contact || 'Someone (not signed in)')}</b>
+      <span class="muted small">${when(f.at)}${f.contact && f.name ? ` · ${esc(f.contact)}` : ''}</span></span>
+      <button class="btn ghost" data-action="admin-del-feedback" data-id="${esc(f.id)}">Delete</button></div>
+    <p class="fb-message">${esc(f.message)}</p>
+    ${f.screenshot ? `<details><summary class="small">Screenshot</summary><img class="fb-shot" src="${esc(f.screenshot)}" alt="Screenshot"></details>` : ''}
+    ${f.details ? `<details><summary class="small">Device details</summary><pre class="fb-details">${esc(f.details)}</pre></details>` : ''}
+  </li>`).join('');
+  return `<h2 id="admin-feedback">Feedback (${list.length})</h2>
+    <ul class="lib-list">${rows || '<li class="muted">No feedback yet.</li>'}</ul>`;
 }
 
 // Runs an admin change, then reloads the lists.
@@ -179,6 +212,9 @@ Object.assign(actions, {
       await fb.adminDeleteItem(gid, id);
       adm.items[gid] = adm.items[gid].filter(x => x.id !== id);
     }, 'Deleted.');
+  },
+  'admin-del-feedback'(b) {
+    adminDo('Delete this feedback?', () => fb.adminDeleteFeedback(b.dataset.id), 'Deleted.');
   },
   'admin-del-group'(b) {
     const g = adm.data.groups.find(x => x.id === b.dataset.gid);

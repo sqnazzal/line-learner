@@ -123,11 +123,16 @@ const SYNC_HELP = topic('Syncing between your devices', `<ol>
     <li><b>Advanced:</b> people who already use GitHub can sync through it instead (Sync &gt; <b>Advanced: sync with GitHub instead</b>). Most people don't need this.</li>
     <li><b>Backup file:</b> on the Sync screen, <b>Download backup</b> saves everything to a file you can keep or <b>Restore</b> on any device, signed in or not.</li></ul>`);
 
+const REAL_HELP = topic('Rehearsing for real: phone on a stand, headphones, long scenes', `<ul>
+    <li><b>Phone on a stand:</b> open <b>Practice settings</b> (under the player) &gt; <b>Text size</b> &gt; <b>Extra large</b>. The play button stays at the bottom of the screen, and the screen stays on while a scene plays. Hands busy? Say <i>"line"</i> when you're stuck.</li>
+    <li><b>Headphones:</b> wired or Bluetooth both work. On many phones the play/pause and skip buttons on them work the player too (most reliably with the AI voices). Bluetooth earbuds use their own microphone, which can be less clear; if good lines keep getting marked wrong, lower <b>Score needed to pass</b> a little.</li>
+    <li><b>Long scenes:</b> leave any time and the script page offers <b>Pick up where you left off</b>. Lines like <code># Act 2</code> or <code>Scene 3</code> in the script make sections you can pick with <b>Start at</b>, and the play icon on any of your lines starts Rehearse from there.</li></ul>`);
+
 const COMMON = topic("Something's not working?", `<ul>
   <li><b>Reload the page.</b> Updates arrive automatically, but a reload makes sure you have the latest.</li>
   <li><b>Check your internet connection:</b> checking lines, AI voices, lyrics, sync and groups need it.</li>
   <li><b>Your scripts live in this browser.</b> Clearing this site's data (or browsing privately) can remove them, so turn on <b>Sync</b> or save a <b>Download backup</b> file now and then.</li>
-  <li>Still stuck? Take a screenshot of the message and send it to Shannon.</li></ul>`)
+  <li>Still stuck? <button class="link-btn" data-action="feedback">Send feedback</button> (add a screenshot of the message if there is one) and Shannon will take a look.</li></ul>`)
   + topic('Tip jar', `<p>Line Learner is free. The natural AI voices and page reading cost a little to run, so if it's helping you get off book, a tip toward the voices is very welcome (and never expected).</p>
   <p><a class="btn primary" href="${TIP_URL}" target="_blank" rel="noopener">☕ Tip Shannon on Venmo</a></p>`);
 
@@ -139,6 +144,7 @@ function renderHelp() {
     <p class="lede">How to set things up and fix common problems. Pick your device:</p>
     <div class="segmented" role="group" aria-label="Your device">${tabs}</div>
     ${HELP[help.tab].map(([t, b], i) => topic(t, b, i === 0)).join('')}
+    ${REAL_HELP}
     ${SYNC_HELP}
     ${COMMON}
   </section>`;
@@ -150,3 +156,100 @@ Object.assign(actions, {
 });
 
 VIEWS.help = renderHelp;
+
+// ---------- Send feedback / Report a bug ----------
+// Goes to the app's Firestore 'feedback' inbox, which only the admin can read (Admin screen). Works signed
+// in or not. Device details help track down bugs; no scripts are included.
+const fbk = { kind: 'bug', from: '', shot: '', sent: false, busy: false };
+const FEEDBACK_KINDS = {
+  bug: ['Report a bug', 'What happened, and what did you expect? What were you doing just before?'],
+  idea: ['Idea', 'What would make rehearsing easier?'],
+  other: ['Something else', "What's on your mind?"],
+};
+
+function deviceDetails() {
+  const version = (document.querySelector('script[src*="app.js?v="]')?.getAttribute('src') || '').split('v=')[1] || 'dev';
+  return [
+    `App version: ${version}`,
+    `Browser: ${navigator.userAgent}`,
+    `Screen: ${screen.width}x${screen.height}, window ${innerWidth}x${innerHeight}, ${devicePixelRatio}x`,
+    `Was on: ${fbk.from || 'library'} screen`,
+    `Checking lines by mic: ${SR ? 'available' : 'not available in this browser'}`,
+    `Voices: ${usingShared() ? "Shannon's shared voices" : ai.key ? 'own OpenAI key' : 'device voices'}`,
+    `Signed in: ${signedInUser() ? 'yes' : 'no'} · scripts on device: ${scripts.length} · text size: ${settings.textSize}`,
+    `Recent errors: ${recentErrors.length ? '\n' + recentErrors.join('\n') : 'none'}`,
+  ].join('\n');
+}
+
+function renderFeedback() {
+  const head = `<div class="row between wrap"><h1>Send feedback</h1><button class="btn ghost" data-action="home">${icon('back')} Your scripts</button></div>`;
+  if (fbk.sent) {
+    return `<section class="stack feedback">${head}
+      <div class="card stack-sm"><h2>Thanks! Message received.</h2>
+        <p>Shannon reads every one. Notes like this are how the app gets better.</p>
+        <div class="row wrap"><button class="btn primary" data-action="home">Back to your scripts</button><button class="btn ghost" data-action="feedback">Send another</button></div></div>
+    </section>`;
+  }
+  const kinds = Object.entries(FEEDBACK_KINDS).map(([k, [label]]) =>
+    `<button class="seg${fbk.kind === k ? ' on' : ''}" data-action="fb-kind" data-kind="${k}" aria-pressed="${fbk.kind === k}">${label}</button>`).join('');
+  return `<section class="stack feedback">
+    ${head}
+    <p class="lede">Found a bug, have an idea, or a line it keeps getting wrong? Tell Shannon here. Especially while it's new, every note helps.</p>
+    <div class="card stack-sm">
+      <div class="segmented" role="group" aria-label="What kind of feedback">${kinds}</div>
+      <label class="field"><span>Message</span><textarea id="fb-msg" rows="6" maxlength="5000" placeholder="${esc(FEEDBACK_KINDS[fbk.kind][1])}"></textarea></label>
+      <label class="field"><span>Your name or email, if you'd like a reply (optional)</span><input id="fb-contact" maxlength="200" value="${esc(signedInUser()?.email || '')}" autocomplete="email"></label>
+      <label class="field"><span>Screenshot (optional)</span><input id="fb-shot" type="file" accept="image/*"></label>
+      ${fbk.shot ? `<div class="row"><img class="fb-thumb" src="${fbk.shot}" alt="Your screenshot"><button class="btn ghost" data-action="fb-unshot">Remove</button></div>` : ''}
+      <label class="check-row"><input type="checkbox" id="fb-details" checked><span>Include device details (browser, screen, app version, recent errors). No scripts are sent.</span></label>
+      <details class="small"><summary>See the device details</summary><pre class="fb-details">${esc(deviceDetails())}</pre></details>
+      <div><button class="btn primary" data-action="fb-send"${fbk.busy ? ' disabled' : ''}>${fbk.busy ? 'Sending…' : 'Send'}</button></div>
+    </div>
+  </section>`;
+}
+
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'fb-shot' || !e.target.files[0]) return;
+  try {
+    fbk.shot = await imageToDataUrl(e.target.files[0], 1400);
+    if (fbk.shot.length > 850000) fbk.shot = await imageToDataUrl(e.target.files[0], 900);
+  } catch { fbk.shot = ''; toast("Couldn't open that picture. Try a PNG or JPEG screenshot."); }
+  const keep = { msg: $('#fb-msg')?.value, contact: $('#fb-contact')?.value };
+  render();
+  $('#fb-msg').value = keep.msg || '';
+  $('#fb-contact').value = keep.contact ?? '';
+});
+
+Object.assign(actions, {
+  feedback() { if (app.view !== 'feedback') fbk.from = app.view; leave(); Object.assign(fbk, { sent: false, shot: '', busy: false }); app.view = 'feedback'; render(); window.scrollTo(0, 0); },
+  'fb-kind'(b) {
+    fbk.kind = b.dataset.kind;
+    for (const x of document.querySelectorAll('[data-action="fb-kind"]')) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }
+    $('#fb-msg').placeholder = FEEDBACK_KINDS[fbk.kind][1];
+  },
+  'fb-unshot'() { fbk.shot = ''; $('.fb-thumb')?.parentElement.remove(); $('#fb-shot').value = ''; },
+  async 'fb-send'(b) {
+    const message = $('#fb-msg').value.trim();
+    if (!message) { toast("Type a message first: what happened, or what you'd like."); $('#fb-msg').focus(); return; }
+    fbk.busy = true;
+    b.disabled = true;
+    b.textContent = 'Sending…';
+    try {
+      await fb.sendFeedback({
+        kind: fbk.kind, message, contact: $('#fb-contact').value.trim(),
+        details: $('#fb-details').checked ? deviceDetails() : '', ...(fbk.shot ? { screenshot: fbk.shot } : {}),
+      });
+      fbk.sent = true;
+      render();
+      window.scrollTo(0, 0);
+    } catch (e) {
+      noteError(e?.code || e?.message);
+      toast("That didn't go through (no internet?). Try again in a moment, or take a screenshot and send it to Shannon.");
+      b.disabled = false;
+      b.textContent = 'Send';
+    }
+    fbk.busy = false;
+  },
+});
+
+VIEWS.feedback = renderFeedback;
