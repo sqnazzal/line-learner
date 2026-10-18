@@ -147,7 +147,7 @@ The home screen lists your scripts under category tabs: **Current**, **Audition*
 
 ## Listen, screen off
 
-**Listen, screen off** on a script builds the scene (or the part chosen with Start at / Stop) into one audio file that keeps playing when your phone locks, with lock-screen controls, scene jumps and **Save as a file**. It uses the AI voices (and your recordings), following the Listen settings for your own lines. Listen mode itself now hears you say your line and moves on when you finish (Practice settings: **move on as soon as I finish my line**).
+**Listen, screen off** on a script builds the part you pick with **From** / **Stop** into one audio file that keeps playing when your phone locks, with lock-screen controls, scene jumps and **Save as a file**. Finished tracks are saved on the device, listed under **Saved tracks** to play any time (even offline), and each has **Delete**. It uses the AI voices (and your recordings), following the Listen settings for your own lines. Listen mode itself now hears you say your line and moves on when you finish (Practice settings: **move on as soon as I finish my line**).
 
 ## Backup, voice lock and your own Spotify
 

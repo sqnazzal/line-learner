@@ -57,9 +57,9 @@ const saveSettings = () => saveJSON(LS_SETTINGS, settings);
 let dbPromise;
 function openDb() {
   return dbPromise ||= new Promise((resolve, reject) => {
-    const req = indexedDB.open('line-learner', 2);
+    const req = indexedDB.open('line-learner', 3);
     req.onupgradeneeded = () => {
-      for (const name of ['recordings', 'tts']) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
+      for (const name of ['recordings', 'tts', 'tracks']) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -83,6 +83,12 @@ const recordings = {
 const ttsCache = {
   get: key => idb('readonly', st => st.get(key), 'tts'),
   put: (key, blob) => idb('readwrite', st => st.put(blob, key), 'tts'),
+};
+// Screen-off tracks you've made, kept on this device: { id, scriptId, label, blob, minutes, sections, sig, created }.
+const savedTracks = {
+  all: () => idb('readonly', st => st.getAll(), 'tracks'),
+  put: t => idb('readwrite', st => st.put(t, t.id), 'tracks'),
+  del: id => idb('readwrite', st => st.delete(id), 'tracks'),
 };
 let recorded = new Set();
 
@@ -2285,6 +2291,7 @@ const actions = {
     scripts = scripts.filter(x => x !== s);
     deleted[s.id] = Date.now();
     saveJSON(LS_DELETED, deleted);
+    window.deleteTracksFor?.(s.id);
     saveScripts();
     // Remove recordings no other script still uses.
     const keep = new Set(scripts.flatMap(x => x.lines.filter(l => l.type === 'line').map(lineKey)));
