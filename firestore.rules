@@ -9,6 +9,11 @@ service cloud.firestore {
     }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
+    // Each person's own synced scripts: only they can read or write them.
+    match /users/{uid}/{rest=**} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
     // Invite codes point to a group. They can be looked up one at a time (to join) but never listed.
     match /invites/{code} {
       allow get: if signedIn();

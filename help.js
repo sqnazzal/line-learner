@@ -42,7 +42,7 @@ const HELP = {
       <li><b>A few pages or screenshots:</b> use <b>Take photo</b> (again for each page) or <b>Choose photos</b>, then <b>Read pages</b>. Uses your OpenAI key.</li>
       <li>Afterwards, check the character list and use <b>Find and fix</b> or <b>Merge characters</b> to tidy names.</li></ul>`],
     ['Sync and groups', `<ul>
-      <li><b>Sync</b> keeps scripts and progress the same on your phone and computer (a free GitHub key, set up once per device).</li>
+      <li><b>Sync</b>: tap <b>Sign in</b> at the top and sign in with Google on each of your devices. Your scripts, songs and progress then stay the same everywhere, automatically.</li>
       <li><b>Download backup</b> (on the Sync and backup screen) saves everything to a file you can keep or restore on a new device.</li>
       <li><b>Sign in</b> (top of the screen) with Google to create or join a group and share scripts.</li>
       <li>Sign-in window doesn't open? iPhone <b>Settings</b> &gt; <b>Apps</b> &gt; <b>Safari</b> &gt; turn off <b>Block Pop-ups</b>, then try again.</li></ul>`],
@@ -74,7 +74,7 @@ const HELP = {
       <li><b>A few pages or screenshots:</b> use <b>Take photo</b> or <b>Choose photos</b>, then <b>Read pages</b>. Uses your OpenAI key.</li>
       <li>Afterwards, use <b>Find and fix</b> or <b>Merge characters</b> to tidy names.</li></ul>`],
     ['Sync and groups', `<ul>
-      <li><b>Sync</b> keeps scripts and progress the same on all your devices.</li>
+      <li><b>Sync</b>: sign in with Google (top of the screen) on each of your devices and your scripts stay the same everywhere, automatically.</li>
       <li><b>Download backup</b> (on the Sync and backup screen) saves everything to a file you can keep or restore on a new device.</li>
       <li><b>Sign in</b> (top of the screen) with Google to create or join a group and share scripts.</li></ul>`],
   ],
@@ -103,7 +103,7 @@ const HELP = {
       <li><b>Scanned PDF or screenshots:</b> they go into the pages list; tap <b>Read pages</b> (uses your OpenAI key).</li>
       <li>Afterwards, use <b>Find and fix</b> or <b>Merge characters</b> to tidy names.</li></ul>`],
     ['Sync and groups', `<ul>
-      <li><b>Sync</b> keeps scripts and progress the same on your computer and phone.</li>
+      <li><b>Sync</b>: sign in with Google (top of the screen) on your computer and phone and your scripts stay the same on both, automatically.</li>
       <li><b>Download backup</b> (on the Sync and backup screen) saves everything to a file you can keep or restore on a new device.</li>
       <li><b>Sign in</b> with Google to create or join a group. If the sign-in window doesn't open, allow pop-ups for this site.</li></ul>`],
   ],

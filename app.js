@@ -2729,7 +2729,11 @@ function mergeRemote(remote) {
   scripts = scripts.filter(s => !(deleted[s.id] && deleted[s.id] >= (s.updated || 0)));
 }
 
+// The Google sign-in sync lives in groups.js (it needs Firebase); these hand off to it when it's loaded.
+const googleSyncPanel = () => (typeof googleSyncHtml === 'function' ? googleSyncHtml() : '');
+
 function scheduleSync() {
+  if (typeof scheduleGoogleSync === 'function') scheduleGoogleSync();
   if (!syncConf.token) return;
   clearTimeout(sync.timer);
   sync.timer = setTimeout(runSync, 4000);
@@ -2779,8 +2783,10 @@ function ago(t) {
 function showSyncStatus() {
   const b = $('#sync-btn');
   if (!b) return;
-  b.textContent = !syncConf.token ? 'Sync' : sync.busy ? 'Syncing…' : sync.error ? 'Sync problem' : 'Synced';
-  b.classList.toggle('problem', !!(syncConf.token && sync.error));
+  const g = typeof googleSyncState === 'function' ? googleSyncState() : null; // { on, busy, error }
+  const on = !!syncConf.token || !!g?.on, busy = sync.busy || g?.busy, error = sync.error || g?.error;
+  b.textContent = !on ? 'Sync' : busy ? 'Syncing…' : error ? 'Sync problem' : 'Synced';
+  b.classList.toggle('problem', !!(on && error));
 }
 
 // ---------- Backup file ----------
@@ -2825,7 +2831,9 @@ function renderSync() {
   if (syncConf.token) {
     return `<section class="stack">
       <h1>Sync and backup</h1>
+      ${googleSyncPanel()}
       <div class="card stack-sm">
+        <b>GitHub sync</b>
         <p><b>This device is connected.</b> ${sync.busy ? 'Syncing now…' : syncConf.lastSync ? `Last synced ${ago(syncConf.lastSync)}.` : 'Not synced yet.'}</p>
         ${syncConf.lastSync && !sync.busy ? `<p class="muted">${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'} on this device and in your GitHub copy.${pendingDraft() ? ' Your unsaved script is not included until you save it.' : ''}</p>` : ''}
         ${sync.error ? `<p class="note">${esc(sync.error)}</p>` : ''}
@@ -2849,18 +2857,20 @@ function renderSync() {
   }
   return `<section class="stack">
     <h1>Sync and backup</h1>
-    <p class="lede">Keep the same scripts and progress on your phone and computer. You set this up once on each device.</p>
+    ${googleSyncPanel()}
     ${sync.error ? `<p class="note">${esc(sync.error)}</p>` : ''}
-    <div class="card stack-sm">
+    <details class="card stack-sm">
+      <summary>Advanced: sync with GitHub instead</summary>
+      <p class="muted small">For people who already use GitHub. Most people should use Google sign-in above.</p>
       <ol class="steps-list">
         <li>Open <a href="${TOKEN_URL}" target="_blank" rel="noopener">GitHub's new access key page</a> and sign in. It comes pre-filled with only the <b>gist</b> box ticked, which is all Line Learner needs.</li>
         <li>Choose an expiration (or "No expiration"), then tap <b>Generate token</b> at the bottom.</li>
         <li>Copy the key (it starts with <code>ghp_</code>) and paste it here:</li>
       </ol>
       <label class="field"><span>GitHub access key</span><input id="sync-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ghp_…"></label>
-      <div class="row"><button class="btn primary" data-action="sync-connect" ${sync.busy ? 'disabled' : ''}>${sync.busy ? 'Connecting…' : 'Connect'}</button></div>
-    </div>
-    <p class="muted small">Then do the same on your other device. Making a second key there is easiest; the app finds your existing scripts automatically. The key is saved only in this browser.</p>
+      <div class="row"><button class="btn" data-action="sync-connect" ${sync.busy ? 'disabled' : ''}>${sync.busy ? 'Connecting…' : 'Connect'}</button></div>
+      <p class="muted small">Then do the same on your other device. Making a second key there is easiest; the app finds your existing scripts automatically. The key is saved only in this browser.</p>
+    </details>
     ${backupCardHtml()}
   </section>`;
 }

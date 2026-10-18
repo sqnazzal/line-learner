@@ -102,6 +102,112 @@ const fb = {
   },
 };
 
+// ---------- Sync through your Google sign-in ----------
+// Each person's scripts are kept privately under users/{their id}/scripts in Firestore (one document per
+// script, stored as text; the line-by-line breakdown is rebuilt from the script text on arrival). Merging
+// works like the GitHub sync: newest edit wins, progress merges line by line, deletions carry over.
+const LS_GSYNC = 'lineLearner.googleSync';
+const gsync = { conf: loadJSON(LS_GSYNC, { on: true, pushed: {} }), busy: false, error: '', timer: 0 };
+const saveGsync = () => saveJSON(LS_GSYNC, gsync.conf);
+const slimScript = s => { const { lines, voices, ...rest } = s; return rest; };
+const rehydrate = r => ({ ...r, lines: r.kind === 'song' ? parseSong(r.raw || '').lines : parseScript(r.raw || '') });
+const MAX_DOC = 900000; // Firestore documents top out around 1 MB
+
+Object.assign(fb, {
+  async pullMine() {
+    const { F, db } = fb.api, uid = fb.user.uid;
+    const [snap, del] = await Promise.all([
+      F.getDocs(F.collection(db, 'users', uid, 'scripts')),
+      F.getDoc(F.doc(db, 'users', uid, 'meta', 'deleted')),
+    ]);
+    return { scripts: snap.docs.map(d => JSON.parse(d.data().json)), deleted: del.exists() ? del.data().map || {} : {} };
+  },
+  async pushMine(list, deletedMap, removeIds) {
+    const { F, db } = fb.api, uid = fb.user.uid;
+    for (let i = 0; i < list.length; i += 5) { // a few at a time: big scripts are big documents
+      const batch = F.writeBatch(db);
+      for (const s of list.slice(i, i + 5)) batch.set(F.doc(db, 'users', uid, 'scripts', s.id), { json: JSON.stringify(slimScript(s)), updated: s.updated || 0 });
+      await batch.commit();
+    }
+    const batch = F.writeBatch(db);
+    batch.set(F.doc(db, 'users', uid, 'meta', 'deleted'), { map: deletedMap });
+    for (const id of removeIds) batch.delete(F.doc(db, 'users', uid, 'scripts', id));
+    await batch.commit();
+  },
+});
+
+function googleSyncState() {
+  return fb.user ? { on: gsync.conf.on, busy: gsync.busy, error: gsync.error } : null;
+}
+
+async function googleSync() {
+  if (!fb.user || !gsync.conf.on || gsync.busy) return;
+  if (P.running) { sync.pending = true; return; } // after the scene, not in the middle of it
+  gsync.busy = true;
+  gsync.error = '';
+  showSyncStatus();
+  try {
+    const remote = await fb.pullMine();
+    const remoteIds = new Set(remote.scripts.map(s => s.id));
+    mergeRemote({ scripts: remote.scripts.map(rehydrate), deleted: remote.deleted });
+    saveJSON(LS_SCRIPTS, scripts);
+    saveJSON(LS_DELETED, deleted);
+    // Send what changed since last time, and remove scripts deleted here.
+    const pushed = gsync.conf.pushed || {};
+    const sig = s => hash(JSON.stringify(slimScript(s)));
+    const changed = scripts.filter(s => sig(s) !== pushed[s.id] || !remoteIds.has(s.id));
+    const tooBig = changed.filter(s => JSON.stringify(slimScript(s)).length > MAX_DOC);
+    const toPush = changed.filter(s => !tooBig.includes(s));
+    const removeIds = [...remoteIds].filter(id => !scripts.some(s => s.id === id));
+    await fb.pushMine(toPush, deleted, removeIds);
+    for (const s of toPush) pushed[s.id] = sig(s);
+    for (const id of removeIds) delete pushed[id];
+    Object.assign(gsync.conf, { pushed, last: Date.now() });
+    saveGsync();
+    if (tooBig.length) gsync.error = `"${tooBig[0].title}" is too big to sync. Keep it safe with Download backup.`;
+    if (app.view === 'script' && !current()) app.view = 'library';
+    if (['library', 'script', 'sync'].includes(app.view) && !app.rec) render();
+  } catch (e) {
+    gsync.error = String(e?.code || '').includes('permission')
+      ? 'Sync was refused. The Firebase security rules need the "users" section (ask Shannon).'
+      : "Couldn't sync just now. Check your connection; it will try again.";
+    if (app.view === 'sync') render();
+  } finally {
+    gsync.busy = false;
+    showSyncStatus();
+  }
+}
+
+function scheduleGoogleSync() {
+  if (!fb.user || !gsync.conf.on) return;
+  clearTimeout(gsync.timer);
+  gsync.timer = setTimeout(googleSync, 4000);
+}
+
+function googleSyncHtml() {
+  if (!fb.api || !fb.user) {
+    if (!fb.api) loadGroups();
+    return `<div class="card stack-sm">
+      <b>Sync with your Google account (easiest)</b>
+      <p>Sign in with Google on each of your devices, and your scripts, songs, categories and progress stay the same everywhere. No keys or setup.</p>
+      <div><button class="btn primary" data-action="group-signin"${fb.api ? '' : ' disabled'}>${fb.api ? 'Sign in with Google' : 'Loading…'}</button></div>
+    </div>`;
+  }
+  const c = gsync.conf;
+  return `<div class="card stack-sm">
+    <b>Sync with your Google account</b>
+    <label class="check-row"><input type="checkbox" id="gsync-on" ${c.on ? 'checked' : ''}><span>Sync my scripts with ${esc(fb.user.name)}'s Google account</span></label>
+    ${c.on ? `<p class="small">${gsync.busy ? 'Syncing now…' : c.last ? `Last synced ${ago(c.last)}. ${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}.` : 'Not synced yet.'}</p>
+      ${gsync.error ? `<p class="note small">${esc(gsync.error)}</p>` : ''}
+      <div><button class="btn" data-action="gsync-now"${gsync.busy ? ' disabled' : ''}>Sync now</button></div>
+      <p class="muted small">Sign in with the same Google account on your other devices and they fill in by themselves. Only you can see your synced scripts. Voices and recordings stay on each device.</p>` : ''}
+  </div>`;
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && fb.user && gsync.conf.on && Date.now() - (gsync.conf.last || 0) > 30000) googleSync();
+});
+
 // Six letters and digits, without look-alikes (0/O, 1/I/L).
 function inviteCode() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -139,8 +245,10 @@ function onUserChanged() {
     });
     const pending = sessionStorage.getItem(SS_JOIN);
     if (pending) { sessionStorage.removeItem(SS_JOIN); joinGroup(pending); }
+    googleSync();
   }
   refreshGroupUi();
+  showSyncStatus();
 }
 
 function selectGroup(gid) {
@@ -156,7 +264,7 @@ function selectGroup(gid) {
 
 // Redraw what depends on the group: the Group screen, or a script page's Share to group button.
 function refreshGroupUi() {
-  if (app.view === 'group') render();
+  if (app.view === 'group' || app.view === 'sync') render();
   else if (app.view === 'script' && current() && !app.rec) render();
 }
 
@@ -310,6 +418,7 @@ async function joinGroup(code) {
 
 Object.assign(actions, {
   group() { leave(); app.view = 'group'; render(); window.scrollTo(0, 0); },
+  'gsync-now'() { googleSync(); render(); },
   'copy-uid'() {
     const id = fb.user?.uid || '';
     navigator.clipboard?.writeText(id).then(() => toast('Account ID copied.'), () => toast(id));
@@ -380,6 +489,13 @@ Object.assign(actions, {
 
 document.addEventListener('change', e => {
   if (e.target.id === 'group-pick') { selectGroup(e.target.value); render(); }
+  if (e.target.id === 'gsync-on') {
+    gsync.conf.on = e.target.checked;
+    saveGsync();
+    if (gsync.conf.on) googleSync();
+    render();
+    showSyncStatus();
+  }
 });
 
 VIEWS.group = renderGroup;

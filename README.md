@@ -26,7 +26,9 @@ Open **<https://sqnazzal.github.io/line-learner/>** in **Safari** (Safari is the
 
 ## Sync between phone and PC
 
-Tap **Sync** at the top right and follow the steps. You create a GitHub access key that can only touch Gists, paste it in, and you're done. Do this once on each device.
+**Easiest:** tap **Sign in** at the top and sign in with Google on each device. Scripts, songs, categories and progress then sync automatically through your own private area (only you can read it). Voices and recordings stay on each device.
+
+**Advanced (GitHub):** on the Sync and backup screen, open **Advanced: sync with GitHub instead**. You create a GitHub access key that can only touch Gists and paste it in, once on each device.
 
 - Your scripts and progress are stored in one secret Gist on your GitHub account. It isn't listed anywhere, but anyone with its link could read it, so don't share that link.
 - Syncing happens on its own a few seconds after a change, and whenever you open the app. **Sync now** pulls the latest right away.
