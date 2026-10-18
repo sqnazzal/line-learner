@@ -1827,7 +1827,8 @@ async function startPlayer(mode, order) {
   if (mode !== 'listen' && !s.myChar) { toast('Pick your character first.'); return; }
   order ||= rangeOrder(s);
   if (!order.length) { toast('Nothing to practice here yet.'); return; }
-  if (mode !== 'listen' && !(await ensureMic())) return;
+  // Every mode settles microphone permission before anything plays, so it never pops up mid-scene.
+  if (!(await ensureMic())) return;
   leave();
   P = newPlayer(mode, order);
   app.view = 'player';
