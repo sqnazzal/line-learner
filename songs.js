@@ -602,7 +602,7 @@ Object.assign(actions, {
     refreshSongPanel();
   },
   sing() { leave(); app.view = 'sing'; render(); window.scrollTo(0, 0); },
-  'sing-mode'(b) { sing.mode = b.dataset.mode; renderLyrics(); $$('.sing-modes .chip').forEach(c => c.classList.toggle('on', c.dataset.mode === sing.mode)); },
+  'sing-mode'(b) { sing.mode = b.dataset.mode; renderLyrics(); $$('.sing-modes .chip').forEach(c => { c.classList.toggle('on', c.dataset.mode === sing.mode); c.setAttribute('aria-pressed', c.dataset.mode === sing.mode); }); },
   'sing-loop'() { sing.loop = sing.loop == null ? sing.idx : null; updateSing(true); },
   'sing-line'(b) { seekToLine(+b.dataset.li); },
   'sing-self-start'() { setFollow(true); sing.controller?.seek(0); sing.controller?.resume(); },
@@ -677,8 +677,9 @@ const timed = s => songTimes(s).some(t => t != null);
 function renderSing() {
   const s = current();
   const sp = s.song?.spotify;
-  const chips = Object.entries(SING_MODES).map(([k, v]) => `<button class="chip${sing.mode === k ? ' on' : ''}" data-action="sing-mode" data-mode="${k}">${v}</button>`).join('');
+  const chips = Object.entries(SING_MODES).map(([k, v]) => `<button class="chip${sing.mode === k ? ' on' : ''}" data-action="sing-mode" data-mode="${k}" aria-pressed="${sing.mode === k}">${v}</button>`).join('');
   return `<section class="stack sing">
+    <h1 class="sr-only">Sing along: ${esc(s.title)}</h1>
     <div class="row between wrap"><button class="btn ghost" data-action="back">${icon('back')} Song</button><span class="mode-tag">Sing along</span></div>
     ${s.song?.instrumental ? `<div class="segmented" role="group" aria-label="Which version plays">
       <button class="seg${usingInst(s) ? '' : ' on'}" data-action="sing-version" data-v="original" aria-pressed="${!usingInst(s)}">Original</button>

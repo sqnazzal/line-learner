@@ -470,3 +470,8 @@ a.btn { text-decoration: none; }
 .find-split { border: 0; border-top: 1px solid var(--border); margin: 8px 0 2px; width: 100%; }
 [hidden] { display: none !important; }
 .player-choice { flex-wrap: wrap; border-radius: 18px; }
+/* Screen readers only: read aloud but not shown. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip-link { position: absolute; left: 8px; top: -60px; z-index: 100; padding: 10px 14px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); }
+.skip-link:focus { top: 8px; }
+h1[tabindex="-1"]:focus, main:focus { outline: none; }

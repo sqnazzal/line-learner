@@ -123,6 +123,13 @@ const SYNC_HELP = topic('Syncing between your devices', `<ol>
     <li><b>Advanced:</b> people who already use GitHub can sync through it instead (Sync &gt; <b>Advanced: sync with GitHub instead</b>). Most people don't need this.</li>
     <li><b>Backup file:</b> on the Sync screen, <b>Download backup</b> saves everything to a file you can keep or <b>Restore</b> on any device, signed in or not.</li></ul>`);
 
+const ACCESS_HELP = topic('Accessibility', `<ul>
+    <li><b>Screen readers and keyboard:</b> every button works from the keyboard, and in the player, results like <i>"Not quite, 60 percent. Missed: glad, see"</i> are announced. Shortcuts: <kbd>Space</kbd> play/pause, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> move, <kbd>H</kbd> hint, <kbd>L</kbd> hear the line, <kbd>Enter</kbd> done speaking.</li>
+    <li><b>Can't or don't want to speak?</b> <b>Type your lines</b> checks typed lines with no microphone, and without mic support, Rehearse lets you mark each line yourself.</li>
+    <li><b>Seeing the words:</b> <b>Practice settings</b> &gt; <b>Text size</b> goes up to Extra large, the colors button at the top switches Light and Dark, and your browser's zoom works everywhere.</li>
+    <li><b>Hearing:</b> everything read aloud is also shown on screen.</li>
+    <li><b>Something in the way?</b> Please <button class="link-btn" data-action="feedback">tell Shannon</button> and it'll get fixed.</li></ul>`);
+
 const REAL_HELP = topic('Rehearsing for real: phone on a stand, headphones, long scenes', `<ul>
     <li><b>Phone on a stand:</b> open <b>Practice settings</b> (under the player) &gt; <b>Text size</b> &gt; <b>Extra large</b>. The play button stays at the bottom of the screen, and the screen stays on while a scene plays. Hands busy? Say <i>"line"</i> when you're stuck.</li>
     <li><b>Headphones:</b> wired or Bluetooth both work. On many phones the play/pause and skip buttons on them work the player too (most reliably with the AI voices). Bluetooth earbuds use their own microphone, which can be less clear; if good lines keep getting marked wrong, lower <b>Score needed to pass</b> a little.</li>
@@ -175,6 +182,7 @@ function renderHelp() {
     ${REAL_HELP}
     ${SYNC_HELP}
     ${COMMON}
+    ${ACCESS_HELP}
     ${privacyHtml()}
   </section>`;
 }

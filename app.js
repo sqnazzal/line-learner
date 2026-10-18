@@ -287,7 +287,7 @@ function diffHtml(text, cmp) {
 }
 
 const REVEAL = ['hidden', 'first', 'initials', 'full'];
-const blank = w => `<span class="blank" style="width:${(Math.min(w.length, 12) * 0.5 + 0.5).toFixed(1)}em"></span>`;
+const blank = w => `<span class="blank" role="img" aria-label="blank" style="width:${(Math.min(w.length, 12) * 0.5 + 0.5).toFixed(1)}em"></span>`;
 function hintHtml(text, level) {
   const toks = spokenText(text).split(' ').filter(Boolean);
   if (level === 'full') return fmt(text);
@@ -1435,7 +1435,7 @@ function renderBrowse() {
   loadLibrary();
   const q = lib.q.trim().toLowerCase().replace(/[’‘]/g, "'");
   const tab = (id, label) => `<button class="seg${lib.tab === id ? ' on' : ''}" data-action="lib-tab" data-tab="${id}" aria-pressed="${lib.tab === id}">${label}</button>`;
-  const chip = (key, val, label) => `<button class="chip${lib[key] === val ? ' on' : ''}" data-action="lib-filter" data-key="${key}" data-val="${val}">${label}</button>`;
+  const chip = (key, val, label) => `<button class="chip${lib[key] === val ? ' on' : ''}" data-action="lib-filter" data-key="${key}" data-val="${val}" aria-pressed="${lib[key] === val}">${label}</button>`;
   return `<section class="stack">
     <div class="row between wrap"><h1>Free scripts</h1><button class="btn ghost" data-action="home">${icon('back')} Your scripts</button></div>
     <p class="lede">Classic plays and audition monologues that are free to use. Add one and it's ready to listen to and rehearse.</p>
@@ -1946,6 +1946,8 @@ function renderPlayer() {
   const s = current();
   const label = { buildup: 'Build up', listen: 'Listen', rehearse: 'Rehearse', type: 'Type' }[P.mode];
   return `<section class="player stack">
+    <h1 class="sr-only">${label}: ${esc(s.title)}</h1>
+    <p id="sr-status" class="sr-only" aria-live="polite"></p>
     <div class="row between">
       <button class="btn ghost" data-action="back">${icon('back')} Script</button>
       <span class="mode-tag">${label}${s.myChar ? ` · as ${esc(titleCase(s.myChar))}` : ''}${P.drill ? ' · weak lines' : P.cuesOnly ? ' · cues only' : ''}</span>
@@ -1959,12 +1961,14 @@ function renderPlayer() {
 
 function refreshPlayer() {
   if (app.view !== 'player') return;
-  const s = current();
+  const s = current(), key = focusKey(document.activeElement);
+  announce(s);
   $('#stage').innerHTML = P.status === 'done' ? doneHtml(s) : P.mode === 'buildup' ? buildUpStageHtml(s) : lineStageHtml(s);
   $('#controls').innerHTML = `
     <button class="ctrl" data-action="prev" aria-label="Previous">${icon('prev')}</button>
     <button class="ctrl big" data-action="toggle" aria-label="${P.running ? 'Pause' : 'Play'}">${icon(P.running ? 'pause' : 'play')}</button>
     <button class="ctrl" data-action="next" aria-label="Next">${icon('next')}</button>`;
+  restoreFocus(key);
   const box = $('#typed');
   if (box && document.activeElement?.id !== 'typed') {
     box.focus({ preventScroll: true });
@@ -1972,10 +1976,34 @@ function refreshPlayer() {
   }
 }
 
+// Tells screen readers what just happened in the player (the result of a line, whose turn it is).
+// Lines read aloud by the app aren't repeated; in quiet Type mode the text is included, since nothing is spoken.
+function announce(s) {
+  const el = $('#sr-status');
+  if (!el || P.mode === 'buildup') return;
+  const item = s.lines[P.order[P.orderPos]];
+  let msg = '';
+  if (P.status === 'done') msg = "That's a wrap.";
+  else if (P.status === 'paused') msg = `Paused. ${P.note}`;
+  else if (P.status === 'typing') msg = 'Your line. Type it, then press Enter.';
+  else if (P.status === 'listening') msg = 'Your line. Say it.';
+  else if (P.status === 'reading' && item) msg = `${titleCase(item.speaker)}: ${spokenText(item.text)}`;
+  else if (P.status === 'prompting' && quiet() && item) msg = `Your line is: ${spokenText(item.text)}`;
+  else if ((P.status === 'good' || P.status === 'missed') && P.result) {
+    const missed = words(item.text).filter((w, i) => !P.result.hit[i]);
+    msg = `${pill().replace(/<[^>]+>/g, '')}, ${P.result.score} percent.${missed.length ? ` Missed: ${missed.join(', ')}.` : ''}`;
+  }
+  if (P.status === 'typing' && quiet() && item) {
+    const cue = s.lines[prevLineIndex(s, P.order[P.orderPos])];
+    if (cue) msg = `${titleCase(cue.speaker)}: ${spokenText(cue.text)}. ${msg}`;
+  }
+  if (msg && el.dataset.said !== P.status + P.orderPos + msg) { el.dataset.said = P.status + P.orderPos + msg; el.textContent = msg; }
+}
+
 function myActions() {
   return `<div class="row wrap card-actions">
     <button class="btn" data-action="hint" ${P.reveal === 'full' ? 'disabled' : ''}>${icon('bulb')} Hint</button>
-    ${quiet() ? `<button class="btn" data-action="hearit" ${P.status === 'typing' ? '' : 'disabled'}>${icon('bulb')} Show me</button>`
+    ${quiet() ? (P.status === 'typing' ? `<button class="btn" data-action="hearit">${icon('bulb')} Show me</button>` : '')
       : `<button class="btn" data-action="hearit">${icon('speaker')} Hear it</button>`}
     ${P.status === 'typing' ? `<button class="btn primary" data-action="type-check">${icon('check')} Check</button>` : ''}
     ${P.status === 'prompting' && quiet() ? '<button class="btn primary" data-action="choose">Try again</button>' : ''}
@@ -3166,8 +3194,27 @@ Object.assign(actions, {
 // songs.js adds its Sing along view here.
 const VIEWS = { library: renderLibrary, edit: renderEdit, script: renderScript, player: renderPlayer, sync: renderSync, browse: renderBrowse };
 
+// Redrawing the page throws away whatever had keyboard focus; these put it back (or on the new page's heading),
+// so keyboard and screen reader users don't get dropped at the top of the page.
+function focusKey(el) {
+  if (!el || el === document.body || !$('#app').contains(el)) return null;
+  if (el.id) return '#' + CSS.escape(el.id);
+  if (!el.dataset.action) return null;
+  return `[data-action="${CSS.escape(el.dataset.action)}"]` + ['i', 'tab', 'cat', 'kind', 'choice', 'gid', 'char']
+    .filter(k => el.dataset[k] != null).map(k => `[data-${k}="${CSS.escape(el.dataset[k])}"]`).join('');
+}
+function restoreFocus(key) {
+  if (document.activeElement && document.activeElement !== document.body) return;
+  if (key) $(key)?.focus({ preventScroll: true });
+}
+
 function render() {
+  const key = focusKey(document.activeElement), newView = !!document.body.dataset.view && document.body.dataset.view !== app.view;
   $('#app').innerHTML = VIEWS[app.view]();
+  if (newView) {
+    const h = $('#app h1');
+    if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+  } else restoreFocus(key);
   if (app.view === 'player') refreshPlayer();
   if (app.view === 'edit') { merger.sig = ''; updatePreview(); }
   document.body.dataset.view = app.view;

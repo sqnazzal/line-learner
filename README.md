@@ -116,6 +116,10 @@ Sign in, then tap **Group**.
 - Only the person who shared something can update or unshare it. Groups can't be deleted, and members can only remove themselves.
 - Each person's progress, recordings, voices and personal scripts stay private.
 
+## Accessibility
+
+Built to WCAG 2.1 AA: works by keyboard and with screen readers (player results are announced, focus follows each screen), passes color contrast in Light and Dark, follows the device's reduce-motion setting, and zooms freely. **Type your lines** practices with no microphone, text size goes up to Extra large, and everything read aloud is also on screen. Checked with the axe accessibility scanner on every screen in both themes. Barriers can be reported through **Send feedback**.
+
 ## Privacy
 
 The full note is in the app (**Privacy** at the bottom of every page). In short: no ads, no tracking, nothing sold. Scripts, progress and recordings stay on your device; recordings never leave it. Signing in (optional) stores your name, email and synced scripts in Shannon's Firebase project. AI voices, page reading, mic checking, lyrics and Spotify only receive what each feature needs. To have your synced data deleted, send feedback asking Shannon.
