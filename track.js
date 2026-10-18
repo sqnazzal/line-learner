@@ -102,14 +102,19 @@ function renderTrack() {
   let maker;
   if (!trackReady(s, part)) {
     maker = `<div class="note"><p><b>This needs the AI voices.</b> The phone's built-in voices can't be saved as audio, so a screen-off track uses the natural AI voices (or your own recordings of every line).</p>
-      <p class="small">Add an OpenAI key on the script page under <b>Voices for each character</b>, then come back.</p></div>`;
+      ${aiAvailable()
+        ? '<p class="small">Turn on <b>Use natural AI voices</b> on the script page under <b>Voices for each character</b>, then come back.</p>'
+        : `<p class="small">Two ways to get them, both on the script page under <b>Voices for each character</b>:</p>
+      <ul class="small"><li><b>In one of Shannon's groups?</b> Sign in and use Shannon's shared voices. No key or cost to you.</li>
+        <li><b>Anyone else:</b> add your own OpenAI key (a few dollars of credit covers a lot).</li></ul>`}
+      <div><button class="btn primary" data-action="track-voices">Set up voices</button></div></div>`;
   } else if (track.building) {
     const pct = Math.round(100 * track.done / Math.max(1, track.total));
     const mins = track.done ? (Date.now() - track.started) / track.done * (track.total - track.done) / 60000 : 0;
     maker = `<div class="card stack-sm tray-status" role="status">
       <div class="bar" aria-hidden="true"><div style="width:${pct}%"></div></div>
       <p class="small"><b>Making “${esc(trackName(s, part))}”: line ${track.done} of ${track.total}</b>${track.done && mins >= 0.1 ? ` · about ${Math.max(1, Math.round(mins))} min left` : ''}</p>
-      <p class="muted small">Lines already made play free; new ones use your OpenAI key. Keep this screen open.</p>
+      <p class="muted small">Lines already made play free; new ones use ${usingShared() ? "Shannon's shared voices" : 'your OpenAI key'}. Keep this screen open.</p>
       <div><button class="btn ghost" data-action="track-stop">Stop</button></div></div>`;
   } else {
     const fromOpts = `<option value="0"${part[0] === 0 ? ' selected' : ''}>The beginning</option>` + sections.map(i => `<option value="${i}"${i === part[0] ? ' selected' : ''}>${esc(s.lines[i].text)}</option>`).join('');
@@ -268,6 +273,7 @@ async function deleteTracksFor(scriptId) {
 
 Object.assign(actions, {
   track() { leave(); app.view = 'track'; render(); window.scrollTo(0, 0); },
+  'track-voices'() { app.voicesOpen = true; openScript(current().id); $('#voices')?.scrollIntoView({ block: 'start' }); },
   'track-make'() { return buildTrack(); },
   'track-stop'() { track.stop = true; },
   'track-play'(b) {

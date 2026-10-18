@@ -19,10 +19,18 @@ function toast(msg) {
   const el = $('#toast');
   el.textContent = msg;
   el.classList.add('show');
+  toast.at = Date.now();
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => el.classList.remove('show'), Math.min(12000, 3500 + Math.max(0, msg.length - 70) * 45));
+  toast.timer = setTimeout(hideToast, Math.min(12000, 3500 + Math.max(0, msg.length - 70) * 45));
 }
-$('#toast')?.addEventListener('click', e => e.currentTarget.classList.remove('show'));
+// Clears the message too, so an old error isn't left for screen readers (or shown) on another page.
+function hideToast() {
+  const el = $('#toast');
+  clearTimeout(toast.timer);
+  el.classList.remove('show');
+  setTimeout(() => { if (!el.classList.contains('show')) el.textContent = ''; }, 400);
+}
+$('#toast')?.addEventListener('click', hideToast);
 
 // The last few unexpected errors, so a bug report can include them. An error in the app's own code also
 // gets a friendly note (at most once a minute) pointing to Send feedback.
@@ -908,18 +916,36 @@ function micHelp() {
 
 // Asks for the microphone as soon as you start (while your tap still counts), so the browser's question
 // never pops up in the middle of a scene and swallows your first line. If it's already allowed, nothing shows.
-async function ensureMic() {
-  if (!SR || !navigator.mediaDevices?.getUserMedia) return true;
+// Without one, the run carries on without it (see noMic) and says so.
+async function ensureMic(mode) {
+  noMic = false;
+  if (!SR || !navigator.mediaDevices?.getUserMedia) return;
   try {
     const state = await navigator.permissions?.query({ name: 'microphone' }).then(p => p.state).catch(() => '');
-    if (state === 'granted') return true;
+    if (state === 'granted') return;
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     stream.getTracks().forEach(t => t.stop());
-    return true;
   } catch (e) {
-    toast(e?.name === 'NotFoundError' ? 'No microphone in the wings. Plug one in (or check your headphones are connected), then try again.' : micHelp());
-    return false;
+    noMic = true;
+    const why = e?.name === 'NotFoundError' ? 'No microphone found.' : 'The microphone is blocked (Help explains how to allow it).';
+    toast(`${why} ${NO_MIC_FALLBACK[mode === 'listen' ? 'listen' : 'rehearse']}`);
   }
+}
+
+// Set when the microphone can't be used this time: Listen then pauses for a set time at your lines,
+// and Rehearse and Build up let you mark yourself.
+let noMic = false;
+const micOn = () => !!SR && !noMic;
+const NO_MIC_FALLBACK = {
+  listen: 'Listen will pause for a set time at your lines instead.',
+  rehearse: 'Say each line, then mark yourself (Got it / Missed it). Or try Type your lines.',
+};
+
+// A microphone problem that won't fix itself mid-scene: carry on without the microphone.
+const lostMic = code => ['not-allowed', 'service-not-allowed', 'audio-capture'].includes(code);
+function carryOnWithoutMic(code) {
+  noMic = true;
+  P.note = `${code === 'audio-capture' ? 'No microphone found.' : 'The microphone is blocked.'} ${NO_MIC_FALLBACK[P.mode === 'listen' ? 'listen' : 'rehearse']}`;
 }
 
 function micError(code) {
@@ -972,7 +998,23 @@ const current = () => scripts.find(s => s.id === app.scriptId) || (sampleScript?
 const lineKey = l => hash(l.speaker + '|' + spokenText(l.text));
 const isMine = (s, l) => l.type === 'line' && l.speaker === s.myChar;
 const statOf = (s, l) => s.stats[lineKey(l)];
-const isSolid = (s, l) => (statOf(s, l)?.last ?? -1) >= settings.passScore;
+// A line is Not practiced (never tried), Solid (passed last time without help), or Working on it (missed, or
+// got it with help: a hint showing half the line or more, Hint, Hear it / Show me, or saying "line").
+const lineState = (s, l) => {
+  const st = statOf(s, l);
+  if (!st?.tries) return 'new';
+  return st.last >= settings.passScore && !st.helped ? 'solid' : 'working';
+};
+const isSolid = (s, l) => lineState(s, l) === 'solid';
+const isWorking = (s, l) => lineState(s, l) === 'working';
+
+// How much of the line the hint gave away when you said it: half the words or more counts as help.
+function hintHelped(text, level) {
+  if (level === 'hidden') return false;
+  if (level !== 'first') return true;
+  const n = spokenText(text).split(' ').filter(Boolean).length;
+  return clamp(Math.floor(n / 2), 1, 3) * 2 >= n;
+}
 
 function characters(s) {
   const m = new Map();
@@ -1002,14 +1044,13 @@ function prevLineIndex(s, i) {
   return -1;
 }
 
-// Your shaky lines in the current range, each preceded by the cue line that leads into it.
 // Each of your lines with the line just before it (your cue), skipping the rest of the scene. With onlyWeak,
-// just the lines you haven't got solid yet (Drill weak lines).
+// just the lines you've tried and are still working on (Drill weak lines); untried lines aren't "weak".
 function cueOrder(s, onlyWeak = false) {
   const order = [];
   for (const i of rangeOrder(s)) {
     const l = s.lines[i];
-    if (!isMine(s, l) || (onlyWeak && isSolid(s, l))) continue;
+    if (!isMine(s, l) || (onlyWeak && !isWorking(s, l))) continue;
     const cue = prevLineIndex(s, i);
     if (cue >= 0 && !isMine(s, s.lines[cue]) && order[order.length - 1] !== cue) order.push(cue);
     order.push(i);
@@ -1084,7 +1125,7 @@ function scriptCardHtml(s) {
   const solid = mine.filter(l => isSolid(s, l)).length;
   return `<li class="script-item"><button class="card script-card" data-action="open" data-id="${s.id}">
       <span class="card-title">${s.kind === 'song' ? '<span class="tag">Song</span> ' : ''}${esc(s.title)}</span>
-      <span class="muted">${s.myChar ? `As ${esc(titleCase(s.myChar))}: ${solid} of ${mine.length} lines solid` : 'Pick your character to start'}</span>
+      <span class="muted">${s.myChar ? `As ${esc(titleCase(s.myChar))}: ${progressText(s, mine)}` : 'Pick your character to start'}</span>
       ${mine.length ? bar(solid / mine.length) : ''}
     </button>
     <select class="cat-pick" data-cat-id="${s.id}" aria-label="Category for ${esc(s.title)}">${categoryOptions(catOf(s))}</select></li>`;
@@ -1173,7 +1214,7 @@ function renderEdit() {
       ${trayHtml()}
       ${findBarHtml()}
       <label class="field"><span>Lyrics</span><textarea id="ed-raw" rows="14" spellcheck="false" placeholder="One line of the song per line">${esc(e.raw)}</textarea></label>
-      <p id="ed-preview" class="muted"></p>
+      <div id="ed-preview" class="muted stack-sm"></div>
       <div class="row wrap">
         <span class="spacer"></span>
         <button class="btn ghost" data-action="cancel-edit">Cancel</button>
@@ -1203,7 +1244,7 @@ JULIET: Ay me!</pre>
     ${trayHtml()}
     ${findBarHtml(true)}
     <label class="field"><span>Script</span><textarea id="ed-raw" rows="16" spellcheck="false" placeholder="Paste your scene or monologue here">${esc(e.raw)}</textarea></label>
-    <p id="ed-preview" class="muted"></p>
+    <div id="ed-preview" class="muted stack-sm"></div>
     <div class="row wrap">
       <span class="spacer"></span>
       <button class="btn ghost" data-action="cancel-edit">Cancel</button>
@@ -1225,9 +1266,40 @@ function updatePreview() {
   }
   const lines = parseScript(raw);
   const n = lines.filter(l => l.type === 'line').length;
-  const chars = [...characters({ lines })].map(([c, k]) => `${esc(titleCase(c))} (${k})`).join(', ');
-  el.innerHTML = n ? `Found <b>${n}</b> speeches. Characters: ${chars}` : 'No lines found yet. See the format tips above.';
+  if (!n) { el.textContent = 'No lines found yet. See the format tips above.'; updateMergeBox(lines); return; }
+  const cast = [...characters({ lines })];
+  const count = type => lines.filter(l => l.type === type).length;
+  const plural = (k, word) => `<b>${k}</b> ${word}${k === 1 ? '' : 's'}`;
+  const totals = [plural(cast.length, 'character'), count('section') && plural(count('section'), 'scene'), plural(n, 'speech').replace('speechs', 'speeches'),
+    count('direction') && plural(count('direction'), 'stage direction')].filter(Boolean).join(' · ');
+  const cut = (t, k = 90) => (t.length > k ? t.slice(0, k).replace(/\s+\S*$/, '') + '…' : t);
+  const sample = lines.filter(l => l.type !== 'section').slice(0, 4).map(l => (l.type === 'line'
+    ? `<li><b>${esc(titleCase(l.speaker))}:</b> ${esc(cut(l.text))}</li>` : `<li><i>(${esc(cut(l.text))})</i></li>`)).join('');
+  const flags = scriptFlags(lines, cast).slice(0, 5).map(f => `<li>${f.html} <button class="link-btn" data-action="preview-find" data-q="${esc(f.q)}">Show me</button></li>`).join('');
+  el.innerHTML = `<p>Found ${totals}.</p>
+    <p class="small">Characters: ${cast.map(([c, k]) => `${esc(titleCase(c))} (${k})`).join(', ')}</p>
+    <details class="small"><summary>How the start reads</summary><ul class="parse-sample">${sample}</ul></details>
+    ${flags ? `<div class="note small"><b>Worth a look before you rehearse:</b><ul>${flags}</ul></div>` : ''}`;
   updateMergeBox(lines);
+}
+
+// Things that often mean the text was read wrong: a page header taken for a character, dialogue taken
+// for a stage direction, or two speeches run together.
+function scriptFlags(lines, cast) {
+  const out = [];
+  const firstWords = t => t.split(/\s+/).slice(0, 4).join(' ');
+  for (const [c, k] of cast) {
+    if (k > 2) continue;
+    if (/\d|\b(page|act|scene|continued|cont|draft|revised|script|copyright)\b/i.test(c) || c.split(/\s+/).length > 3) {
+      out.push({ html: `<b>${esc(c)}</b> speaks ${k === 1 ? 'once' : 'twice'}. A page header or title, not a character?`, q: c });
+    }
+  }
+  for (const l of lines) {
+    if (l.type === 'direction' && words(l.text).length > 45) out.push({ html: `A long stage direction (“${esc(firstWords(l.text))}…”). Is it really dialogue?`, q: firstWords(l.text) });
+    else if (l.type === 'line' && /(?:^|[.!?]\s+)[A-Z][A-Z.'’ -]{2,}:\s/.test(l.text)) out.push({ html: `${esc(titleCase(l.speaker))}’s speech (“${esc(firstWords(l.text))}…”) seems to have another name inside it. Two speeches run together?`, q: firstWords(l.text) });
+    else if (l.type === 'line' && words(l.text).length > 300) out.push({ html: `${esc(titleCase(l.speaker))} has a very long speech (“${esc(firstWords(l.text))}…”). Two speeches run together?`, q: firstWords(l.text) });
+  }
+  return out;
 }
 
 // ---------- Merging characters (e.g. "MRS" and "MRS. PECK" are the same person) ----------
@@ -1613,8 +1685,8 @@ function trayHtml() {
       ${n && !tray.reading ? `<button class="btn primary" data-action="tray-read">Read ${n} ${n === 1 ? 'page' : 'pages'}</button><button class="btn ghost" data-action="tray-clear">Clear</button>` : ''}
       ${tray.reading ? '<button class="btn ghost" data-action="tray-stop">Stop</button>' : ''}
     </div>
-    <p class="muted small">Handwriting (blocking, notes, arrows) is ignored; only the printed script is read.</p>
-    <label class="check-row small"><input type="checkbox" data-setting="skipCuts" ${settings.skipCuts ? 'checked' : ''}${tray.reading ? ' disabled' : ''}><span>Leave out lines crossed out by hand (cuts)</span></label>
+    <p class="muted small">${song ? 'Only the printed lyrics are read; handwritten notes are ignored.' : 'Handwriting (blocking, notes, arrows) is ignored; only the printed script is read.'}</p>
+    ${song ? "" : `<label class="check-row small"><input type="checkbox" data-setting="skipCuts" ${settings.skipCuts ? 'checked' : ''}${tray.reading ? ' disabled' : ''}><span>Leave out lines crossed out by hand (cuts)</span></label>`}
     ${trayStatusHtml()}
     ${n ? `<div class="thumbs">${shown.map((p, i) => `<figure class="thumb"><img src="${p.url}" alt="Page ${i + 1}" loading="lazy"><figcaption>${i + 1}</figcaption>
       ${tray.reading ? '' : `<button class="thumb-x" data-action="tray-remove" data-i="${i}" aria-label="Remove page ${i + 1}">×</button>`}</figure>`).join('')}
@@ -1790,9 +1862,18 @@ function textChanged() {
 }
 
 function statDot(st) {
-  if (!st) return '<span class="dot new" title="Not rehearsed yet"></span>';
-  const cls = st.last >= settings.passScore ? 'solid' : st.last >= 50 ? 'close' : 'weak';
-  return `<span class="dot ${cls}" title="Last run ${st.last}%, best ${st.best}%"></span>`;
+  const dot = (cls, label) => `<span class="dot ${cls}" role="img" aria-label="${label}" title="${label}"></span>`;
+  if (!st?.tries) return dot('new', 'Not practiced yet');
+  if (st.last >= settings.passScore) return st.helped ? dot('close', `Working on it: got it with help (${st.last}%)`) : dot('solid', `Solid: ${st.last}%, best ${st.best}%`);
+  return dot(st.last >= 50 ? 'close' : 'weak', `Working on it: last run ${st.last}%, best ${st.best}%`);
+}
+
+// "3 solid · 2 working on it · 5 not practiced"
+function progressText(s, mine) {
+  const n = { solid: 0, working: 0, new: 0 };
+  for (const l of mine) n[lineState(s, l)]++;
+  if (n.new === mine.length) return `${mine.length} ${mine.length === 1 ? 'line' : 'lines'}, not practiced yet`;
+  return [n.solid && `${n.solid} solid`, n.working && `${n.working} working on it`, n.new && `${n.new} not practiced`].filter(Boolean).join(' · ');
 }
 
 function resumeHtml(s) {
@@ -1859,16 +1940,16 @@ function renderScript() {
       </select></label>
       ${rangeHtml}
       ${s.kind !== 'song' && s.myChar ? `<label class="check-row"><input type="checkbox" id="cues-only" ${app.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines.</b> Listen, Rehearse and Type play only the line before each of yours, then yours, and skip the rest.</span></label>` : ''}
-      ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${solid} of ${mine.length} lines solid</span></div>` : ''}
+      ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${progressText(s, mine)}</span></div>` : ''}
     </div>
     ${resumeHtml(s)}
     <div class="modes">
       ${s.kind === 'song' ? `<button class="mode" data-action="sing">${icon('headphones')}<b>Sing along</b><span>${s.song?.spotify ? 'Play the real song with the lyrics highlighted, and hide words as you learn them.' : 'Learn the lyrics. Add the Spotify song (Edit) to sing with the track.'}</span></button>` : ''}
       <button class="mode" data-action="listen">${icon('headphones')}<b>Listen</b><span>Hear the scene like an audio track. It pauses for you to say your lines.</span></button>
-      ${s.kind !== 'song' ? `<button class="mode" data-action="track">${icon('headphones')}<b>Listen, screen off</b><span>One audio track of the scene that keeps playing when your phone locks, like a podcast.</span></button>` : ''}
+      ${s.kind !== 'song' ? `<button class="mode" data-action="track">${icon('headphones')}<b>Listen, screen off</b><span>One audio track of the scene that keeps playing when your phone locks, like a podcast.${aiReady() ? '' : ' <i>Needs the AI voices (set up under Voices below) or your recordings of every line.</i>'}</span></button>` : ''}
       <button class="mode" data-action="rehearse" ${s.myChar ? '' : 'disabled'}>${icon('mic')}<b>Rehearse</b><span>Your cues are read aloud. Say your lines and the mic checks them.</span></button>
       <button class="mode" data-action="type" ${s.myChar ? '' : 'disabled'}>${icon('keyboard')}<b>Type your lines</b><span>For the train or anywhere you can't talk. Read your cues, type your lines, and get the same word-by-word check.</span></button>
-      <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line needs' : 'lines need'} work` : 'Nothing shaky right now') : 'Pick your character first'}</span></button>
+      <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line' : 'lines'} you're working on` : mine.some(l => isSolid(s, l)) ? 'Nothing shaky right now' : 'Nothing to drill yet: rehearse first') : 'Pick your character first'}</span></button>
     </div>
     <details id="voices" class="card" ${app.voicesOpen ? 'open' : ''}>
       <summary>Voices for each character</summary>
@@ -1931,7 +2012,7 @@ const quiet = () => P.mode === 'type' && settings.typeCues !== 'speak';
 function newPlayer(mode, order) {
   return {
     mode, order, orderPos: 0, status: 'idle', reveal: settings.hint, result: null, transcript: '', note: '',
-    running: false, token: null, run: { lines: 0, solid: 0 }, bu: null, finishListen: null, choose: null,
+    running: false, token: null, run: { lines: 0, solid: 0, helped: 0 }, bu: null, finishListen: null, choose: null,
   };
 }
 let P = newPlayer('listen', []);
@@ -2032,7 +2113,7 @@ function lineStageHtml(s) {
     card = `<div class="card stage-card mine-card">
       <div class="card-head"><span class="who">You${s.myChar !== 'YOU' ? ` (${esc(titleCase(s.myChar))})` : ''}</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}</div>
       <p class="script-text">${myLineBody(item.text)}</p>
-      ${SR && (P.mode === 'rehearse' || (P.mode === 'listen' && settings.listenHears)) ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
+      ${micOn() && (P.mode === 'rehearse' || (P.mode === 'listen' && settings.listenHears)) ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
       ${P.status === 'typing' ? `<textarea id="typed" class="typed" rows="3" placeholder="Type your line, then Check (or press Enter)" autocapitalize="sentences" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Type your line">${esc(P.typed || '')}</textarea>` : ''}
       ${P.mode === 'type' && P.result && P.typed && P.status !== 'typing' ? `<p class="transcript">You typed: ${esc(P.typed)}</p>` : ''}
       ${myActions()}
@@ -2061,21 +2142,23 @@ function buildUpStageHtml(s) {
     <div class="card stage-card mine-card">
       <div class="card-head"><span class="who">You</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}</div>
       <p class="script-text">${body}</p>
-      ${SR ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
+      ${micOn() ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
       ${myActions()}
     </div>`;
 }
 
 function doneHtml(s) {
   const weak = s.myChar ? weakCount(s) : 0;
-  const { solid, lines } = P.run;
+  const { solid, lines, helped = 0 } = P.run;
+  const withHelp = helped ? ` <b>${helped}</b> more with help (they'll count once you get them without).` : '';
   let title = "That's a wrap!", msg;
   if (P.mode === 'buildup') { title = "That's the whole speech!"; msg = 'Now try it in Rehearse with hints turned off.'; }
-  else if (P.mode === 'listen') msg = 'Play it again, or switch to Rehearse and say your lines out loud.';  else if (P.drill) {
+  else if (P.mode === 'listen') msg = 'Play it again, or switch to Rehearse and say your lines out loud.';
+  else if (P.drill) {
     title = solid === lines ? 'Nothing shaky left!' : "That's a wrap on the drill!";
-    msg = solid === lines ? `All <b>${lines}</b> of those lines landed. Nice work.` : `<b>${solid}</b> of <b>${lines}</b> shaky lines landed this time. The rest will get there.`;
-  } else if (lines && solid === lines) msg = `Every line on the first try (<b>${lines}</b> of <b>${lines}</b>). Take a bow.`;
-  else msg = `You got <b>${solid}</b> of <b>${lines}</b> lines on the first try.${lines && solid / lines >= 0.7 ? ' Looking good.' : ' Every run makes the next one easier.'}`;
+    msg = solid === lines ? `All <b>${lines}</b> of those lines landed. Nice work.` : `<b>${solid}</b> of <b>${lines}</b> shaky lines landed on your own this time.${withHelp} The rest will get there.`;
+  } else if (lines && solid === lines) msg = `Every line on the first try, no help (<b>${lines}</b> of <b>${lines}</b>). Take a bow.`;
+  else msg = `You got <b>${solid}</b> of <b>${lines}</b> lines on the first try on your own.${withHelp}${lines && solid / lines >= 0.7 ? ' Looking good.' : ' Every run makes the next one easier.'}`;
   return `<div class="card stage-card done-card">
     <h2>${title}</h2>
     <p>${msg}</p>
@@ -2087,26 +2170,33 @@ function doneHtml(s) {
   </div>`;
 }
 
+// Everyday choices up front; scoring and microphone timing under Advanced. Only what affects the mode you're in shows.
 function settingsHtml() {
   const sel = (key, opts) => `<select data-setting="${key}">${opts.map(([v, t]) => `<option value="${v}" ${String(settings[key]) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
   const chk = key => `<input type="checkbox" data-setting="${key}" ${settings[key] ? 'checked' : ''}>`;
   const rng = (key, min, max, step) => `<span class="range"><input type="range" data-setting="${key}" min="${min}" max="${max}" step="${step}" value="${settings[key]}"><output>${settingLabel(key)}</output></span>`;
+  const m = P.mode, spoken = !quiet(), checked = m !== 'listen';
+  const usesMic = SR && !noMic && (m === 'rehearse' || m === 'buildup' || (m === 'listen' && settings.listenHears));
+  const everyday = [
+    `<label><span>Text size</span>${sel('textSize', [['normal', 'Normal'], ['large', 'Large'], ['huge', 'Extra large (phone on a stand)']])}</label>`,
+    spoken && `<label><span>Reading speed</span>${rng('rate', 0.6, 1.5, 0.05)}</label>`,
+    m === 'listen' && `<label><span>Your lines</span>${sel('myLines', [['gapThenSpeak', 'Pause for me, then read them'], ['gap', 'Pause for me only'], ['speak', 'Read them aloud'], ['skip', 'Skip them']])}</label>`,
+    `<label><span>Hints when it's your line</span>${sel('hint', [['hidden', 'No words, just blanks'], ['first', 'First few words'], ['initials', 'First letter of each word'], ['full', 'Show the whole line']])}<small class="muted">A line counts as solid only when you get it without help (a hint showing half the line or more counts as help).</small></label>`,
+    m === 'type' && `<label><span>Cues</span>${sel('typeCues', [['show', 'Show them on screen (silent)'], ['speak', 'Read them aloud (headphones)']])}</label>`,
+    m === 'rehearse' && `<label><span>Cue before your line</span>${sel('cueLength', [['full', 'Read the whole line'], ['last', 'Last sentence only']])}</label>`,
+    m === 'listen' && `<label class="check">${chk('loop')}<span>Loop the scene</span></label>`,
+    m === 'listen' && SR && `<label class="check">${chk('listenHears')}<span>Move on as soon as I finish my line (uses the microphone)</span></label>`,
+  ];
+  const advanced = [
+    checked && `<label><span>Score needed to pass</span>${rng('passScore', 50, 100, 5)}</label>`,
+    usesMic && `<label><span>Wait after you stop talking</span>${rng('silenceMs', 800, 4000, 100)}</label>`,
+    m !== 'buildup' && `<label class="check">${chk('readDirections')}<span>${spoken ? 'Read stage directions aloud' : 'Show stage directions'}</span></label>`,
+    spoken && `<label class="check">${chk('useRecordings')}<span>Use recorded voices when available</span></label>`,
+  ].filter(Boolean);
   return `<details class="card settings">
     <summary>Practice settings</summary>
-    <div class="settings-grid">
-      <label><span>Text size</span>${sel('textSize', [['normal', 'Normal'], ['large', 'Large'], ['huge', 'Extra large (phone on a stand)']])}</label>
-      <label><span>Reading speed</span>${rng('rate', 0.6, 1.5, 0.05)}</label>
-      <label><span>Your lines in Listen mode</span>${sel('myLines', [['gapThenSpeak', 'Pause for me, then read them'], ['gap', 'Pause for me only'], ['speak', 'Read them aloud'], ['skip', 'Skip them']])}</label>
-      <label><span>Hints when it's your line</span>${sel('hint', [['hidden', 'No words, just blanks'], ['first', 'First few words'], ['initials', 'First letter of each word'], ['full', 'Show the whole line']])}</label>
-      <label><span>Cue before your line (Rehearse)</span>${sel('cueLength', [['full', 'Read the whole line'], ['last', 'Last sentence only']])}</label>
-      <label><span>Cues in Type mode</span>${sel('typeCues', [['show', 'Show them on screen (silent)'], ['speak', 'Read them aloud (headphones)']])}</label>
-      <label><span>Score needed to pass</span>${rng('passScore', 50, 100, 5)}</label>
-      <label><span>Wait after you stop talking</span>${rng('silenceMs', 800, 4000, 100)}</label>
-      <label class="check">${chk('readDirections')}<span>Read stage directions aloud</span></label>
-      <label class="check">${chk('useRecordings')}<span>Use recorded voices when available</span></label>
-      <label class="check">${chk('loop')}<span>Loop the scene in Listen mode</span></label>
-      <label class="check">${chk('listenHears')}<span>Listen mode: move on as soon as I finish my line</span></label>
-    </div>
+    <div class="settings-grid">${everyday.filter(Boolean).join('')}</div>
+    ${advanced.length ? `<details class="settings-advanced"><summary class="small">Advanced</summary><div class="settings-grid">${advanced.join('')}</div></details>` : ''}
   </details>`;
 }
 
@@ -2162,8 +2252,8 @@ async function startPlayer(mode, order, from = 0, drill = false) {
   const cuesOnly = !order && app.cuesOnly && !!s.myChar;
   order ||= playOrder(s);
   if (!order.length) { toast('Empty stage: nothing to practice here yet. Tap Edit to add some lines.'); return false; }
-  // Every spoken mode settles microphone permission before anything plays, so it never pops up mid-scene.
-  if (mode !== 'type' && !(await ensureMic())) return false;
+  // Settles microphone permission before anything plays, so it never pops up mid-scene.
+  if (mode === 'rehearse' || (mode === 'listen' && settings.listenHears)) await ensureMic(mode);
   leave();
   P = newPlayer(mode, order);
   Object.assign(P, { drill, cuesOnly });
@@ -2194,7 +2284,7 @@ function saveResume() {
 }
 
 async function startBuildUp(i) {
-  if (!(await ensureMic())) return;
+  await ensureMic('buildup');
   leave();
   P = newPlayer('buildup', [i]);
   P.bu = { i, parts: buildParts(current().lines[i].text), k: 0, phase: 'listen' };
@@ -2260,10 +2350,13 @@ async function listenMine(item, token) {
   P.status = 'gap';
   P.transcript = '';
   refreshPlayer();
-  if (settings.listenHears && SR) {
+  if (settings.listenHears && micOn()) {
     // Hands-free: listen while you say it and carry on as soon as you finish (or after a pause if you don't).
     const r = await listen(token, item.text);
-    if (r.reason.startsWith('error:')) await sleep(gapMs(item.text), token);
+    if (r.reason.startsWith('error:')) {
+      if (lostMic(r.reason.slice(6))) { carryOnWithoutMic(r.reason.slice(6)); refreshPlayer(); }
+      await sleep(gapMs(item.text), token);
+    }
   } else {
     await sleep(gapMs(item.text), token);
   }
@@ -2289,7 +2382,7 @@ async function attempt(expected, token) {
     P.result = compare(expected, typed.text);
     return { score: P.result.score };
   }
-  if (!SR) {
+  if (!micOn()) {
     P.status = 'self';
     refreshPlayer();
     const choice = await new Promise(resolve => { P.choose = resolve; token.onCancel(() => resolve('cancel')); });
@@ -2311,17 +2404,18 @@ const IDLE_NOTE = "Holding for you: I didn't hear anything. If you were talking,
 
 async function rehearseLine(item, token) {
   const s = current(), key = lineKey(item);
-  const wasShaky = (s.stats[key]?.tries || 0) > 0 && s.stats[key].last < settings.passScore;
+  const wasShaky = isWorking(s, item);
   let tries = 0, idle = 0, first = null;
-  // The first attempt in a run is what counts toward "solid"; best keeps your best ever.
+  // The first attempt in a run is what counts toward "solid" (if no help was needed); best keeps your best ever.
   const note = score => {
     const st = s.stats[key] || { tries: 0, best: 0, last: 0 };
     if (first === null) {
       first = score;
       st.tries++;
       st.last = score;
+      st.helped = score >= settings.passScore && hintHelped(item.text, P.reveal);
       P.run.lines++;
-      if (score >= settings.passScore) P.run.solid++;
+      if (score >= settings.passScore) P.run[st.helped ? 'helped' : 'solid']++;
     }
     st.best = Math.max(st.best, score);
     st.at = Date.now();
@@ -2331,6 +2425,7 @@ async function rehearseLine(item, token) {
   while (!token.cancelled) {
     const r = await attempt(item.text, token);
     if (token.cancelled) return;
+    if (r.reason === 'error' && lostMic(r.error)) { carryOnWithoutMic(r.error); continue; }
     if (r.reason === 'error') return pauseRun(micError(r.error));
     if (r.reason === 'timeout' && ++idle >= 2) return pauseRun(IDLE_NOTE);
     if (r.reason === 'prompt' || r.reason === 'timeout') {
@@ -2381,6 +2476,7 @@ async function runBuildUp(fromK) {
       P.reveal = settings.hint;
       const r = await attempt(expected, token);
       if (token.cancelled) return;
+      if (r.reason === 'error' && lostMic(r.error)) { carryOnWithoutMic(r.error); continue; }
       if (r.reason === 'error') return pauseRun(micError(r.error));
       if (r.reason === 'timeout' && ++idle >= 2) return pauseRun(IDLE_NOTE);
       if (r.score != null && r.score >= settings.passScore) {
@@ -2479,6 +2575,7 @@ const actions = {
     }
   },
   'backup-download'() { downloadBackup(); },
+  'backup-recordings'() { downloadRecordings(); },
   'lib-cat'(b) { saveJSON(LS_LIB_CAT, b.dataset.cat); render(); },
   'merge-chars'(b) {
     const from = b.dataset.from || $('#merge-from').value, to = b.dataset.to || $('#merge-to').value;
@@ -2502,6 +2599,14 @@ const actions = {
     toast('Merge undone.');
   },
   'find-next'() { showMatch(1); },
+  'preview-find'(b) {
+    const box = $('#find-box'), q = $('#find-q');
+    if (!box || !q) return;
+    if (!box.open) { merger.autoOpened = true; box.open = true; }
+    q.value = b.dataset.q;
+    finder.idx = -1;
+    showMatch(1);
+  },
   'find-prev'() { showMatch(-1); },
   'find-replace'() {
     const box = $('#ed-raw'), q = $('#find-q').value, rep = $('#find-r').value;
@@ -2683,7 +2788,7 @@ const actions = {
   restart() {
     P.status = 'idle';
     if (P.mode === 'buildup') { P.bu.k = 0; runBuildUp(0); }
-    else { P.run = { lines: 0, solid: 0 }; run(0); }
+    else { P.run = { lines: 0, solid: 0, helped: 0 }; run(0); }
   },
 };
 
@@ -2990,10 +3095,38 @@ function showSyncStatus() {
 function backupCardHtml() {
   return `<div class="card stack-sm">
     <b>Backup file</b>
-    <p class="muted small">Save all ${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}, your progress and settings to a file (keep it in Files, iCloud or email it to yourself). Restoring adds anything missing and keeps the newest version of each script. Keys and voice recordings aren't included.</p>
+    <p class="muted small">Save all ${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}, your progress and settings to a file (keep it in Files, iCloud or email it to yourself). Restoring adds anything missing and keeps the newest version of each script.</p>
+    <p class="note small"><b>Not in the backup:</b> your voice recordings${recorded.size ? ` (${recorded.size} on this device)` : ''}, AI voices already made, saved tracks and keys.${recorded.size ? ' Recordings have their own file: <b>Download recordings</b>.' : ''}</p>
     <div class="row wrap"><button class="btn" data-action="backup-download">Download backup</button>
-      <label class="btn ghost">Restore backup<input type="file" id="restore-file" accept=".json,application/json" hidden></label></div>
+      ${recorded.size ? `<button class="btn" data-action="backup-recordings">Download recordings (${recorded.size})</button>` : ''}
+      <label class="btn ghost">Restore a backup or recordings<input type="file" id="restore-file" accept=".json,application/json" hidden></label></div>
   </div>`;
+}
+
+// Your recordings in a file of their own (it can be big), restored with the same Restore button.
+async function downloadRecordings() {
+  toast('Gathering your recordings…');
+  const out = {};
+  for (const key of await recordings.keys().catch(() => [])) {
+    const blob = await recordings.get(key).catch(() => null);
+    if (blob) out[key] = await new Promise(resolve => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => resolve(null); r.readAsDataURL(blob); });
+  }
+  const file = new Blob([JSON.stringify({ app: 'line-learner', kind: 'recordings', version: 1, saved: Date.now(), recordings: out })], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file);
+  a.download = `line-learner-recordings-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  toast(`Saved ${Object.keys(out).length} recordings to a file.`);
+}
+
+async function restoreRecordings(data) {
+  let n = 0;
+  for (const [key, url] of Object.entries(data.recordings || {})) {
+    try { await recordings.put(key, await (await fetch(url)).blob()); recorded.add(key); n++; } catch { /* skip a damaged one */ }
+  }
+  toast(`Recordings restored: ${n}.`);
+  render();
 }
 
 function downloadBackup() {
@@ -3010,6 +3143,7 @@ function downloadBackup() {
 async function restoreBackup(file) {
   let data;
   try { data = JSON.parse(await file.text()); } catch { data = null; }
+  if (data?.app === 'line-learner' && data.kind === 'recordings') return restoreRecordings(data);
   if (data?.app !== 'line-learner' || !Array.isArray(data.scripts)) { toast("That file isn't a Line Learner backup."); return; }
   const before = new Set(scripts.map(s => s.id));
   mergeRemote({ scripts: data.scripts, deleted: data.deleted || {} });
@@ -3212,6 +3346,7 @@ function render() {
   const key = focusKey(document.activeElement), newView = !!document.body.dataset.view && document.body.dataset.view !== app.view;
   $('#app').innerHTML = VIEWS[app.view]();
   if (newView) {
+    if (Date.now() - (toast.at || 0) > 1500) hideToast(); // an old message belongs to the last page
     const h = $('#app h1');
     if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
   } else restoreFocus(key);

@@ -475,3 +475,11 @@ a.btn { text-decoration: none; }
 .skip-link { position: absolute; left: 8px; top: -60px; z-index: 100; padding: 10px 14px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); }
 .skip-link:focus { top: 8px; }
 h1[tabindex="-1"]:focus, main:focus { outline: none; }
+.parse-sample { margin: 6px 0 0; padding-left: 18px; }
+#ed-preview p { margin: 0; }
+#ed-preview .note ul { margin: 4px 0 0; padding-left: 18px; }
+.settings-advanced { margin-top: 14px; }
+.settings-advanced > summary { cursor: pointer; margin-bottom: 10px; }
+.settings-grid label small { font-weight: 400; }
+.help-body h2 { font-size: 1rem; margin: 14px 0 6px; }
+.help-body h2:first-child { margin-top: 0; }

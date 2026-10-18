@@ -404,7 +404,7 @@ function songPanelHtml(e) {
   </div>`;
 }
 
-function ownSpotifyHtml(summary = "Connect says you're not allowed? Use your own Spotify app") {
+function ownSpotifyHtml(summary = 'Spotify connection help') {
   const own = SPOTIFY_CLIENT_ID !== SPOTIFY_DEFAULT_CLIENT;
   return `<details class="own-spotify small"${own ? ' open' : ''}>
     <summary>${summary}</summary>

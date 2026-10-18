@@ -41,11 +41,6 @@ const HELP = {
       <li><b>Paper script:</b> in the <b>Notes</b> app, tap the camera icon &gt; <b>Scan Documents</b>, save, then <b>Share</b> &gt; <b>Save to Files</b> as a PDF. Import that PDF and tap <b>Read pages</b>.</li>
       <li><b>A few pages or screenshots:</b> use <b>Take photo</b> (again for each page) or <b>Choose photos</b>, then <b>Read pages</b>. Uses your OpenAI key.</li>
       <li>Afterwards, check the character list and use <b>Find and fix</b> (in Edit) to tidy text and character names.</li></ul>`],
-    ['Sync and groups', `<ul>
-      <li><b>Sync</b>: tap <b>Sign in</b> at the top and sign in with Google on each of your devices. Your scripts, songs and progress then stay the same everywhere, automatically.</li>
-      <li><b>Download backup</b> (on the Sync and backup screen) saves everything to a file you can keep or restore on a new device.</li>
-      <li><b>Sign in</b> (top of the screen) with Google to create or join a group and share scripts.</li>
-      <li>Sign-in window doesn't open? iPhone <b>Settings</b> &gt; <b>Apps</b> &gt; <b>Safari</b> &gt; turn off <b>Block Pop-ups</b>, then try again.</li></ul>`],
   ],
   android: [
     ['Getting started', `<ol>
@@ -73,10 +68,6 @@ const HELP = {
       <li><b>Paper script:</b> in the <b>Google Drive</b> app, tap <b>+</b> &gt; <b>Scan</b> to make a PDF, then import it and tap <b>Read pages</b>.</li>
       <li><b>A few pages or screenshots:</b> use <b>Take photo</b> or <b>Choose photos</b>, then <b>Read pages</b>. Uses your OpenAI key.</li>
       <li>Afterwards, use <b>Find and fix</b> (in Edit) to tidy text and character names.</li></ul>`],
-    ['Sync and groups', `<ul>
-      <li><b>Sync</b>: sign in with Google (top of the screen) on each of your devices and your scripts stay the same everywhere, automatically.</li>
-      <li><b>Download backup</b> (on the Sync and backup screen) saves everything to a file you can keep or restore on a new device.</li>
-      <li><b>Sign in</b> (top of the screen) with Google to create or join a group and share scripts.</li></ul>`],
   ],
   computer: [
     ['Getting started', `<ol>
@@ -102,26 +93,30 @@ const HELP = {
       <li><b>PDF or .txt:</b> New script &gt; <b>Import PDF or .txt</b>, or drag the file onto the text box.</li>
       <li><b>Scanned PDF or screenshots:</b> they go into the pages list; tap <b>Read pages</b> (uses your OpenAI key).</li>
       <li>Afterwards, use <b>Find and fix</b> (in Edit) to tidy text and character names.</li></ul>`],
-    ['Sync and groups', `<ul>
-      <li><b>Sync</b>: sign in with Google (top of the screen) on your computer and phone and your scripts stay the same on both, automatically.</li>
-      <li><b>Download backup</b> (on the Sync and backup screen) saves everything to a file you can keep or restore on a new device.</li>
-      <li><b>Sign in</b> with Google to create or join a group. If the sign-in window doesn't open, allow pop-ups for this site.</li></ul>`],
   ],
 };
 
-const SYNC_HELP = topic('Syncing between your devices', `<ol>
+const SYNC_HELP = topic('Sync, groups and backups', `<h2>Syncing your devices</h2>
+  <ol>
     <li>Tap <b>Sign in</b> at the top and sign in with Google.</li>
     <li>Do the same, with the <b>same Google account</b>, on your other phone, tablet or computer.</li>
     <li>That's it: your scripts, songs, categories and practice progress fill in on each device by themselves.</li></ol>
   <ul>
     <li><b>When it syncs:</b> a few seconds after any change, and whenever you open the app. To pull the latest right away, tap <b>Sync</b> (top right) &gt; <b>Sync now</b>.</li>
-    <li><b>Private:</b> other people can't see your synced scripts; people in your groups only see what you choose to <b>Share to group</b>. The app's admin (Shannon) can remove accounts and their synced data if needed.</li>
     <li><b>Edited on two devices?</b> The most recent edit of a script wins. Practice progress is combined line by line, so practice anywhere counts. Deleting a script on one device deletes it on the others.</li>
-    <li><b>Stays on each device:</b> computer voices, AI voices already made, your recordings and saved screen-off tracks. (They're re-made or re-recorded on the other device as needed.)</li>
+    <li><b>Stays on each device:</b> computer voices, AI voices already made, your recordings and saved screen-off tracks. (Recordings can be moved with <b>Download recordings</b>; see Backups.)</li>
     <li><b>The Sync button says "Sync problem"?</b> Tap it to see why. Usually it's no internet for a moment; it tries again by itself. If it says sync was refused, tell Shannon.</li>
     <li><b>Very long scripts:</b> one script bigger than about 900 KB of text (far longer than a normal play) can't sync; the app will say so. Use <b>Download backup</b> to keep it safe.</li>
-    <li><b>Advanced:</b> people who already use GitHub can sync through it instead (Sync &gt; <b>Advanced: sync with GitHub instead</b>). Most people don't need this.</li>
-    <li><b>Backup file:</b> on the Sync screen, <b>Download backup</b> saves everything to a file you can keep or <b>Restore</b> on any device, signed in or not.</li></ul>`);
+    <li><b>Advanced:</b> people who already use GitHub can sync through it instead (Sync &gt; <b>Advanced: sync with GitHub instead</b>). Most people don't need this.</li></ul>
+  <h2>Groups</h2>
+  <ul>
+    <li><b>Sign in</b> (top of the screen) to create a group or join one from an invite, then <b>Share to group</b> from a script so your cast can add it.</li>
+    <li><b>Private:</b> other people can't see your synced scripts; people in your groups only see what you choose to share. The app's admin (Shannon) can remove accounts and their synced data if needed.</li>
+    <li><b>Sign-in window doesn't open?</b> Allow pop-ups for this site. On iPhone: <b>Settings</b> &gt; <b>Apps</b> &gt; <b>Safari</b> &gt; turn off <b>Block Pop-ups</b>, then try again.</li></ul>
+  <h2>Backups</h2>
+  <ul>
+    <li><b>Download backup</b> (Sync screen) saves your scripts, progress and settings to a file you can keep, then <b>Restore</b> on any device, signed in or not.</li>
+    <li><b>Not in the backup:</b> your recordings. Use <b>Download recordings</b> next to it for those (the same Restore button brings them back).</li></ul>`);
 
 const ACCESS_HELP = topic('Accessibility', `<ul>
     <li><b>Screen readers and keyboard:</b> every button works from the keyboard, and in the player, results like <i>"Not quite, 60 percent. Missed: glad, see"</i> are announced. Shortcuts: <kbd>Space</kbd> play/pause, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> move, <kbd>H</kbd> hint, <kbd>L</kbd> hear the line, <kbd>Enter</kbd> done speaking.</li>
@@ -143,7 +138,7 @@ const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.p
   <p><b>Stays on your device</b> (in this browser):</p>
   <ul>
     <li>Your scripts, songs, categories and practice progress</li>
-    <li>Your voice recordings (they never leave your device)</li>
+    <li>Your voice recordings (they never leave your device unless you download them)</li>
     <li>Saved screen-off tracks and AI voice audio</li>
     <li>Your own OpenAI key, if you add one, and your Spotify connection</li>
   </ul>
