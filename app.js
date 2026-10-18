@@ -1088,21 +1088,25 @@ function prevLineIndex(s, i) {
 
 // Each of your lines with the line just before it (your cue), skipping the rest of the scene. With onlyWeak,
 // just the lines you've tried and are still working on (Drill weak lines); untried lines aren't "weak".
+// When the line just before is also yours (a speech split by a stage direction, say), your cue is the other
+// character's line before that run, and the run of your lines is kept too, so you come in where you really do.
 function cueOrder(s, onlyWeak = false) {
   const order = [];
   for (const i of rangeOrder(s)) {
     const l = s.lines[i];
     if (!isMine(s, l) || (onlyWeak && !isWorking(s, l))) continue;
-    const cue = prevLineIndex(s, i);
-    if (cue >= 0 && !isMine(s, s.lines[cue]) && order[order.length - 1] !== cue) order.push(cue);
-    order.push(i);
+    const lead = [];
+    let j = prevLineIndex(s, i);
+    while (j >= 0 && isMine(s, s.lines[j])) { lead.unshift(j); j = prevLineIndex(s, j); }
+    if (j >= 0) lead.unshift(j);
+    for (const k of [...lead, i]) if (!(k <= order[order.length - 1])) order.push(k);
   }
   return order;
 }
 const weakOrder = s => cueOrder(s, true);
 // What Listen and Rehearse play: the whole scene, or just your cues and lines (a checkbox on the script page).
 const playOrder = s => (app.cuesOnly && s.myChar ? cueOrder(s) : rangeOrder(s));
-const weakCount = s => weakOrder(s).filter(i => isMine(s, s.lines[i])).length;
+const weakCount = s => weakOrder(s).filter(i => isMine(s, s.lines[i]) && isWorking(s, s.lines[i])).length;
 
 // ---------- Icons ----------
 const ICONS = {
@@ -2242,7 +2246,7 @@ function doneHtml(s) {
   else if (P.mode === 'listen') msg = 'Play it again, or switch to Rehearse and say your lines out loud.';
   else if (P.drill) {
     title = solid === lines ? 'Nothing shaky left!' : "That's a wrap on the drill!";
-    msg = solid === lines ? `All <b>${lines}</b> of those lines landed. Nice work.` : `<b>${solid}</b> of <b>${lines}</b> shaky lines landed on your own this time.${withHelp} The rest will get there.`;
+    msg = solid === lines ? `All <b>${lines}</b> of those lines landed. Nice work.` : `<b>${solid}</b> of <b>${lines}</b> lines landed on your own this time.${withHelp} The rest will get there.`;
   } else if (lines && solid === lines) msg = `Every line on the first try, no help (<b>${lines}</b> of <b>${lines}</b>). Take a bow.`;
   else msg = `You got <b>${solid}</b> of <b>${lines}</b> lines on the first try on your own.${withHelp}${lines && solid / lines >= 0.7 ? ' Looking good.' : ' Every run makes the next one easier.'}`;
   return `<div class="card stage-card done-card">
