@@ -17,7 +17,7 @@
    CREATE TABLE usage (uid TEXT, month TEXT, usd REAL, PRIMARY KEY (uid, month));
    ```
    Then in the Worker: **Settings > Bindings > Add > D1 database**, variable name `DB`, database `line-learner-usage`.
-5. **Connect the app.** Copy the Worker's address (like `https://line-learner-voices.yourname.workers.dev`) into `SHARED_VOICES_URL` at the top of the shared-voices section in `app.js`.
+5. **Connect the app.** The Worker's address goes in `SHARED_VOICES_URL` in `app.js` (currently `https://line-learner-voices.sqnazzal.workers.dev`).
 
 ## How it decides
 
