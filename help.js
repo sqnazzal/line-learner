@@ -252,6 +252,7 @@ const UPDATES = [
     '<b>Accessibility:</b> better screen reader support, keyboard focus and headings throughout.',
     '<b>Privacy notice</b> rewritten in plain language, with privacy and copyright requests in Send feedback.',
     '<b>Home screen icon:</b> theatre masks instead of a gray letter (remove and re-add the app to see it).',
+    '<b>Scene breaks:</b> a scene heading is now read out by an announcer ("Act 2", "Scene 1") with a longer pause, in Listen, Rehearse and screen-off tracks (silent Type mode just shows it a little longer). Remake a track to get it.',
     '<b>Drill weak lines</b> cues you properly when the line before yours is also yours (a speech split by a stage direction): you hear the other character\'s cue and come in from the start of your speech.',
     '<b>Recordings backup:</b> with Google sync on, your recordings are backed up to your account too and come back on any device you sign in on (Sync screen, <b>Back up my recordings too</b>).',
     '<b>Warning on iPhone:</b> removing the home screen icon deletes the app\'s recordings, key and tracks on that device; Help and the Sync screen now say so.',

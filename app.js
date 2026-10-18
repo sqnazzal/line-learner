@@ -578,6 +578,24 @@ async function speakAs(speaker, text, token) {
   return speakText(text, voiceFor(speaker), token, rate);
 }
 
+// Scene headings (and screen-off tracks' notices) are read by a calm announcer, set apart from the characters.
+const ANNOUNCER = ['alloy', 'Voice: a calm, clear announcer. Accent: General American. Read this like the opening announcement of an audiobook.'];
+const fromRoman = r => [...r.toUpperCase()].reduce((n, c, i, a) => {
+  const v = { I: 1, V: 5, X: 10, L: 50, C: 100 }, x = v[c], y = v[a[i + 1]] || 0;
+  return n + (x < y ? -x : x);
+}, 0);
+// "ACT II" and "SCENE I. Elsinore" read as "Act 2" and "Scene 1. Elsinore", not letters.
+const spokenHeading = text => text
+  .replace(/\b(act|scene|part|prologue|epilogue)\b/gi, w => w[0].toUpperCase() + w.slice(1).toLowerCase())
+  .replace(/\b(Act|Scene|Part) ([IVXLC]+)\b/g, (m, w, r) => `${w} ${fromRoman(r)}`);
+async function announceHeading(text, token) {
+  const say = spokenHeading(text);
+  if (aiReady()) {
+    try { await playBlob(await aiAudio(...ANNOUNCER, say), token, settings.rate); return; } catch (e) { aiFailed(e); }
+  }
+  return speakText(say, voiceList()[0], token);
+}
+
 // ---------- Natural AI voices (OpenAI text to speech) ----------
 const LS_AI = 'lineLearner.ai';
 const AI_MODEL = 'gpt-4o-mini-tts';
@@ -2397,7 +2415,11 @@ async function run(from) {
     refreshPlayer();
     saveResume();
     if (!quiet()) aiPrefetch(s, P.order.slice(p, p + 4));
-    if (item.type === 'section') await sleep(700, token);
+    if (item.type === 'section') {
+      // A real break between scenes: the heading is read out (just shown, in silent Type mode).
+      if (quiet()) await sleep(2500, token);
+      else { await sleep(600, token); P.status = 'speaking'; refreshPlayer(); await announceHeading(item.text, token); await sleep(1500, token); }
+    }
     else if (item.type === 'direction') {
       if (settings.readDirections && quiet()) await waitRead(readMs(item.text), token);
       else if (settings.readDirections) { P.status = 'speaking'; refreshPlayer(); await speakText(item.text, voiceList()[0], token); }

@@ -71,6 +71,7 @@ Each of your lines is **Not practiced**, **Working on it**, or **Solid**. Solid 
 - **Stuck?** Say **"line"** and it feeds you the line.
 - **Sound-alikes pass:** different spellings that sound the same (Dotty / Dottie, Jon / John) and run-together words (dammit / damn it, wanna / want to, gonna / going to) count as right.
 - **Just your part:** tick **Just my cues and lines** on a script and Listen, Rehearse and Type play only each cue line and your line, skipping the rest.
+- **Scene breaks:** each scene heading is read out by an announcer ("Act 2", "Scene 1") with a pause, so a new scene is clear even with the screen off.
 - **Long scenes:** leave mid-scene and the script page offers **Pick up where you left off**.
 - **Continue:** the home screen offers **Continue** for your last run (same script, mode, section and cues-only setting), from where you stopped in a long scene.
 - **Edited or updated scripts keep your progress:** progress is kept per line (who says it and the words), so lines that didn't change keep theirs and changed lines start fresh. **Start at** and **Pick up where you left off** follow the same lines too.

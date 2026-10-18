@@ -50,7 +50,7 @@ function partLabel(s, [from, to]) {
 
 // What a track depends on: the part, the lines, their voices, and the Listen settings that shape it.
 function trackSig(s, part) {
-  return hash(JSON.stringify(['announced', s.id, s.updated, part, s.myChar, track.cuesOnly && !!s.myChar, s.aiVoices, s.aiStyles, s.genders,
+  return hash(JSON.stringify(['announced-scenes', s.id, s.updated, part, s.myChar, track.cuesOnly && !!s.myChar, s.aiVoices, s.aiStyles, s.genders,
     settings.myLines, settings.rate, settings.useRecordings, aiReady()]));
 }
 
@@ -146,14 +146,14 @@ function renderTrack() {
 // ---------- Building the audio ----------
 // Spoken at the start and end of every track (with AI voices): the use notice and what the track is.
 // Scripts from the library know their author; plays are titled "Title (Author)", read as "Title, by Author".
-const ANNOUNCER = ['alloy', 'Voice: a calm, clear announcer. Accent: General American. Read this like the opening announcement of an audiobook.'];
+// (ANNOUNCER, the announcer's voice, is in app.js.)
 function trackWho(s) {
   if (!s.author) return `${s.title}.`;
   const title = s.title.endsWith(` (${s.author})`) ? s.title.slice(0, -s.author.length - 3) : s.title;
   return `${title}, by ${s.author}.`;
 }
 function trackAnnouncements(s, part) {
-  const whole = part[0] === 0 && part[1] >= s.lines.length, label = partLabel(s, part);
+  const whole = part[0] === 0 && part[1] >= s.lines.length, label = spokenHeading(partLabel(s, part));
   return [
     `For private, non-commercial use only. ${trackWho(s)}${whole ? '' : ` ${label}.`}`,
     `${whole ? 'The end.' : `End of ${label}.`} ${trackWho(s)} For private, non-commercial use only.`,
@@ -223,7 +223,13 @@ async function buildTrack() {
     for (const l of items) {
       if (track.stop) break;
       if (samples / TRACK_RATE / 60 > TRACK_MAX_MIN) { track.error = `Stopped at ${TRACK_MAX_MIN} minutes to keep the file manageable. Make the rest as another track.`; break; }
-      if (l.type === 'section') { sections.push({ label: l.text, t: samples / TRACK_RATE }); add(silence(1.2)); continue; }
+      if (l.type === 'section') {
+        // A real break between scenes, with the heading read out.
+        sections.push({ label: l.text, t: samples / TRACK_RATE });
+        add(silence(1.2));
+        if (aiReady()) { for (const a of await sayAnnouncement(spokenHeading(l.text))) add(a); add(silence(1.3)); }
+        continue;
+      }
       if (l.type !== 'line') continue;
       if (isMine(s, l)) {
         if (settings.myLines !== 'skip') {
