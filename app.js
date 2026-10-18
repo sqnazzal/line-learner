@@ -97,18 +97,29 @@ function openDb() {
     req.onupgradeneeded = () => {
       for (const name of ['recordings', 'tts', 'tracks']) if (!req.result.objectStoreNames.contains(name)) req.result.createObjectStore(name);
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      // iPhones can drop the connection while the app sits in the background; open a fresh one next time.
+      req.result.onclose = () => { dbPromise = null; };
+      resolve(req.result);
+    };
+    req.onerror = () => { dbPromise = null; reject(req.error); };
   });
 }
-async function idb(mode, fn, store = 'recordings') {
+async function idb(mode, fn, store = 'recordings', retry = true) {
   const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, mode);
-    const req = fn(tx.objectStore(store));
-    tx.oncomplete = () => resolve(req.result);
-    tx.onerror = () => reject(tx.error);
-  });
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(store, mode);
+      const req = fn(tx.objectStore(store));
+      tx.oncomplete = () => resolve(req.result);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('aborted'));
+    });
+  } catch (e) {
+    if (!retry) throw e;
+    dbPromise = null; // a lost connection: reconnect and try once more
+    return idb(mode, fn, store, false);
+  }
 }
 const recordings = {
   get: key => idb('readonly', st => st.get(key)),
@@ -3477,7 +3488,22 @@ JULIET: My ears have not yet drunk a hundred words of thy tongue's uttering, yet
 ROMEO: Neither, fair saint, if either thee dislike.`;
 
 if (synth) synth.onvoiceschanged = () => { if (app.view === 'script') render(); };
-recordings.keys().then(keys => { recorded = new Set(keys); }).catch(() => {}).finally(render);
+recordings.keys().then(keys => { recorded = new Set(keys); }).catch(e => noteError('Recordings could not be read: ' + (e?.name || e))).finally(render);
+
+// What's kept on this device, for Send feedback's device details (counts only, never contents or keys).
+let storageInfo = 'not checked yet';
+async function checkStorage() {
+  const count = async store => { try { return String((await idb('readonly', st => st.getAllKeys(), store)).length); } catch (e) { return `unreadable (${e?.name || e})`; } };
+  const est = await navigator.storage?.estimate?.().catch(() => null);
+  const kept = await navigator.storage?.persisted?.().catch(() => null);
+  let local = 0;
+  try { for (let i = 0; i < localStorage.length; i++) local += (localStorage.getItem(localStorage.key(i)) || '').length; } catch { /* unreadable */ }
+  storageInfo = `recordings ${await count('recordings')} (${recorded.size} known), AI lines ${await count('tts')}, tracks ${await count('tracks')}`
+    + ` · key saved: ${ai.key ? 'yes' : 'no'}, shared voices: ${ai.shared ? 'on' : 'off'}, AI on: ${ai.on ? 'yes' : 'no'}, play recordings: ${settings.useRecordings ? 'on' : 'off'}`
+    + ` · protected from cleanup: ${kept == null ? 'unknown' : kept ? 'yes' : 'no'}${est ? `, using ${(est.usage / 1048576).toFixed(1)} MB` : ''}, local settings ${Math.round(local / 1024)} KB`;
+  return storageInfo;
+}
+checkStorage();
 render();
 applyTheme(savedTheme());
 showSyncStatus();

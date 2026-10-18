@@ -303,6 +303,7 @@ function deviceDetails() {
     `Checking lines by mic: ${SR ? 'available' : 'not available in this browser'}`,
     `Voices: ${usingShared() ? "Shannon's shared voices" : ai.key ? 'own OpenAI key' : 'device voices'}`,
     `Signed in: ${signedInUser() ? 'yes' : 'no'} · scripts on device: ${scripts.length} · text size: ${settings.textSize}`,
+    `On this device: ${storageInfo}`,
     `Recent errors: ${recentErrors.length ? '\n' + recentErrors.join('\n') : 'none'}`,
   ].join('\n');
 }
@@ -347,7 +348,9 @@ document.addEventListener('change', async e => {
 });
 
 Object.assign(actions, {
-  feedback(b) { if (app.view !== 'feedback') fbk.from = app.view; leave(); Object.assign(fbk, { sent: false, shot: '', busy: false, ...(FEEDBACK_KINDS[b?.dataset?.kind] ? { kind: b.dataset.kind } : {}) }); app.view = 'feedback'; render(); window.scrollTo(0, 0); },
+  feedback(b) { if (app.view !== 'feedback') fbk.from = app.view; leave(); Object.assign(fbk, { sent: false, shot: '', busy: false, ...(FEEDBACK_KINDS[b?.dataset?.kind] ? { kind: b.dataset.kind } : {}) }); app.view = 'feedback'; render(); window.scrollTo(0, 0);
+    checkStorage().then(() => { const pre = $('.fb-details'); if (pre) pre.textContent = deviceDetails(); });
+  },
   'fb-kind'(b) {
     fbk.kind = b.dataset.kind;
     for (const x of document.querySelectorAll('[data-action="fb-kind"]')) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }
