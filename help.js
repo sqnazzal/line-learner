@@ -231,6 +231,51 @@ const renderAbout = () => `<section class="stack about-page">
 actions.about = () => { leave(); app.view = 'about'; render(); window.scrollTo(0, 0); };
 VIEWS.about = renderAbout;
 
+// ---------- What's new ----------
+// Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
+const UPDATES = [
+  ['2026-10-18', [
+    '<b>Type your lines:</b> practice quietly (on a train, say) by typing your lines. Cues show on screen, or can be read aloud.',
+    '<b>Sound-alikes count:</b> different spellings that sound the same (Dotty / Dottie) and run-together words (damn it / dammit, want to / wanna) now pass.',
+    '<b>No microphone? No problem:</b> Listen and Rehearse keep going with timed pauses instead.',
+    '<b>Clearer progress:</b> each line is Not practiced, Working on it or Solid, and lines you needed help with don\'t count as solid yet.',
+    '<b>Continue</b> on the home screen picks up where you left off, and your place is kept when a script is edited.',
+    '<b>Script preview</b> before saving, with warnings about anything that looks off.',
+    '<b>Settings</b> split into everyday ones and an Advanced section.',
+    '<b>Backups</b> say clearly what\'s not included, and your own recordings can be saved separately.',
+    '<b>Safer group sharing:</b> sharing asks you to confirm you have permission and for the show\'s last performance date; shared scripts show when the license has ended or they\'re inactive; unsharing can be undone.',
+    '<b>Accessibility:</b> better screen reader support, keyboard focus and headings throughout.',
+    '<b>Privacy notice</b> rewritten in plain language, with privacy and copyright requests in Send feedback.',
+    '<b>Home screen icon:</b> theatre masks instead of a gray letter (remove and re-add the app to see it).',
+    '<b>About Line Learner</b> page and this <b>What\'s new</b> page.',
+    '<b>Fixed:</b> Check could stop responding after skipping lines in Type mode, and going back could bounce forward again.',
+  ]],
+  ['2026-10-17', [
+    '<b>Line Learner opens!</b> Learn lines by listening, then rehearse out loud while it listens and checks you.',
+    '<b>Voices</b> matched to each character, with a speed for each, plus optional natural AI voices.',
+    '<b>Import scripts</b> from screenshots and photos of paper pages, with handwriting ignored.',
+    '<b>Library</b> of free public-domain plays and monologues.',
+    '<b>Sing along:</b> practice songs with lyrics that follow Spotify.',
+    '<b>Groups:</b> sign in with Google to share scripts and songs with your cast.',
+    '<b>Sync</b> your scripts and progress between devices.',
+    '<b>Screen-off tracks</b> to listen with your phone locked, and <b>Just my cues and lines</b> to run only your parts.',
+    '<b>Help</b>, <b>Send feedback</b>, light and dark themes, and a tip jar.',
+  ]],
+];
+
+const renderUpdates = () => `<section class="stack updates-page">
+  <div class="row between wrap"><h1>What's new</h1><button class="btn ghost" data-action="home">${icon('back')} Your scripts</button></div>
+  <p class="lede">Changes to Line Learner, newest first. Reload the page to get the latest.</p>
+  ${UPDATES.map(([d, items]) => `<div class="card stack">
+    <h2>${new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</h2>
+    <ul class="update-list">${items.map(i => `<li>${i}</li>`).join('')}</ul>
+  </div>`).join('')}
+  <p class="muted small">Something not working, or an idea? <button class="link-btn" data-action="feedback">Send feedback</button></p>
+</section>`;
+
+actions.updates = () => { leave(); app.view = 'updates'; render(); window.scrollTo(0, 0); };
+VIEWS.updates = renderUpdates;
+
 // ---------- Send feedback / Report a bug ----------
 // Goes to the app's Firestore 'feedback' inbox, which only the admin can read (Admin screen). Works signed
 // in or not. Device details help track down bugs; no scripts are included.
