@@ -9,7 +9,7 @@
     // Apply the saved Light/Dark choice before the page draws, so it never flashes the wrong colors.
     try { var t = localStorage.getItem('lineLearner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
-  <link rel="stylesheet" href="styles.css?v=202610171951">
+  <link rel="stylesheet" href="styles.css?v=202610171953">
 </head>
 <body>
   <header class="topbar">
@@ -20,10 +20,11 @@
     <button id="sync-btn" class="sync-btn" data-action="sync-view">Sync</button>
   </header>
   <main id="app"></main>
-  <footer class="site-footer">Built by Shannon Nazzal · © 2026 · Not for commercial use</footer>
+  <footer class="site-footer"><button class="link-btn" data-action="help">Help &amp; troubleshooting</button><br>Built by Shannon Nazzal · © 2026 · Not for commercial use</footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=202610171951"></script>
-  <script src="groups.js?v=202610171951"></script>
-  <script src="songs.js?v=202610171951"></script>
+  <script src="app.js?v=202610171953"></script>
+  <script src="help.js?v=202610171953"></script>
+  <script src="groups.js?v=202610171953"></script>
+  <script src="songs.js?v=202610171953"></script>
 </body>
 </html>

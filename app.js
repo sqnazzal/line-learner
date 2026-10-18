@@ -887,6 +887,7 @@ function renderLibrary() {
         <button class="btn" data-action="new-song">+ New song</button>
         <button class="btn" data-action="browse">Browse free scripts &amp; monologues</button>
         <button class="btn ghost" data-action="sample">Try a sample scene</button>
+        <button class="btn ghost" data-action="help">Help &amp; troubleshooting</button>
       </div>
     </div>
     ${supportNote()}
@@ -2728,7 +2729,7 @@ document.addEventListener('visibilitychange', () => {
 // version is out, reload (only on the home, script or library screens, so nothing in progress is cut off).
 async function checkForUpdate() {
   if (location.protocol === 'file:' || new URLSearchParams(location.search).has('code')) return;
-  if (!['library', 'script', 'browse', 'sync'].includes(app.view)) return;
+  if (!['library', 'script', 'browse', 'sync', 'help'].includes(app.view)) return;
   try {
     const mine = (document.querySelector('script[src*="app.js?v="]')?.getAttribute('src') || '').split('v=')[1];
     const html = await (await fetch(location.pathname, { cache: 'no-store' })).text();

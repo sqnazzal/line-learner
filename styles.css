@@ -335,6 +335,11 @@ button, .btn { touch-action: manipulation; }
   padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
 body[data-view="sing"] .site-footer { padding-bottom: 130px; } /* clear of the player bar */
+.site-footer .link-btn { font-size: .85rem; margin-bottom: 4px; }
+.help-page .segmented { flex-wrap: wrap; }
+.help-topic > summary { font-size: 1.05rem; }
+.help-body { line-height: 1.6; }
+.help-body ul, .help-body ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Groups */
 .group-name { font-size: 1.15rem; }

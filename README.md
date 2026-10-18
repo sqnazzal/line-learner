@@ -140,3 +140,7 @@ Tap **Sign in** at the top (next to Sync) and sign in with Google; it then says 
 - Each person's progress, recordings, voices and personal scripts stay private. Only what you share goes to the group.
 
 Groups use Google Firebase (project `line-learner-45bd1`): Authentication with Google sign-in, and Firestore for groups and shared items. Access is controlled by `firestore.rules`; paste it into **Databases and storage > Firestore > Rules** in the Firebase console and tap **Publish** whenever it changes. Sign-in only works from domains listed under **Security > Authentication > Settings > Authorized domains** (add `sqnazzal.github.io`).
+
+## Help
+
+**Help & troubleshooting** (on the home screen and at the bottom of every page) has setup steps and fixes for each kind of device, with tabs for iPhone & iPad, Android and computers. It opens on the tab for the device you're using.
