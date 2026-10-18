@@ -109,6 +109,20 @@ const HELP = {
   ],
 };
 
+const SYNC_HELP = topic('Syncing between your devices', `<ol>
+    <li>Tap <b>Sign in</b> at the top and sign in with Google.</li>
+    <li>Do the same, with the <b>same Google account</b>, on your other phone, tablet or computer.</li>
+    <li>That's it: your scripts, songs, categories and practice progress fill in on each device by themselves.</li></ol>
+  <ul>
+    <li><b>When it syncs:</b> a few seconds after any change, and whenever you open the app. To pull the latest right away, tap <b>Sync</b> (top right) &gt; <b>Sync now</b>.</li>
+    <li><b>Private:</b> only you can see your synced scripts. People in your groups only see what you choose to <b>Share to group</b>.</li>
+    <li><b>Edited on two devices?</b> The most recent edit of a script wins. Practice progress is combined line by line, so practice anywhere counts. Deleting a script on one device deletes it on the others.</li>
+    <li><b>Stays on each device:</b> computer voices, AI voices already made, your recordings and saved screen-off tracks. (They're re-made or re-recorded on the other device as needed.)</li>
+    <li><b>The Sync button says "Sync problem"?</b> Tap it to see why. Usually it's no internet for a moment; it tries again by itself. If it says sync was refused, tell Shannon.</li>
+    <li><b>Very long scripts:</b> one script bigger than about 900 KB of text (far longer than a normal play) can't sync; the app will say so. Use <b>Download backup</b> to keep it safe.</li>
+    <li><b>Advanced:</b> people who already use GitHub can sync through it instead (Sync &gt; <b>Advanced: sync with GitHub instead</b>). Most people don't need this.</li>
+    <li><b>Backup file:</b> on the Sync screen, <b>Download backup</b> saves everything to a file you can keep or <b>Restore</b> on any device, signed in or not.</li></ul>`);
+
 const COMMON = topic("Something's not working?", `<ul>
   <li><b>Reload the page.</b> Updates arrive automatically, but a reload makes sure you have the latest.</li>
   <li><b>Check your internet connection:</b> checking lines, AI voices, lyrics, sync and groups need it.</li>
@@ -125,6 +139,7 @@ function renderHelp() {
     <p class="lede">How to set things up and fix common problems. Pick your device:</p>
     <div class="segmented" role="group" aria-label="Your device">${tabs}</div>
     ${HELP[help.tab].map(([t, b], i) => topic(t, b, i === 0)).join('')}
+    ${SYNC_HELP}
     ${COMMON}
   </section>`;
 }
