@@ -157,7 +157,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 
 ## License
 
-Line Learner is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md): anyone can use, copy and change it for personal, educational, charitable or other noncommercial purposes, but not to make money from it. For any other use, ask Shannon.
+Line Learner is licensed under the [PolyForm Strict License 1.0.0](LICENSE.md): anyone can use it for personal, educational, charitable or other noncommercial purposes, but not change it, share copies of it, or make money from it. For anything else, ask Shannon.
 
 Not covered by that license: PDF.js in `vendor/pdfjs` keeps its own Apache 2.0 license, and the plays and monologues in `library/` are public domain texts from Project Gutenberg.
 
