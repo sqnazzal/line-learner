@@ -717,8 +717,30 @@ function setTranscript(text) {
   if (el) el.textContent = text;
 }
 
+// How to switch the microphone on for this site, in words for the browser you're using.
+function micHelp() {
+  if (IS_IOS) return 'The microphone is blocked. In Safari, tap the "aA" button in the address bar > Website Settings > Microphone > Allow (in Chrome: the site\'s settings, or iPhone Settings > Chrome > Microphone). Then press play.';
+  return 'The microphone is blocked. Click the icon at the left of the address bar, set Microphone to Allow, then press play.';
+}
+
+// Asks for the microphone as soon as you start (while your tap still counts), so the browser's question
+// never pops up in the middle of a scene and swallows your first line. If it's already allowed, nothing shows.
+async function ensureMic() {
+  if (!SR || !navigator.mediaDevices?.getUserMedia) return true;
+  try {
+    const state = await navigator.permissions?.query({ name: 'microphone' }).then(p => p.state).catch(() => '');
+    if (state === 'granted') return true;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(t => t.stop());
+    return true;
+  } catch (e) {
+    toast(e?.name === 'NotFoundError' ? 'No microphone found. Plug one in (or use your phone), then try again.' : micHelp());
+    return false;
+  }
+}
+
 function micError(code) {
-  if (code === 'not-allowed' || code === 'service-not-allowed') return 'I need microphone access. Allow it in the address bar, then press play.';
+  if (code === 'not-allowed' || code === 'service-not-allowed') return micHelp();
   if (code === 'network') return 'Checking your lines needs an internet connection. Reconnect, then press play.';
   if (code === 'audio-capture') return 'No microphone found. Plug one in, then press play.';
   return `The microphone stopped (${code}). Press play to try again.`;
@@ -1800,11 +1822,12 @@ function leave() {
   if (sync.pending) { sync.pending = false; scheduleSync(); }
 }
 
-function startPlayer(mode, order) {
+async function startPlayer(mode, order) {
   const s = current();
   if (mode !== 'listen' && !s.myChar) { toast('Pick your character first.'); return; }
   order ||= rangeOrder(s);
   if (!order.length) { toast('Nothing to practice here yet.'); return; }
+  if (mode !== 'listen' && !(await ensureMic())) return;
   leave();
   P = newPlayer(mode, order);
   app.view = 'player';
@@ -1812,7 +1835,8 @@ function startPlayer(mode, order) {
   run(0);
 }
 
-function startBuildUp(i) {
+async function startBuildUp(i) {
+  if (!(await ensureMic())) return;
   leave();
   P = newPlayer('buildup', [i]);
   P.bu = { i, parts: buildParts(current().lines[i].text), k: 0, phase: 'listen' };
