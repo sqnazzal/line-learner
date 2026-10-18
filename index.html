@@ -9,7 +9,7 @@
     // Apply the saved Light/Dark choice before the page draws, so it never flashes the wrong colors.
     try { var t = localStorage.getItem('lineLearner.theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
-  <link rel="stylesheet" href="styles.css?v=202610172151">
+  <link rel="stylesheet" href="styles.css?v=202610172201">
 </head>
 <body>
   <header class="topbar">
@@ -22,10 +22,11 @@
   <main id="app"></main>
   <footer class="site-footer"><button class="link-btn" data-action="help">Help &amp; troubleshooting</button> · <a class="tip-link" href="https://venmo.com/u/shannonnazzal" target="_blank" rel="noopener">☕ Tip jar: help cover the voices</a><br><span class="disclaimer">Built by Shannon Nazzal © 2026, an actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Not for commercial use.</span></footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=202610172151"></script>
-  <script src="track.js?v=202610172151"></script>
-  <script src="help.js?v=202610172151"></script>
-  <script src="groups.js?v=202610172151"></script>
-  <script src="songs.js?v=202610172151"></script>
+  <script src="app.js?v=202610172201"></script>
+  <script src="track.js?v=202610172201"></script>
+  <script src="help.js?v=202610172201"></script>
+  <script src="groups.js?v=202610172201"></script>
+  <script src="admin.js?v=202610172201"></script>
+  <script src="songs.js?v=202610172201"></script>
 </body>
 </html>

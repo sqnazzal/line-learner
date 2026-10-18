@@ -115,7 +115,7 @@ const SYNC_HELP = topic('Syncing between your devices', `<ol>
     <li>That's it: your scripts, songs, categories and practice progress fill in on each device by themselves.</li></ol>
   <ul>
     <li><b>When it syncs:</b> a few seconds after any change, and whenever you open the app. To pull the latest right away, tap <b>Sync</b> (top right) &gt; <b>Sync now</b>.</li>
-    <li><b>Private:</b> only you can see your synced scripts. People in your groups only see what you choose to <b>Share to group</b>.</li>
+    <li><b>Private:</b> other people can't see your synced scripts; people in your groups only see what you choose to <b>Share to group</b>. The app's admin (Shannon) can remove accounts and their synced data if needed.</li>
     <li><b>Edited on two devices?</b> The most recent edit of a script wins. Practice progress is combined line by line, so practice anywhere counts. Deleting a script on one device deletes it on the others.</li>
     <li><b>Stays on each device:</b> computer voices, AI voices already made, your recordings and saved screen-off tracks. (They're re-made or re-recorded on the other device as needed.)</li>
     <li><b>The Sync button says "Sync problem"?</b> Tap it to see why. Usually it's no internet for a moment; it tries again by itself. If it says sync was refused, tell Shannon.</li>

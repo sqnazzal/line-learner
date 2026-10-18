@@ -48,6 +48,22 @@ export default {
       const used = await getUsage(env, user.sub, month);
 
       if (path.endsWith('/status')) return json({ ok: true, owner: isOwner, used, limit });
+
+      // Admin (the owner only): everyone's use this month, and resetting someone's allowance.
+      if (path.includes('/admin/')) {
+        if (!isOwner) return json({ error: 'Only the admin can do that.' }, 403);
+        if (!env.DB) return json({ rows: [] });
+        if (path.endsWith('/admin/usage')) {
+          const { results = [] } = await env.DB.prepare('SELECT uid, usd FROM usage WHERE month = ?').bind(month).all();
+          return json({ rows: results });
+        }
+        if (path.endsWith('/admin/reset') && request.method === 'POST') {
+          const { uid } = await request.json();
+          await env.DB.prepare('DELETE FROM usage WHERE uid = ? AND month = ?').bind(String(uid || ''), month).run();
+          return json({ ok: true });
+        }
+        return json({ error: 'Not found' }, 404);
+      }
       if (request.method !== 'POST') return json({ error: 'Not found' }, 404);
       if (limit > 0 && used >= limit) {
         return json({ error: `You've used this month's share of the voices (about $${limit}). It resets next month; ask Shannon if you need more.` }, 429);

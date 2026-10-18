@@ -1,58 +1,80 @@
 rules_version = '2';
 
-// Security rules for Line Learner groups. Paste into Firebase: Databases and storage > Firestore > Rules, then Publish.
+// Security rules for Line Learner. Paste into Firebase: Databases and storage > Firestore > Rules, then Publish.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    // The app's admin (Shannon). Must match ADMIN_UID in admin.js.
+    function isAdmin() { return signedIn() && request.auth.uid == 'ADMIN_UID_HERE'; }
+    // Blocked people can't use groups, sharing or the shared voices.
+    function notBlocked() { return !exists(/databases/$(database)/documents/blocked/$(request.auth.uid)); }
     function memberOf(gid) {
-      return signedIn() && request.auth.uid in get(/databases/$(database)/documents/groups/$(gid)).data.members;
+      return signedIn() && notBlocked() && request.auth.uid in get(/databases/$(database)/documents/groups/$(gid)).data.members;
     }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
-    // Each person's own synced scripts: only they can read or write them.
+    // Each person's own synced scripts: only they can read or write them. The admin can see and delete
+    // them (to remove someone's data).
     match /users/{uid}/{rest=**} {
       allow read, write: if signedIn() && request.auth.uid == uid;
+      allow read, delete: if isAdmin();
+    }
+
+    // Name, email and last seen, so the admin knows who uses the app.
+    match /profiles/{uid} {
+      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow delete: if isAdmin();
+    }
+
+    // People the admin has blocked. They can see that they're blocked; only the admin can change it.
+    match /blocked/{uid} {
+      allow get: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow list, write: if isAdmin();
     }
 
     // Invite codes point to a group. They can be looked up one at a time (to join) but never listed.
     match /invites/{code} {
-      allow get: if signedIn();
+      allow get: if (signedIn() && notBlocked()) || isAdmin();
       // Created together with its group, by that group's creator.
-      allow create: if signedIn()
+      allow create: if signedIn() && notBlocked()
         && request.auth.uid in getAfter(/databases/$(database)/documents/groups/$(request.resource.data.gid)).data.members;
+      allow delete: if isAdmin();
     }
 
     match /groups/{gid} {
-      allow read: if signedIn() && request.auth.uid in resource.data.members;
-      allow create: if signedIn()
+      allow read: if (signedIn() && notBlocked() && request.auth.uid in resource.data.members) || isAdmin();
+      allow create: if signedIn() && notBlocked()
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.members == [request.auth.uid];
-      allow update: if signedIn() && (
+      allow update: if isAdmin() || (signedIn() && (
         // Leaving: you can take yourself off the member list, and no one else.
         (request.auth.uid in resource.data.members
           && changed().hasOnly(['members'])
           && resource.data.members.toSet().difference(request.resource.data.members.toSet()) == [request.auth.uid].toSet()
           && request.resource.data.members.toSet().difference(resource.data.members.toSet()).size() == 0)
         // Joining (or rejoining): only by showing the invite code, adding only yourself and your own name.
-        || (changed().hasOnly(['members', 'memberNames', 'lastJoinCode'])
+        || (notBlocked()
+          && changed().hasOnly(['members', 'memberNames', 'lastJoinCode'])
           && request.resource.data.lastJoinCode == resource.data.inviteCode
           && request.resource.data.members.toSet().hasAll(resource.data.members.toSet())
           && request.resource.data.members.toSet().difference(resource.data.members.toSet()).hasOnly([request.auth.uid])
           && request.resource.data.memberNames.diff(resource.data.memberNames).affectedKeys().hasOnly([request.auth.uid]))
         // Renaming: the group's creator only.
         || (resource.data.ownerUid == request.auth.uid && changed().hasOnly(['name']))
-      );
-      // Groups are never deleted, so no one can make shared scripts disappear that way.
-      allow delete: if false;
+      ));
+      // Only the admin can delete a group, so no one else can make shared scripts disappear that way.
+      allow delete: if isAdmin();
 
-      // Shared scripts and songs: members can see them; only the person who shared one can change or unshare it.
+      // Shared scripts and songs: members can see them; only the person who shared one (or the admin) can
+      // change or remove it.
       match /items/{itemId} {
-        allow read: if memberOf(gid);
+        allow read: if memberOf(gid) || isAdmin();
         allow create: if memberOf(gid) && request.resource.data.addedBy == request.auth.uid;
         allow update: if memberOf(gid)
           && resource.data.addedBy == request.auth.uid
           && request.resource.data.addedBy == request.auth.uid;
-        allow delete: if signedIn() && resource.data.addedBy == request.auth.uid;
+        allow delete: if (signedIn() && resource.data.addedBy == request.auth.uid) || isAdmin();
       }
     }
   }

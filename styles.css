@@ -356,6 +356,9 @@ body[data-view="sing"] .site-footer { padding-bottom: 130px; } /* clear of the p
 .script-item .script-card { padding-bottom: 46px; }
 .cat-pick { position: absolute; left: 18px; bottom: 12px; font-size: .8rem; padding: 3px 8px; border-radius: 999px; max-width: calc(100% - 36px); }
 
+/* Admin */
+.admin-row { display: flex; flex-direction: column; gap: 10px; }
+
 /* Groups */
 .group-name { font-size: 1.15rem; }
 .code { font-family: ui-monospace, Consolas, monospace; letter-spacing: .12em; font-size: 1.05rem; }

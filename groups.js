@@ -31,7 +31,7 @@ const fb = {
       const auth = A.getAuth(appRef), db = F.getFirestore(appRef);
       fb.api = { A, F, auth, db };
       A.onAuthStateChanged(auth, u => {
-        fb.user = u ? { uid: u.uid, name: u.displayName || u.email || 'Someone' } : null;
+        fb.user = u ? { uid: u.uid, name: u.displayName || u.email || 'Someone', email: u.email || '' } : null;
         onUserChanged();
       });
     })().catch(e => { fb.loading = null; throw e; });
@@ -238,6 +238,7 @@ function onUserChanged() {
   Object.assign(grp, { groups: [], items: [], unsubGroups: null, unsubItems: null });
   if (fb.user) {
     saveJSON(LS_GROUP_USED, true);
+    Promise.resolve(fb.saveProfile?.()).catch(() => {}); // so the admin can see who uses the app (admin.js)
     grp.unsubGroups = fb.watchGroups(groups => {
       grp.groups = groups.sort((a, b) => a.name.localeCompare(b.name));
       if (!groups.some(g => g.id === grp.current)) selectGroup(groups[0]?.id || null);
@@ -301,7 +302,7 @@ function takeItem(item) {
 
 // ---------- Views ----------
 function renderGroup() {
-  const head = `<div class="row between wrap"><h1>Group</h1><button class="btn ghost" data-action="home">${icon('back')} Your scripts</button></div>`;
+  const head = `<div class="row between wrap"><h1>Group</h1><span class="row">${typeof isAdmin === 'function' && isAdmin() ? '<button class="btn" data-action="admin">Admin</button>' : ''}<button class="btn ghost" data-action="home">${icon('back')} Your scripts</button></span></div>`;
   if (!fb.api) {
     loadGroups();
     return `<section class="stack">${head}<p class="muted">${grp.error ? esc(grp.error) : 'Loading…'}</p></section>`;
