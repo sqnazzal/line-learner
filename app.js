@@ -55,6 +55,7 @@ const DEFAULT_SETTINGS = {
   skipCuts: false,         // reading pages: leave out printed lines crossed out by hand
   listenHears: true,       // Listen mode: hear you say your line and move on when you finish
   textSize: 'normal',      // normal | large | huge (bigger words for a phone on a stand)
+  typeCues: 'show',        // Type mode: show (silent) | speak (headphones)
 };
 
 function loadJSON(key, fallback) {
@@ -200,6 +201,14 @@ const SOUNDALIKE = {
   their: 'there', theyre: 'there', youre: 'your', too: 'to', two: 'to', hear: 'here', know: 'no',
   write: 'right', okay: 'ok', oh: 'o', ay: 'i', aye: 'i', eye: 'i', whose: 'whos', yeah: 'yes',
 };
+// Run-together ways of saying two words; spelled out so "wanna" passes for "want to" (and the other way round).
+const RUN_TOGETHER = {
+  dammit: 'damn it', wanna: 'want to', gonna: 'going to', gotta: 'got to', hafta: 'have to', kinda: 'kind of',
+  sorta: 'sort of', outta: 'out of', lotta: 'lot of', lemme: 'let me', gimme: 'give me', dunno: 'dont know',
+  gotcha: 'got you', betcha: 'bet you', whaddya: 'what do you', cmon: 'come on', yall: 'you all',
+  alright: 'all right', cannot: 'can not', oughta: 'ought to', shoulda: 'should have', coulda: 'could have',
+  woulda: 'would have', musta: 'must have', aint: 'is not',
+};
 
 function words(s) {
   return spokenText(s).toLowerCase()
@@ -207,12 +216,23 @@ function words(s) {
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .split(' ').filter(Boolean)
     .map(w => (/^\d+$/.test(w) && +w <= 20 ? NUMS[+w] : w))
+    .flatMap(w => (RUN_TOGETHER[w] ? RUN_TOGETHER[w].split(' ') : [w]))
     .map(w => SOUNDALIKE[w] || w);
 }
 
-// True when two words are the same or one letter apart (forgives small recognition slips).
+// A rough "how it sounds" spelling, so Dotty and Dottie, Jon and John, or till and 'til count as the same word.
+function soundKey(w) {
+  return w
+    .replace(/ph/g, 'f').replace(/ck|q/g, 'k').replace(/c(?=[eiy])/g, 's').replace(/c/g, 'k')
+    .replace(/^wr/, 'r').replace(/^kn/, 'n').replace(/(?!^)h(?![aeiou])/g, '')
+    .replace(/(ie|ey|ee|y)(s?)$/, 'i$2')
+    .replace(/(.)\1+/g, '$1');
+}
+
+// True when two words are the same, sound the same, or are one letter apart (forgives small recognition slips).
 function near(a, b) {
   if (a === b) return true;
+  if (a.length > 2 && b.length > 2 && soundKey(a) === soundKey(b)) return true;
   if (Math.min(a.length, b.length) < 4 || Math.abs(a.length - b.length) > 1) return false;
   let i = 0, j = 0, edits = 0;
   while (i < a.length && j < b.length) {
@@ -1016,6 +1036,7 @@ const ICONS = {
   speaker: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6"/>',
   bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/>',
   check: '<path d="M5 12l5 5 9-10"/>',
+  keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
@@ -1778,7 +1799,7 @@ function resumeHtml(s) {
   const r = resumeAt[s.id];
   if (!r || s.kind === 'song' || !s.lines[r.line]) return '';
   return `<div class="card resume-card">
-    <span><b>Pick up where you left off?</b> <span class="muted">Line ${r.pos} of ${r.total} in ${r.mode === 'listen' ? 'Listen' : 'Rehearse'}, ${ago(r.at)}.</span></span>
+    <span><b>Pick up where you left off?</b> <span class="muted">Line ${r.pos} of ${r.total} in ${{ listen: 'Listen', rehearse: 'Rehearse', type: 'Type' }[r.mode]}, ${ago(r.at)}.</span></span>
     <button class="btn primary" data-action="resume-run">${icon('play')} Pick up</button>
   </div>`;
 }
@@ -1837,7 +1858,7 @@ function renderScript() {
         ${chars.map(([c, n]) => `<option value="${esc(c)}" ${c === s.myChar ? 'selected' : ''}>${esc(titleCase(c))} (${n} ${n === 1 ? 'line' : 'lines'})</option>`).join('')}
       </select></label>
       ${rangeHtml}
-      ${s.kind !== 'song' && s.myChar ? `<label class="check-row"><input type="checkbox" id="cues-only" ${app.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines.</b> Listen and Rehearse play only the line before each of yours, then yours, and skip the rest.</span></label>` : ''}
+      ${s.kind !== 'song' && s.myChar ? `<label class="check-row"><input type="checkbox" id="cues-only" ${app.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines.</b> Listen, Rehearse and Type play only the line before each of yours, then yours, and skip the rest.</span></label>` : ''}
       ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${solid} of ${mine.length} lines solid</span></div>` : ''}
     </div>
     ${resumeHtml(s)}
@@ -1846,6 +1867,7 @@ function renderScript() {
       <button class="mode" data-action="listen">${icon('headphones')}<b>Listen</b><span>Hear the scene like an audio track. It pauses for you to say your lines.</span></button>
       ${s.kind !== 'song' ? `<button class="mode" data-action="track">${icon('headphones')}<b>Listen, screen off</b><span>One audio track of the scene that keeps playing when your phone locks, like a podcast.</span></button>` : ''}
       <button class="mode" data-action="rehearse" ${s.myChar ? '' : 'disabled'}>${icon('mic')}<b>Rehearse</b><span>Your cues are read aloud. Say your lines and the mic checks them.</span></button>
+      <button class="mode" data-action="type" ${s.myChar ? '' : 'disabled'}>${icon('keyboard')}<b>Type your lines</b><span>For the train or anywhere you can't talk. Read your cues, type your lines, and get the same word-by-word check.</span></button>
       <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line needs' : 'lines need'} work` : 'Nothing shaky right now') : 'Pick your character first'}</span></button>
     </div>
     <details id="voices" class="card" ${app.voicesOpen ? 'open' : ''}>
@@ -1900,8 +1922,11 @@ function renderScript() {
 const STATUS_TEXT = {
   speaking: 'Speaking', you: 'Your line', gap: 'Your turn: say it out loud', answer: 'Here is how it goes',
   listening: 'Listening… say your line', prompting: 'Here is your line', good: 'Nailed it', missed: 'Not quite',
-  self: 'Say it, then mark yourself', paused: 'Paused',
+  self: 'Say it, then mark yourself', paused: 'Paused', typing: 'Your line: type it', reading: 'Cue',
 };
+
+// Type mode with the cues shown on screen instead of read aloud (the quiet way, for a train or a library).
+const quiet = () => P.mode === 'type' && settings.typeCues !== 'speak';
 
 function newPlayer(mode, order) {
   return {
@@ -1919,7 +1944,7 @@ const goodWord = wasShaky => (wasShaky ? "That line's looking solid" : GOOD_WORD
 
 function renderPlayer() {
   const s = current();
-  const label = { buildup: 'Build up', listen: 'Listen', rehearse: 'Rehearse' }[P.mode];
+  const label = { buildup: 'Build up', listen: 'Listen', rehearse: 'Rehearse', type: 'Type' }[P.mode];
   return `<section class="player stack">
     <div class="row between">
       <button class="btn ghost" data-action="back">${icon('back')} Script</button>
@@ -1940,12 +1965,20 @@ function refreshPlayer() {
     <button class="ctrl" data-action="prev" aria-label="Previous">${icon('prev')}</button>
     <button class="ctrl big" data-action="toggle" aria-label="${P.running ? 'Pause' : 'Play'}">${icon(P.running ? 'pause' : 'play')}</button>
     <button class="ctrl" data-action="next" aria-label="Next">${icon('next')}</button>`;
+  const box = $('#typed');
+  if (box && document.activeElement?.id !== 'typed') {
+    box.focus({ preventScroll: true });
+    box.selectionStart = box.selectionEnd = box.value.length;
+  }
 }
 
 function myActions() {
   return `<div class="row wrap card-actions">
     <button class="btn" data-action="hint" ${P.reveal === 'full' ? 'disabled' : ''}>${icon('bulb')} Hint</button>
-    <button class="btn" data-action="hearit">${icon('speaker')} Hear it</button>
+    ${quiet() ? `<button class="btn" data-action="hearit" ${P.status === 'typing' ? '' : 'disabled'}>${icon('bulb')} Show me</button>`
+      : `<button class="btn" data-action="hearit">${icon('speaker')} Hear it</button>`}
+    ${P.status === 'typing' ? `<button class="btn primary" data-action="type-check">${icon('check')} Check</button>` : ''}
+    ${P.status === 'prompting' && quiet() ? '<button class="btn primary" data-action="choose">Try again</button>' : ''}
     ${P.status === 'listening' ? `<button class="btn primary" data-action="done-speaking">${icon('check')} Done</button>` : ''}
     ${P.status === 'self' ? '<button class="btn good" data-action="choose" data-choice="got">Got it</button><button class="btn bad" data-action="choose" data-choice="miss">Missed it</button>' : ''}
   </div>`;
@@ -1972,10 +2005,13 @@ function lineStageHtml(s) {
       <div class="card-head"><span class="who">You${s.myChar !== 'YOU' ? ` (${esc(titleCase(s.myChar))})` : ''}</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}</div>
       <p class="script-text">${myLineBody(item.text)}</p>
       ${SR && (P.mode === 'rehearse' || (P.mode === 'listen' && settings.listenHears)) ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
+      ${P.status === 'typing' ? `<textarea id="typed" class="typed" rows="3" placeholder="Type your line, then Check (or press Enter)" autocapitalize="sentences" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Type your line">${esc(P.typed || '')}</textarea>` : ''}
+      ${P.mode === 'type' && P.result && P.typed && P.status !== 'typing' ? `<p class="transcript">You typed: ${esc(P.typed)}</p>` : ''}
       ${myActions()}
     </div>`;
   } else {
-    card = `<div class="card stage-card"><div class="card-head"><span class="who">${esc(titleCase(item.speaker))}</span>${pill()}</div><p class="script-text">${fmt(item.text)}</p></div>`;
+    const go = P.status === 'reading' ? '<div class="row card-actions"><button class="btn" data-action="choose">Continue</button></div>' : '';
+    card = `<div class="card stage-card"><div class="card-head"><span class="who">${esc(titleCase(item.speaker))}</span>${pill()}</div><p class="script-text">${fmt(item.text)}</p>${go}</div>`;
   }
   return `<div class="progress" aria-hidden="true"><div style="width:${Math.round(100 * (pos + 1) / P.order.length)}%"></div></div>
     <p class="muted small">${pos + 1} of ${P.order.length}</p>
@@ -2007,8 +2043,7 @@ function doneHtml(s) {
   const { solid, lines } = P.run;
   let title = "That's a wrap!", msg;
   if (P.mode === 'buildup') { title = "That's the whole speech!"; msg = 'Now try it in Rehearse with hints turned off.'; }
-  else if (P.mode === 'listen') msg = 'Play it again, or switch to Rehearse and say your lines out loud.';
-  else if (P.drill) {
+  else if (P.mode === 'listen') msg = 'Play it again, or switch to Rehearse and say your lines out loud.';  else if (P.drill) {
     title = solid === lines ? 'Nothing shaky left!' : "That's a wrap on the drill!";
     msg = solid === lines ? `All <b>${lines}</b> of those lines landed. Nice work.` : `<b>${solid}</b> of <b>${lines}</b> shaky lines landed this time. The rest will get there.`;
   } else if (lines && solid === lines) msg = `Every line on the first try (<b>${lines}</b> of <b>${lines}</b>). Take a bow.`;
@@ -2036,6 +2071,7 @@ function settingsHtml() {
       <label><span>Your lines in Listen mode</span>${sel('myLines', [['gapThenSpeak', 'Pause for me, then read them'], ['gap', 'Pause for me only'], ['speak', 'Read them aloud'], ['skip', 'Skip them']])}</label>
       <label><span>Hints when it's your line</span>${sel('hint', [['hidden', 'No words, just blanks'], ['first', 'First few words'], ['initials', 'First letter of each word'], ['full', 'Show the whole line']])}</label>
       <label><span>Cue before your line (Rehearse)</span>${sel('cueLength', [['full', 'Read the whole line'], ['last', 'Last sentence only']])}</label>
+      <label><span>Cues in Type mode</span>${sel('typeCues', [['show', 'Show them on screen (silent)'], ['speak', 'Read them aloud (headphones)']])}</label>
       <label><span>Score needed to pass</span>${rng('passScore', 50, 100, 5)}</label>
       <label><span>Wait after you stop talking</span>${rng('silenceMs', 800, 4000, 100)}</label>
       <label class="check">${chk('readDirections')}<span>Read stage directions aloud</span></label>
@@ -2098,8 +2134,8 @@ async function startPlayer(mode, order, from = 0, drill = false) {
   const cuesOnly = !order && app.cuesOnly && !!s.myChar;
   order ||= playOrder(s);
   if (!order.length) { toast('Empty stage: nothing to practice here yet. Tap Edit to add some lines.'); return false; }
-  // Every mode settles microphone permission before anything plays, so it never pops up mid-scene.
-  if (!(await ensureMic())) return false;
+  // Every spoken mode settles microphone permission before anything plays, so it never pops up mid-scene.
+  if (mode !== 'type' && !(await ensureMic())) return false;
   leave();
   P = newPlayer(mode, order);
   Object.assign(P, { drill, cuesOnly });
@@ -2123,7 +2159,7 @@ function headphoneControls() {
 // Remembers the line you're on in a long Listen or Rehearse run (not drills), so you can pick up there.
 function saveResume() {
   const s = current();
-  if (!s || P.drill || !['listen', 'rehearse'].includes(P.mode) || P.order.length < 30) return;
+  if (!s || P.drill || !['listen', 'rehearse', 'type'].includes(P.mode) || P.order.length < 30) return;
   if (P.status === 'done' || P.orderPos < 3) delete resumeAt[s.id];
   else resumeAt[s.id] = { mode: P.mode, line: P.order[P.orderPos], pos: P.orderPos + 1, total: P.order.length, at: Date.now() };
   saveJSON(LS_RESUME, resumeAt);
@@ -2148,12 +2184,17 @@ async function run(from) {
     Object.assign(P, { orderPos: p, result: null, transcript: '', reveal: settings.hint, status: 'idle' });
     refreshPlayer();
     saveResume();
-    aiPrefetch(s, P.order.slice(p, p + 4));
+    if (!quiet()) aiPrefetch(s, P.order.slice(p, p + 4));
     if (item.type === 'section') await sleep(700, token);
     else if (item.type === 'direction') {
-      if (settings.readDirections) { P.status = 'speaking'; refreshPlayer(); await speakText(item.text, voiceList()[0], token); }
-    } else if (isMine(s, item)) await (P.mode === 'rehearse' ? rehearseLine(item, token) : listenMine(item, token));
-    else { P.status = 'speaking'; refreshPlayer(); await playCue(s, p, token); }
+      if (settings.readDirections && quiet()) await waitRead(readMs(item.text), token);
+      else if (settings.readDirections) { P.status = 'speaking'; refreshPlayer(); await speakText(item.text, voiceList()[0], token); }
+    } else if (isMine(s, item)) await (P.mode === 'listen' ? listenMine(item, token) : rehearseLine(item, token));
+    else if (quiet()) {
+      // The cue right before your line shows above your line, so only the others wait to be read.
+      const next = s.lines[P.order[p + 1]];
+      if (!next || !isMine(s, next)) { P.status = 'reading'; await waitRead(readMs(item.text), token); }
+    } else { P.status = 'speaking'; refreshPlayer(); await playCue(s, p, token); }
     if (token.cancelled) return;
     await sleep(300, token);
     if (P.mode === 'listen' && settings.loop && p === P.order.length - 1) p = -1;
@@ -2165,7 +2206,7 @@ function playCue(s, p, token) {
   const item = s.lines[P.order[p]];
   const next = s.lines[P.order[p + 1]];
   let text = item.text;
-  if (P.mode === 'rehearse' && settings.cueLength === 'last' && next && isMine(s, next)) {
+  if (P.mode !== 'listen' && settings.cueLength === 'last' && next && isMine(s, next)) {
     const parts = sentences(spokenText(text));
     text = parts[parts.length - 1] || text;
   }
@@ -2173,6 +2214,17 @@ function playCue(s, p, token) {
 }
 
 const gapMs = text => Math.max(2500, words(text).length * 450 / settings.rate + 1500);
+const readMs = text => Math.max(1500, words(text).length * 300 / settings.rate + 800);
+
+// Quiet Type mode: leaves text on screen long enough to read, or until Continue / Try again is tapped.
+async function waitRead(ms, token) {
+  refreshPlayer();
+  await new Promise(resolve => { P.choose = resolve; setTimeout(resolve, ms); token.onCancel(resolve); });
+  P.choose = null;
+}
+
+// Feeds you the line: read aloud, or in quiet Type mode shown in full for a moment.
+const feedLine = (item, token) => (quiet() ? waitRead(gapMs(item.text) + 1500, token) : sayLine(item, token));
 
 async function listenMine(item, token) {
   if (settings.myLines === 'skip') return;
@@ -2198,6 +2250,17 @@ async function listenMine(item, token) {
 async function attempt(expected, token) {
   P.result = null;
   P.transcript = '';
+  if (P.mode === 'type') {
+    P.status = 'typing';
+    P.typed = '';
+    refreshPlayer();
+    const typed = await new Promise(resolve => { P.choose = resolve; token.onCancel(() => resolve('cancel')); });
+    P.choose = null;
+    if (typeof typed === 'string') return { reason: typed }; // 'cancel' or 'prompt' (Show me)
+    if (!typed.text.trim()) return { reason: 'prompt' };
+    P.result = compare(expected, typed.text);
+    return { score: P.result.score };
+  }
   if (!SR) {
     P.status = 'self';
     refreshPlayer();
@@ -2246,7 +2309,7 @@ async function rehearseLine(item, token) {
       note(0);
       P.status = 'prompting';
       refreshPlayer();
-      await sayLine(item, token);
+      await feedLine(item, token);
       continue;
     }
     note(r.score);
@@ -2266,7 +2329,7 @@ async function rehearseLine(item, token) {
     if (token.cancelled) return;
     P.status = 'prompting';
     refreshPlayer();
-    await sayLine(item, token);
+    await feedLine(item, token);
     if (tries >= 2) return;
   }
 }
@@ -2541,7 +2604,9 @@ const actions = {
   },
   listen() { startPlayer('listen'); },
   rehearse() { startPlayer('rehearse'); },
-  weak() { startPlayer('rehearse', weakOrder(current()), 0, true); },
+  type() { startPlayer('type'); },
+  weak() { startPlayer(app.view === 'player' && P.mode === 'type' ? 'type' : 'rehearse', weakOrder(current()), 0, true); },
+  'type-check'() { P.choose?.({ text: P.typed = $('#typed')?.value ?? P.typed ?? '' }); },
   'resume-run'() {
     const r = resumeAt[current().id], order = playOrder(current());
     startPlayer(r.mode, order, Math.max(0, order.indexOf(r.line)));
@@ -2574,6 +2639,8 @@ const actions = {
   hearit() {
     if (P.status === 'listening') return P.finishListen?.('prompt');
     if (P.status === 'self') return P.choose?.('hear');
+    if (P.status === 'typing') return P.choose?.('prompt');
+    if (quiet()) return;
     if (P.running) return;
     const s = current();
     if (P.mode === 'buildup') {
@@ -2721,6 +2788,11 @@ document.addEventListener('toggle', e => {
 // Find and fix: Enter jumps to the next match; Match case recounts.
 document.addEventListener('keydown', e => {
   if (e.target.id === 'find-q' && e.key === 'Enter') { e.preventDefault(); showMatch(e.shiftKey ? -1 : 1); }
+  // Type mode: Enter checks the line (Shift+Enter for a new line).
+  if (e.target.id === 'typed' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); actions['type-check'](); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'typed') P.typed = e.target.value;
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'find-case') { finder.idx = -1; updateFindCount(); }

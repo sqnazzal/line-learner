@@ -285,6 +285,9 @@ em.dir { font-style: italic; }
 .new-part { background: color-mix(in srgb, var(--gold) 18%, transparent); border-radius: 4px; }
 .transcript { min-height: 1.5em; color: var(--muted); font-style: italic; }
 .transcript:empty::before { content: "\00a0"; }
+.typed { font-size: 1.15rem; margin-top: 8px; }
+:root[data-text-size="large"] .typed { font-size: 1.35rem; }
+:root[data-text-size="huge"] .typed { font-size: 1.6rem; }
 .card-actions .btn svg { width: 16px; height: 16px; }
 
 .steps { display: flex; gap: 4px; }

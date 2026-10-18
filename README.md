@@ -59,11 +59,13 @@ On a script, choose who you're playing (**I'm playing**) and, optionally, a scen
 | **Listen** | The scene is read aloud. At your lines it waits for you to say them (it hears you and moves on when you finish), then plays the line so you hear how it goes. Turn on **Loop** and leave it running. |
 | **Listen, screen off** | Makes the scene (pick **From** / **Stop**) into one audio track that keeps playing with your phone locked, with lock-screen and AirPods controls. Tracks are saved on the device under **Saved tracks** to play any time, offline, or **Delete**; **Save as a file** keeps a copy. Uses the AI voices. |
 | **Rehearse** | Your cues are read aloud and the mic listens to you, with a word-by-word check (green right, red missed). Miss it and you hear the line, then try again. |
+| **Type your lines** | The quiet way (on a train, say): cues show on screen, you type your lines and get the same word-by-word check. No microphone needed. Cues can be read aloud instead (Practice settings, with headphones). |
 | **Build up** | For long speeches and monologues: hear one sentence, say it from the top; add the next, from the top again. Tap the stairs icon on a long line. |
 | **Drill weak lines** | Only the lines you missed last time, each with its cue. |
 
 - **Stuck?** Say **"line"** and it feeds you the line.
-- **Just your part:** tick **Just my cues and lines** on a script and Listen and Rehearse play only each cue line and your line, skipping the rest.
+- **Sound-alikes pass:** different spellings that sound the same (Dotty / Dottie, Jon / John) and run-together words (dammit / damn it, wanna / want to, gonna / going to) count as right.
+- **Just your part:** tick **Just my cues and lines** on a script and Listen, Rehearse and Type play only each cue line and your line, skipping the rest.
 - **Long scenes:** leave mid-scene and the script page offers **Pick up where you left off**.
 - **Headphones:** wired or Bluetooth work; on many phones their play/pause and skip buttons work the player.
 - **Practice settings** (under the player): text size (up to **Extra large** for a phone on a stand), reading speed, how much of your line shows as a hint, how strict the check is, how long it waits after you stop talking, and more.
