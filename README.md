@@ -95,7 +95,7 @@ Tap **+ New song**.
 
 - **Full songs:** the player inside the page plays previews on iPhone. Choose **Spotify app (full song)** (Spotify Premium) to play in your own Spotify app while the lyrics follow along. If Spotify is asleep, tap **Open Spotify** and come straight back. Wrong speaker? **Change device**.
 - **Original | Instrumental** switch; if the highlight is out of step, tap **It's early** / **It's late**, or **Re-time lyrics** by tapping along.
-- Spotify allows 5 people per personal app. Anyone else with Premium can follow **Use your own Spotify app** when connecting.
+- Line Learner's built-in Spotify connection is only for people signed in and in Shannon's **Nazzal only** group (Spotify also caps it at 5 people Shannon adds). Anyone else with Premium can follow **Use your own Spotify app** when connecting.
 
 ## Sync and backup
 
@@ -113,6 +113,10 @@ Sign in, then tap **Group**.
 - Only the person who shared something can update or unshare it. Groups can't be deleted, and members can only remove themselves.
 - Each person's progress, recordings, voices and personal scripts stay private.
 
+## Privacy
+
+The full note is in the app (**Privacy** at the bottom of every page). In short: no ads, no tracking, nothing sold. Scripts, progress and recordings stay on your device; recordings never leave it. Signing in (optional) stores your name, email and synced scripts in Shannon's Firebase project. AI voices, page reading, mic checking, lyrics and Spotify only receive what each feature needs. To have your synced data deleted, send feedback asking Shannon.
+
 ## Tip jar
 
 Line Learner is free. The AI voices cost a little to run, so a tip is welcome: <https://venmo.com/u/shannonnazzal> (also in the footer and Help).
@@ -128,7 +132,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | **Google Firebase** (project `line-learner-45bd1`) | Google sign-in, groups, shared items, Google sync | console.firebase.google.com: **Security > Authentication** (Google enabled; `sqnazzal.github.io` under Authorized domains), **Databases and storage > Firestore > Rules** |
 | **Cloudflare Worker** (`line-learner-voices`) | Shared voices: holds the OpenAI key for group members | See `server/README.md` |
 | **OpenAI** | AI voices and reading pages | platform.openai.com: keep a **monthly budget** on the shared project (Settings > Limits) |
-| **Spotify developer app** | Connecting Spotify (Client ID in `songs.js`) | developer.spotify.com/dashboard: **User Management** (up to 5 people; owner needs Premium) |
+| **Spotify developer app** | Connecting Spotify (Client ID in `songs.js`) | developer.spotify.com/dashboard: **User Management** (up to 5 people; owner needs Premium). The app also only offers it to members of the **Nazzal only** group (`SPOTIFY_GROUP` in `songs.js`) |
 | **GitHub** | Hosting, and the optional GitHub sync | This repository; Pages builds from `main` |
 
 - **Security rules:** `firestore.rules` is the source of truth. After changing it, paste it into Firestore > Rules and **Publish**.

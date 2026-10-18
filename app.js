@@ -544,8 +544,8 @@ const ai = loadJSON(LS_AI, {}); // { key, on } : the key stays on this device an
 const aiInflight = new Map();
 let aiWarned = false;
 
-// Shannon's shared voices: a small server (server/voices-worker.js on Cloudflare) holds her OpenAI key, and
-// people in her groups use it by signing in, with no key of their own. Empty until the server is set up.
+// Shannon's shared voices: a small server (server/voices-worker.js on Cloudflare) holds Shannon's OpenAI key, and
+// people in Shannon's groups use it by signing in, with no key of their own. Empty until the server is set up.
 const SHARED_VOICES_URL = 'https://line-learner-voices.sqnazzal.workers.dev';
 const usingShared = () => !ai.key && !!ai.shared && !!SHARED_VOICES_URL && !!signedInUser();
 // The Google sign-in (from groups.js, loaded after this file; its "fb" isn't a property of window).
@@ -733,7 +733,7 @@ function sharedPanelHtml() {
   if (!SHARED_VOICES_URL) return '';
   if (!signedInUser()) {
     return `<div class="stack-sm"><b>Shannon's shared voices</b>
-      <p class="small">No key needed: sign in with Google and join one of Shannon's groups (ask her for an invite).</p>
+      <p class="small">No key needed: sign in with Google and join one of Shannon's groups (ask Shannon for an invite).</p>
       <div><button class="btn" data-action="group">Sign in</button></div></div>`;
   }
   if (ai.shared) loadSharedStatus();

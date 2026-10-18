@@ -49,7 +49,7 @@ export default {
       try { user = await verifyFirebaseToken(token, env.FIREBASE_PROJECT_ID); } catch { return json({ error: 'Your sign-in has expired. Sign in again.' }, 401); }
       const isOwner = user.sub === env.OWNER_UID;
       if (!isOwner && !(await inOwnersGroup(user.sub, token, env))) {
-        return json({ error: "The shared voices are for people in Shannon's groups. Ask her for an invite." }, 403);
+        return json({ error: "The shared voices are for people in Shannon's groups. Ask Shannon for an invite." }, 403);
       }
 
       const path = new URL(request.url).pathname.replace(/\/+$/, '');

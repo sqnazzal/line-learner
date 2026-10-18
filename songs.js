@@ -65,7 +65,40 @@ const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(
 const PLAYER_SCOPES = 'user-read-playback-state user-modify-playback-state';
 const canControlApp = () => spotifyReady() && (spotify.scope || '').includes('user-modify-playback-state');
 
+// Shannon's built-in Spotify connection is only for the "Nazzal only" group (Spotify itself also allows just
+// the people added under User Management). Anyone else can connect their own Spotify app instead.
+const SPOTIFY_GROUP = 'nazzal only';
+const usingBuiltInSpotify = () => SPOTIFY_CLIENT_ID === SPOTIFY_DEFAULT_CLIENT;
+const inSpotifyGroup = () => typeof grp !== 'undefined'
+  && grp.groups.some(g => g.ownerUid === ADMIN_UID && (g.name || '').trim().toLowerCase() === SPOTIFY_GROUP);
+const SPOTIFY_GROUP_ONLY = "Shannon's built-in Spotify connection is just for the Nazzal only group. To use Spotify, connect your own Spotify app instead (in the song editor: \"Use your own Spotify app\").";
+
+async function spotifyAllowed() {
+  if (!usingBuiltInSpotify()) return true;
+  if (typeof fb === 'undefined') return false;
+  await fb.load().catch(() => {});
+  if (!fb.user) return false;
+  for (let i = 0; i < 25 && !grp.loaded; i++) await new Promise(r => setTimeout(r, 200)); // groups arrive a moment after sign-in
+  return inSpotifyGroup();
+}
+
+// Disconnects a device from the built-in connection once it's clear its person isn't in the group.
+function checkSpotifyAccess() {
+  if (!usingBuiltInSpotify() || !spotify.refresh || typeof fb === 'undefined' || !fb.api) return;
+  if (fb.user && (!grp.loaded || inSpotifyGroup())) return;
+  for (const k of Object.keys(spotify)) delete spotify[k];
+  try { localStorage.removeItem(LS_SPOTIFY); } catch { /* nothing saved */ }
+  toast(fb.user ? `Spotify disconnected. ${SPOTIFY_GROUP_ONLY}` : `Spotify disconnected: sign in to use it. ${SPOTIFY_GROUP_ONLY}`);
+  if (['sing', 'edit'].includes(app.view)) render();
+}
+
 async function spotifyLogin() {
+  if (!(await spotifyAllowed())) {
+    toast(typeof fb !== 'undefined' && fb.user ? SPOTIFY_GROUP_ONLY : `Sign in first (top of the screen). ${SPOTIFY_GROUP_ONLY}`);
+    const own = $('.own-spotify');
+    if (own) { own.open = true; own.scrollIntoView({ block: 'center' }); }
+    return;
+  }
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
   const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
   const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
@@ -376,7 +409,7 @@ function ownSpotifyHtml() {
   return `<details class="own-spotify small"${own ? ' open' : ''}>
     <summary>Connect says you're not allowed? Use your own Spotify app</summary>
     <div class="stack-sm">
-      <p class="muted">Line Learner's Spotify connection works for up to 5 people Shannon adds. Anyone with Spotify Premium can make their own free Spotify app instead:</p>
+      <p class="muted">Line Learner's built-in Spotify connection is only for Shannon's Nazzal only group. Anyone with Spotify Premium can make their own free Spotify app instead:</p>
       <ol class="steps-list">
         <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a>, sign in, and tap <b>Create app</b>.</li>
         <li>Any name. Redirect URI exactly: <code>${esc(SPOTIFY_REDIRECT)}</code>. Tick <b>Web API</b>, agree, and save.</li>
@@ -882,3 +915,5 @@ document.addEventListener('keydown', e => {
 VIEWS.sing = renderSing;
 window.stopSing = stopSing;
 finishSpotifyLogin();
+// A device connected to the built-in Spotify app checks its person is still in the group (checkSpotifyAccess).
+if (usingBuiltInSpotify() && spotify.refresh && typeof loadGroups === 'function') loadGroups();

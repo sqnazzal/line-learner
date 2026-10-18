@@ -34,7 +34,7 @@ const HELP = {
       <li>For full songs: <b>Connect Spotify</b> (needs Premium), then in Sing along choose <b>Spotify app (full song)</b>.</li>
       <li>"Spotify is asleep"? Tap <b>Open Spotify</b>, then come straight back (tap <b>◀ Safari</b> in the top-left corner, or swipe right along the bottom edge); the song starts by itself. iPhones can't switch back automatically.</li>
       <li>Playing on the wrong speaker? Tap <b>Change device</b>.</li>
-      <li>"Not allowed" when connecting? Spotify lets 5 people use Line Learner's connection; anyone else with Premium can tap <b>Use your own Spotify app</b> and follow the steps.</li>
+      <li>"Not allowed" when connecting? Line Learner's own Spotify connection is only for Shannon's Nazzal only group (signed in); anyone else with Premium can tap <b>Use your own Spotify app</b> and follow the steps.</li>
       <li>Highlight out of step? Tap <b>It's early</b> / <b>It's late</b>, or <b>Re-time lyrics</b>.</li></ul>`],
     ['Importing a script', `<ul>
       <li><b>PDF:</b> New script &gt; <b>Import PDF or .txt</b>.</li>
@@ -67,7 +67,7 @@ const HELP = {
       <li>If you're signed in to Spotify in Chrome, the page player may play full songs; otherwise it plays previews.</li>
       <li>For full songs either way: <b>Connect Spotify</b> (needs Premium), then choose <b>Spotify app (full song)</b> in Sing along.</li>
       <li>Playing on the wrong speaker? Tap <b>Change device</b>.</li>
-      <li>"Not allowed" when connecting? Spotify lets 5 people use Line Learner's connection; anyone else with Premium can tap <b>Use your own Spotify app</b> and follow the steps.</li></ul>`],
+      <li>"Not allowed" when connecting? Line Learner's own Spotify connection is only for Shannon's Nazzal only group (signed in); anyone else with Premium can tap <b>Use your own Spotify app</b> and follow the steps.</li></ul>`],
     ['Importing a script', `<ul>
       <li><b>PDF:</b> New script &gt; <b>Import PDF or .txt</b>.</li>
       <li><b>Paper script:</b> in the <b>Google Drive</b> app, tap <b>+</b> &gt; <b>Scan</b> to make a PDF, then import it and tap <b>Read pages</b>.</li>
@@ -97,7 +97,7 @@ const HELP = {
     ['Songs and Spotify', `<ul>
       <li>Signed in at <b>open.spotify.com</b> in the same browser? The page player plays full songs. Otherwise it plays previews.</li>
       <li>Or: <b>Connect Spotify</b> (Premium) and choose <b>Spotify app (full song)</b> to play in the Spotify desktop app.</li>
-      <li>"Not allowed" when connecting? Spotify lets 5 people use Line Learner's connection; anyone else with Premium can use <b>Use your own Spotify app</b>.</li></ul>`],
+      <li>"Not allowed" when connecting? Line Learner's own Spotify connection is only for Shannon's Nazzal only group (signed in); anyone else with Premium can use <b>Use your own Spotify app</b>.</li></ul>`],
     ['Importing a script', `<ul>
       <li><b>PDF or .txt:</b> New script &gt; <b>Import PDF or .txt</b>, or drag the file onto the text box.</li>
       <li><b>Scanned PDF or screenshots:</b> they go into the pages list; tap <b>Read pages</b> (uses your OpenAI key).</li>
@@ -129,6 +129,32 @@ const REAL_HELP = topic('Rehearsing for real: phone on a stand, headphones, long
     <li><b>Just your part:</b> on a script, tick <b>Just my cues and lines</b> and Listen and Rehearse play only the line before each of yours, then yours, skipping the rest of the show. <b>Listen, screen off</b> has the same choice when you make a track.</li>
     <li><b>Long scenes:</b> leave any time and the script page offers <b>Pick up where you left off</b>. Lines like <code># Act 2</code> or <code>Scene 3</code> in the script make sections you can pick with <b>Start at</b>, and the play icon on any of your lines starts Rehearse from there.</li></ul>`);
 
+// Kept in step with what the app actually stores and sends; update it when that changes.
+const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.privacyOpen ? ' open' : ''}><summary>Privacy: what's stored and where</summary><div class="help-body">
+  <p>Line Learner is a free app Shannon made for friends, family and fellow actors. There are no ads, no tracking, and nothing is ever sold.</p>
+  <p><b>Stays on your device</b> (in this browser):</p>
+  <ul>
+    <li>Your scripts, songs, categories and practice progress</li>
+    <li>Your voice recordings (they never leave your device)</li>
+    <li>Saved screen-off tracks and AI voice audio</li>
+    <li>Your own OpenAI key, if you add one, and your Spotify connection</li>
+  </ul>
+  <p><b>If you sign in with Google</b> (optional), Shannon's Firebase project (run by Google) keeps:</p>
+  <ul>
+    <li>Your name, email and when you last used the app, so Shannon can see who's using it</li>
+    <li>Your synced scripts, songs, categories and progress. Only you can see them; Shannon, as the app's admin, can delete them</li>
+    <li>The groups you're in, and anything you <b>Share to group</b>, which everyone in that group can see</li>
+  </ul>
+  <p><b>Sent to other services, only when you use a feature that needs them:</b></p>
+  <ul>
+    <li><b>AI voices and reading pages:</b> the lines being voiced, or the page photos, go to OpenAI. With Shannon's shared voices they pass through Shannon's small server, which keeps only a running monthly cost total for your account.</li>
+    <li><b>Checking your lines by microphone:</b> your browser's speech recognition (Apple or Google) hears what you say.</li>
+    <li><b>Songs:</b> song names go to LRCLIB to find lyrics, and Spotify to play them.</li>
+    <li><b>Send feedback:</b> your message, anything you add (contact details, a screenshot) and, if ticked, device details go to Shannon, by email and in the app.</li>
+  </ul>
+  <p><b>Removing your data:</b> delete scripts in the app any time; clearing this site's data in your browser removes everything on this device. To have your synced scripts, profile and group memberships deleted, <button class="link-btn" data-action="feedback">send feedback</button> asking Shannon to delete your data.</p>
+</div></details>`;
+
 const COMMON = topic("Something's not working?", `<ul>
   <li><b>Reload the page.</b> Updates arrive automatically, but a reload makes sure you have the latest.</li>
   <li><b>Check your internet connection:</b> checking lines, AI voices, lyrics, sync and groups need it.</li>
@@ -148,12 +174,19 @@ function renderHelp() {
     ${REAL_HELP}
     ${SYNC_HELP}
     ${COMMON}
+    ${privacyHtml()}
   </section>`;
 }
 
 Object.assign(actions, {
   help() { leave(); app.view = 'help'; render(); window.scrollTo(0, 0); },
   'help-tab'(b) { help.tab = b.dataset.tab; render(); },
+  privacy() {
+    help.privacyOpen = true;
+    actions.help();
+    help.privacyOpen = false;
+    $('#privacy')?.scrollIntoView({ block: 'start' });
+  },
 });
 
 VIEWS.help = renderHelp;

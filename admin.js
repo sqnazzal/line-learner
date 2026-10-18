@@ -63,6 +63,10 @@ Object.assign(fb, {
     const { F, db } = fb.api;
     return on ? F.setDoc(F.doc(db, 'blocked', uid), { at: Date.now(), by: fb.user.uid }) : F.deleteDoc(F.doc(db, 'blocked', uid));
   },
+  adminDeleteProfile(uid) {
+    const { F, db } = fb.api;
+    return F.deleteDoc(F.doc(db, 'profiles', uid));
+  },
   async adminDeleteSynced(uid) {
     const { F, db } = fb.api;
     const snap = await F.getDocs(F.collection(db, 'users', uid, 'scripts'));
@@ -119,7 +123,7 @@ function renderAdmin() {
         ${gs.length ? `<button class="btn ghost" data-action="admin-kick-all" data-uid="${esc(p.id)}">Remove from all groups</button>` : ''}
         <button class="btn ghost" data-action="admin-block" data-uid="${esc(p.id)}" data-on="${isBlocked ? '' : '1'}">${isBlocked ? 'Unblock' : 'Block'}</button>
         ${adm.usage[p.id] ? `<button class="btn ghost" data-action="admin-reset" data-uid="${esc(p.id)}">Reset voices share</button>` : ''}
-        <button class="btn ghost" data-action="admin-wipe" data-uid="${esc(p.id)}">Delete synced scripts</button>
+        <button class="btn ghost" data-action="admin-wipe" data-uid="${esc(p.id)}">Delete their data</button>
       </div>`}</li>`;
   }).join('');
   const groupRows = groups.slice().sort((a, b) => a.name.localeCompare(b.name)).map(g => {
@@ -206,10 +210,16 @@ Object.assign(actions, {
     const uid = b.dataset.uid;
     adminDo(`Reset ${nameOf(uid)}'s shared voices allowance for this month to $0?`, () => voicesAdmin('/admin/reset', { uid }), 'Allowance reset.');
   },
+  // What the privacy note promises: their synced scripts, their profile, and their place in every group.
   'admin-wipe'(b) {
-    const uid = b.dataset.uid;
-    adminDo(`Delete ${nameOf(uid)}'s synced scripts from the cloud? Copies on their own devices stay unless they sync again. This can't be undone.`,
-      async () => toast(`Deleted ${await fb.adminDeleteSynced(uid)} synced scripts.`));
+    const uid = b.dataset.uid, gs = adm.data.groups.filter(g => (g.members || []).includes(uid));
+    adminDo(`Delete ${nameOf(uid)}'s data? This removes them from ${gs.length} ${gs.length === 1 ? 'group' : 'groups'} and deletes their synced scripts and profile. Copies on their own devices stay. If they sign in again, a new profile starts. This can't be undone.`,
+      async () => {
+        await Promise.all(gs.map(g => fb.adminRemoveMember(g.id, uid)));
+        const n = await fb.adminDeleteSynced(uid);
+        await fb.adminDeleteProfile(uid);
+        toast(`Deleted: ${n} synced ${n === 1 ? 'script' : 'scripts'}, their profile and group memberships. To remove their Google sign-in too, use Firebase > Authentication > Users.`);
+      });
   },
   'admin-del-item'(b) {
     const { gid, id } = b.dataset, it = adm.items[gid]?.find(x => x.id === id);

@@ -235,19 +235,22 @@ function showGroupButton() {
 function onUserChanged() {
   showGroupButton();
   grp.unsubGroups?.(); grp.unsubItems?.();
-  Object.assign(grp, { groups: [], items: [], unsubGroups: null, unsubItems: null });
+  Object.assign(grp, { groups: [], items: [], unsubGroups: null, unsubItems: null, loaded: false });
   if (fb.user) {
     saveJSON(LS_GROUP_USED, true);
     Promise.resolve(fb.saveProfile?.()).catch(() => {}); // so the admin can see who uses the app (admin.js)
     grp.unsubGroups = fb.watchGroups(groups => {
       grp.groups = groups.sort((a, b) => a.name.localeCompare(b.name));
+      grp.loaded = true;
       if (!groups.some(g => g.id === grp.current)) selectGroup(groups[0]?.id || null);
+      window.checkSpotifyAccess?.();
       refreshGroupUi();
     });
     const pending = sessionStorage.getItem(SS_JOIN);
     if (pending) { sessionStorage.removeItem(SS_JOIN); joinGroup(pending); }
     googleSync();
   }
+  window.checkSpotifyAccess?.();
   refreshGroupUi();
   showSyncStatus();
 }
