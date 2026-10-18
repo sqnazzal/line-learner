@@ -120,7 +120,7 @@ Sign in, then tap **Group**.
 - **Create a group** and share its invite code or link; people who open the link and sign in join automatically. In several groups? Switch with the tabs.
 - On any script or song, **Share to group** shows all your groups with **Share**, **Update** and **Unshare** for each. Others tap **Add to my scripts**, and later **Update my copy** (keeping their progress and character).
 - Only the person who shared something can update or unshare it. Groups can't be deleted, and members can only remove themselves.
-- **Permission to share is the sharer's responsibility.** Only share what the production's license (or the publisher) allows; Line Learner and Shannon don't check licenses or permissions.
+- **Permission to share is the sharer's responsibility.** Sharing asks for the show's last performance date and a tick confirming the production's license (or the publisher) allows digital copies for the cast; without both it stays private. Line Learner and Shannon don't check licenses. After that date the item shows **License ended**, or the sharer can **Mark inactive**: either way no one new can add it, and people who have a copy see a note.
 - Each person's progress, recordings, voices and personal scripts stay private.
 
 ## Accessibility

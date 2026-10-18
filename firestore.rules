@@ -85,7 +85,9 @@ service cloud.firestore {
       // "Unshare" only marks it removed; and only the admin can delete one for good.
       match /items/{itemId} {
         function validItem(d) {
-          return d.keys().hasOnly(['id', 'title', 'raw', 'kind', 'updated', 'addedBy', 'addedByName', 'song', 'prevRaw', 'prevTitle', 'prevUpdated', 'removed'])
+          return d.keys().hasOnly(['id', 'title', 'raw', 'kind', 'updated', 'addedBy', 'addedByName', 'song', 'prevRaw', 'prevTitle', 'prevUpdated', 'removed', 'licenseEnds', 'permission', 'inactive'])
+            && (!('licenseEnds' in d) || (d.licenseEnds is string && d.licenseEnds.size() <= 10))
+            && (!('inactive' in d) || d.inactive is bool)
             && d.title is string && d.title.size() <= 300
             && d.raw is string && d.raw.size() <= 450000
             && d.kind in ['script', 'song']

@@ -1997,6 +1997,7 @@ function renderScript() {
       <h1>${esc(s.title)}</h1>
       ${s.sample ? '' : `<div class="row wrap">${typeof shareButtonHtml === 'function' ? shareButtonHtml(s) : ''}<button class="btn ghost" data-action="edit-script">Edit</button><button class="btn ghost" data-action="delete-script">Delete</button></div>`}
     </div>
+    ${s.groupItem && typeof sharedStatusNote === 'function' ? sharedStatusNote(s) : ''}
     ${s.sample ? '<p class="muted">A sample scene to try things out. It isn\'t saved to your scripts, so play with it freely.</p>' : typeof sharePanelHtml === 'function' ? sharePanelHtml(s) : ''}
     ${supportNote()}
     <div class="card stack-sm">

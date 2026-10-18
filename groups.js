@@ -97,6 +97,11 @@ const fb = {
     return F.setDoc(ref, full);
   },
 
+  setItemInactive(gid, id, on) {
+    const { F, db } = fb.api;
+    return F.updateDoc(F.doc(db, 'groups', gid, 'items', id), { inactive: on });
+  },
+
   // Unsharing hides an item rather than deleting it, so only the admin can delete for good (and can restore it).
   removeItem(gid, id) {
     const { F, db } = fb.api;
@@ -235,6 +240,24 @@ function groupError(e) {
 // Shown wherever shared scripts appear: permission to share is the sharer's responsibility.
 const LICENSE_NOTE = "Shared scripts and songs are shared by group members, who are responsible for having permission (for example, under the production's license). Line Learner and Shannon don't check licenses or permissions.";
 
+// A shared item's license status: the sharer gives the show's last performance date when sharing, and can
+// mark it inactive. Once the date has passed (or it's inactive), no one new can add it.
+const todayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
+const fmtDate = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+function shareState(it) {
+  if (!it) return { live: true };
+  if (it.inactive) return { live: false, label: 'Inactive', why: 'it was marked inactive by the person who shared it' };
+  if (it.licenseEnds && it.licenseEnds < todayStr()) return { live: false, label: `License ended ${fmtDate(it.licenseEnds)}`, why: `the show's license ended ${fmtDate(it.licenseEnds)}` };
+  return { live: true, label: it.licenseEnds ? `Through ${fmtDate(it.licenseEnds)}` : '' };
+}
+
+// On your own copy of something shared: a reminder once its license has ended or it was made inactive.
+function sharedStatusNote(s) {
+  const st = shareState(s.groupItem);
+  if (st.live) return '';
+  return `<p class="note small">This was shared with your group, and ${st.why}. If the production's license requires it, please delete your copy (Delete, above).</p>`;
+}
+
 // ---------- State ----------
 const grp = { groups: [], items: [], current: null, unsubGroups: null, unsubItems: null, error: '' };
 
@@ -273,6 +296,16 @@ function selectGroup(gid) {
   if (gid) {
     grp.unsubItems = fb.watchItems(gid, items => {
       grp.items = items.sort((a, b) => (b.updated || 0) - (a.updated || 0));
+      // Keep your copies' license status in step with the group's list.
+      let changed = false;
+      for (const it of items) {
+        const s = localCopyOf(it);
+        if (s?.groupItem && (s.groupItem.licenseEnds !== (it.licenseEnds || '') || !!s.groupItem.inactive !== !!it.inactive)) {
+          Object.assign(s.groupItem, { licenseEnds: it.licenseEnds || '', inactive: !!it.inactive });
+          changed = true;
+        }
+      }
+      if (changed) saveScripts();
       refreshGroupUi();
     });
   }
@@ -312,7 +345,7 @@ function takeItem(item) {
     s = { id: uid(), voices: {}, stats: {}, ...fresh, title: item.title, raw: item.raw, updated: Date.now(), category: defaultCategory() };
     scripts.push(s);
   }
-  s.groupItem = { gid: grp.current, id: item.id, updated: item.updated };
+  s.groupItem = { gid: grp.current, id: item.id, updated: item.updated, licenseEnds: item.licenseEnds || '', inactive: !!item.inactive };
   saveScripts();
   return s;
 }
@@ -344,15 +377,17 @@ function renderGroup() {
   }
   const members = Object.entries(g.memberNames || {}).filter(([id]) => (g.members || []).includes(id)).map(([, n]) => n);
   const list = grp.items.length ? `<ul class="lib-list">${grp.items.map(it => {
-    const mine = localCopyOf(it);
-    const state = !mine ? `<button class="btn primary" data-action="group-take" data-id="${esc(it.id)}">Add to my scripts</button>`
-      : (mine.groupItem?.updated || 0) < it.updated && it.addedBy !== fb.user.uid ? `<button class="btn primary" data-action="group-take" data-id="${esc(it.id)}">Update my copy</button>`
+    const mine = localCopyOf(it), st = shareState(it), canRemove = it.addedBy === fb.user.uid; // only the person who shared it
+    const state = !mine ? (st.live ? `<button class="btn primary" data-action="group-take" data-id="${esc(it.id)}">Add to my scripts</button>` : '')
+      : st.live && (mine.groupItem?.updated || 0) < it.updated && !canRemove ? `<button class="btn primary" data-action="group-take" data-id="${esc(it.id)}">Update my copy</button>`
       : `<button class="btn ghost" data-action="open" data-id="${esc(mine.id)}">Open</button>`;
-    const canRemove = it.addedBy === fb.user.uid; // only the person who shared it
     return `<li class="card lib-card"><div class="lib-main">
-        <b>${it.kind === 'song' ? '<span class="tag">Song</span> ' : ''}${esc(it.title)}</b>
-        <span class="muted small">Shared by ${esc(it.addedBy === fb.user.uid ? 'you' : it.addedByName || 'someone')}${it.updated ? ' · ' + ago(it.updated) : ''}</span></div>
-      <div class="lib-actions">${state}${canRemove ? `<button class="btn ghost" data-action="group-remove" data-id="${esc(it.id)}">Unshare</button>` : ''}</div></li>`;
+        <b>${it.kind === 'song' ? '<span class="tag">Song</span> ' : ''}${esc(it.title)}${st.label ? ` <span class="tag${st.live ? '' : ' ended'}">${esc(st.label)}</span>` : ''}</b>
+        <span class="muted small">Shared by ${esc(canRemove ? 'you' : it.addedByName || 'someone')}${it.updated ? ' · ' + ago(it.updated) : ''}</span>
+        ${!st.live && !mine ? '<span class="small">No longer available to add.</span>' : ''}
+        ${canRemove && !it.licenseEnds ? '<span class="small">No last performance date yet: open it and tap <b>Share to group</b> &gt; <b>Update</b> to add one.</span>' : ''}</div>
+      <div class="lib-actions">${state}${canRemove ? `<button class="btn ghost" data-action="group-inactive" data-id="${esc(it.id)}" data-on="${it.inactive ? '' : '1'}">${it.inactive ? 'Make active' : 'Mark inactive'}</button>
+        <button class="btn ghost" data-action="group-remove" data-id="${esc(it.id)}">Unshare</button>` : ''}</div></li>`;
   }).join('')}</ul>` : '<p class="muted">Nothing shared yet. Open any script or song and tap <b>Share to group</b>.</p>';
   return `<section class="stack">${head}
     ${switcher}
@@ -386,7 +421,7 @@ function loadGroups() {
 // ---------- Sharing from a script's page ----------
 // The same id is used in every group, so a script can be shared to several groups and found again.
 const itemIdOf = s => s.groupItem?.id || s.id;
-const share = { open: null, status: {} }; // status: gid -> shared item, null (not shared) or 'loading'
+const share = { open: null, status: {}, ok: false, ends: '' }; // status: gid -> shared item, null (not shared) or 'loading'; ok, ends: the permission box and last performance date
 
 function shareButtonHtml(s) {
   if (!fb.user || !grp.groups.length) return '';
@@ -399,9 +434,10 @@ function sharePanelHtml(s) {
     const st = share.status[g.id];
     // Only the person who shared an item can update or unshare it (the security rules enforce this too).
     const mine = st && st !== 'loading' && st.addedBy === fb.user.uid;
+    const ready = share.ok && share.ends ? '' : ' disabled';
     const actionsHtml = st === 'loading' ? '<span class="muted small">Checking…</span>'
-      : !st ? `<button class="btn primary" data-action="group-share-to" data-gid="${esc(g.id)}">Share</button>`
-      : mine ? `<button class="btn" data-action="group-share-to" data-gid="${esc(g.id)}">Update</button>
+      : !st ? `<button class="btn primary" data-action="group-share-to" data-gid="${esc(g.id)}"${ready}>Share</button>`
+      : mine ? `<button class="btn" data-action="group-share-to" data-gid="${esc(g.id)}"${ready}>Update</button>
          <button class="btn ghost" data-action="group-unshare" data-gid="${esc(g.id)}">Unshare</button>`
       : '';
     const note = st && st !== 'loading'
@@ -409,7 +445,12 @@ function sharePanelHtml(s) {
       : st === null ? 'Not shared' : '';
     return `<li class="share-row"><div class="lib-main"><b>${esc(g.name)}</b><span class="muted small">${note}</span></div><div class="row">${actionsHtml}</div></li>`;
   }).join('');
-  return `<div class="card stack-sm share-panel"><b>Share “${esc(s.title)}” with</b><ul class="share-list">${rows}</ul>
+  return `<div class="card stack-sm share-panel"><b>Share “${esc(s.title)}”</b>
+    <label class="field inline"><span>${s.kind === 'song' ? 'Last performance date (or when your permission ends)' : "The show's last performance date"}</span>
+      <input type="date" id="share-ends" value="${esc(share.ends)}" min="${todayStr()}"></label>
+    <label class="check-row small"><input type="checkbox" id="share-ok" ${share.ok ? 'checked' : ''}><span>I confirm the production's license (or the publisher) allows giving the cast digital copies of this, through that date.</span></label>
+    <p class="muted small" id="share-hint"${share.ok && share.ends ? ' hidden' : ''}>Can't confirm that? Keep it private: it's still yours to rehearse with on your own devices. <b>Share</b> and <b>Update</b> turn on once both are filled in.</p>
+    <b class="small">With</b><ul class="share-list">${rows}</ul>
     <p class="muted small">Shared copies go to everyone in that group. <b>Only share if your production's license (or the publisher) allows giving the cast digital copies. Whoever shares is responsible for that: Line Learner and Shannon don't check licenses or permissions.</b> Only you can update or unshare what you share. Unsharing removes it from the group's list, but copies people already added stay with them and can't be taken back. Nobody's copy changes until they choose <b>Update my copy</b>.</p></div>`;
 }
 
@@ -420,8 +461,24 @@ async function loadShareStatus(s) {
   await Promise.all(grp.groups.map(async g => {
     try { share.status[g.id] = await fb.getItem(g.id, id); } catch (e) { share.status[g.id] = null; groupError(e); }
   }));
+  // Already shared? Start from the date given last time (the permission box is ticked fresh each time).
+  share.ends ||= Object.values(share.status).find(st => st?.licenseEnds)?.licenseEnds || '';
   if (share.open === s.id && app.view === 'script') render();
 }
+
+// The permission box and date switch Share / Update on without redrawing (so typing a date isn't interrupted).
+function updateShareReady() {
+  const ready = share.ok && !!share.ends;
+  for (const b of document.querySelectorAll('[data-action="group-share-to"]')) b.disabled = !ready;
+  $('#share-hint')?.toggleAttribute('hidden', ready);
+}
+document.addEventListener('input', e => {
+  if (e.target.id === 'share-ends') { share.ends = e.target.value; updateShareReady(); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'share-ok') { share.ok = e.target.checked; updateShareReady(); }
+  if (e.target.id === 'share-ends') { share.ends = e.target.value; updateShareReady(); }
+});
 
 async function joinGroup(code) {
   code = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -464,6 +521,7 @@ Object.assign(actions, {
     const s = current();
     if (share.open === s.id) { share.open = null; render(); return; }
     share.open = s.id;
+    Object.assign(share, { ok: false, ends: '' });
     loadShareStatus(s);
   },
   async 'group-share-to'(b) {
@@ -471,7 +529,8 @@ Object.assign(actions, {
     try {
       const prev = share.status[gid];
       if (prev && prev.addedBy !== fb.user.uid) { toast(`Only ${prev.addedByName || 'the person who shared it'} can change this.`); return; }
-      const item = itemFromScript(s);
+      if (!share.ok || !share.ends) { toast("Add the show's last performance date and tick the permission box first."); return; }
+      const item = { ...itemFromScript(s), licenseEnds: share.ends, permission: true };
       await fb.shareItem(gid, item);
       share.status[gid] = item;
       if (!s.groupItem) s.groupItem = { gid, id: item.id, updated: item.updated };
@@ -491,9 +550,15 @@ Object.assign(actions, {
       render();
     } catch (e) { groupError(e); }
   },
+  async 'group-inactive'(b) {
+    const item = grp.items.find(it => it.id === b.dataset.id), on = !!b.dataset.on;
+    if (!item || (on && !confirm(`Mark "${item.title}" inactive? No one new can add it, and people who have it see a note. You can make it active again.`))) return;
+    try { await fb.setItemInactive(grp.current, item.id, on); toast(on ? 'Marked inactive.' : 'Active again.'); } catch (e) { groupError(e); }
+  },
   'group-take'(b) {
     const item = grp.items.find(it => it.id === b.dataset.id);
     if (!item) return;
+    if (!shareState(item).live) { toast(`"${item.title}" can't be added: ${shareState(item).why}.`); return; }
     const existed = !!localCopyOf(item);
     const s = takeItem(item);
     toast(existed ? 'Your copy is up to date.' : 'Added to your scripts.');

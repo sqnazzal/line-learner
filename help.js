@@ -110,7 +110,7 @@ const SYNC_HELP = topic('Sync, groups and backups', `<h2>Syncing your devices</h
     <li><b>Advanced:</b> people who already use GitHub can sync through it instead (Sync &gt; <b>Advanced: sync with GitHub instead</b>). Most people don't need this.</li></ul>
   <h2>Groups</h2>
   <ul>
-    <li><b>Sign in</b> (top of the screen) to create a group or join one from an invite, then <b>Share to group</b> from a script so your cast can add it. Only share what your production's license (or the publisher) allows: whoever shares is responsible, and Line Learner and Shannon don't check licenses or permissions.</li>
+    <li><b>Sign in</b> (top of the screen) to create a group or join one from an invite, then <b>Share to group</b> from a script so your cast can add it. Only share what your production's license (or the publisher) allows: sharing asks for the show's last performance date and a tick confirming permission (can't confirm? keep it private). Whoever shares is responsible; Line Learner and Shannon don't check licenses. After that date, or once the sharer taps <b>Mark inactive</b>, no one new can add it, and people who have it see a note.</li>
     <li><b>Private:</b> other people can't see your synced scripts; people in your groups only see what you choose to share. The app's admin (Shannon) can remove accounts and their synced data if needed.</li>
     <li><b>Sign-in window doesn't open?</b> Allow pop-ups for this site. On iPhone: <b>Settings</b> &gt; <b>Apps</b> &gt; <b>Safari</b> &gt; turn off <b>Block Pop-ups</b>, then try again.</li></ul>
   <h2>Backups</h2>
