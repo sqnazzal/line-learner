@@ -699,6 +699,7 @@ async function aiPrepareAll() {
     const el = $('#ai-progress');
     if (el) el.textContent = `Preparing voices: ${prog.done} of ${prog.total}`;
   }
+  shared.status = null; // fetch the shared-voices total again now that new lines were made
   if (prog.done === prog.total) toast('All lines are ready. They play instantly, even offline.');
   app.aiProgress = null;
   if (app.view === 'script') render();
