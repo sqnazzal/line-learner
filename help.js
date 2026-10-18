@@ -240,6 +240,7 @@ VIEWS.about = renderAbout;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-18', [
+    '<b>Past shows stay put:</b> moving a script to Past removes it from the Continue shortcut on the home screen.',
     '<b>Type your lines:</b> practice quietly (on a train, say) by typing your lines. Cues show on screen, or can be read aloud.',
     '<b>Sound-alikes count:</b> different spellings that sound the same (Dotty / Dottie) and run-together words (damn it / dammit, want to / wanna) now pass.',
     '<b>No microphone? No problem:</b> Listen and Rehearse keep going with timed pauses instead.',

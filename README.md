@@ -73,7 +73,7 @@ Each of your lines is **Not practiced**, **Working on it**, or **Solid**. Solid 
 - **Just your part:** tick **Just my cues and lines** on a script and Listen, Rehearse and Type play only each cue line and your line, skipping the rest.
 - **Scene breaks:** each scene heading is read out by an announcer ("Act 2", "Scene 1") with a pause, so a new scene is clear even with the screen off.
 - **Long scenes:** leave mid-scene and the script page offers **Pick up where you left off**.
-- **Continue:** the home screen offers **Continue** for your last run (same script, mode, section and cues-only setting), from where you stopped in a long scene.
+- **Continue:** the home screen offers **Continue** for your last run (same script, mode, section and cues-only setting), from where you stopped in a long scene. Scripts moved to Past drop off it.
 - **Edited or updated scripts keep your progress:** progress is kept per line (who says it and the words), so lines that didn't change keep theirs and changed lines start fresh. **Start at** and **Pick up where you left off** follow the same lines too.
 - **Headphones:** wired or Bluetooth work; on many phones their play/pause and skip buttons work the player.
 - **Practice settings** (under the player): text size (up to **Extra large** for a phone on a stand), reading speed, how much of your line shows as a hint, how strict the check is, how long it waits after you stop talking, and more.

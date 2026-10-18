@@ -1236,10 +1236,10 @@ function accountLineHtml() {
 }
 
 // "Continue Hamlet as Horatio · Act 1, Scene 2 · Rehearse": straight back into your last run, same mode,
-// section and Just my cues setting, from where you stopped if it was a long scene.
+// section and Just my cues setting, from where you stopped if it was a long scene. Hidden once the script is moved to Past.
 function continueHtml() {
   const s = lastRun && scripts.find(x => x.id === lastRun.id);
-  if (!s || s.kind === 'song' || (lastRun.mode !== 'listen' && !s.myChar)) return '';
+  if (!s || s.kind === 'song' || catOf(s) === 'past' || (lastRun.mode !== 'listen' && !s.myChar)) return '';
   const r = resumeAt[s.id]?.mode === lastRun.mode ? resumeAt[s.id] : null;
   const at = r ? r.line : rangeBounds(s)[0];
   let section = '';
