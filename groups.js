@@ -232,6 +232,9 @@ function groupError(e) {
     : e?.message || 'Something went wrong with the group.');
 }
 
+// Shown wherever shared scripts appear: permission to share is the sharer's responsibility.
+const LICENSE_NOTE = "Shared scripts and songs are shared by group members, who are responsible for having permission (for example, under the production's license). Line Learner and Shannon don't check licenses or permissions.";
+
 // ---------- State ----------
 const grp = { groups: [], items: [], current: null, unsubGroups: null, unsubItems: null, error: '' };
 
@@ -360,6 +363,7 @@ function renderGroup() {
     </div>
     <h2>Shared scripts and songs</h2>
     ${list}
+    ${grp.items.length ? `<p class="muted small">${LICENSE_NOTE}</p>` : ''}
     ${createJoin}
     <p class="muted small">Signed in as ${esc(fb.user.name)}. <button class="link-btn" data-action="group-signout">Sign out</button> · <button class="link-btn" data-action="group-leave">Leave ${esc(g.name)}</button></p>
     ${accountIdHtml()}
@@ -406,7 +410,7 @@ function sharePanelHtml(s) {
     return `<li class="share-row"><div class="lib-main"><b>${esc(g.name)}</b><span class="muted small">${note}</span></div><div class="row">${actionsHtml}</div></li>`;
   }).join('');
   return `<div class="card stack-sm share-panel"><b>Share “${esc(s.title)}” with</b><ul class="share-list">${rows}</ul>
-    <p class="muted small">Shared copies go to everyone in that group. Only share if your production's license (or the publisher) allows giving the cast digital copies. Only you can update or unshare what you share. Unsharing removes it from the group's list, but copies people already added stay with them and can't be taken back. Nobody's copy changes until they choose <b>Update my copy</b>.</p></div>`;
+    <p class="muted small">Shared copies go to everyone in that group. <b>Only share if your production's license (or the publisher) allows giving the cast digital copies. Whoever shares is responsible for that: Line Learner and Shannon don't check licenses or permissions.</b> Only you can update or unshare what you share. Unsharing removes it from the group's list, but copies people already added stay with them and can't be taken back. Nobody's copy changes until they choose <b>Update my copy</b>.</p></div>`;
 }
 
 async function loadShareStatus(s) {
