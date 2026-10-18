@@ -105,7 +105,8 @@ const SYNC_HELP = topic('Sync, groups and backups', `<h2>Syncing your devices</h
   <ul>
     <li><b>When it syncs:</b> a few seconds after any change, and whenever you open the app. To pull the latest right away, tap <b>Sync</b> (top right) &gt; <b>Sync now</b>.</li>
     <li><b>Edited on two devices?</b> The most recent edit of a script wins. Practice progress is combined line by line, so practice anywhere counts. Deleting a script on one device deletes it on the others.</li>
-    <li><b>Stays on each device:</b> computer voices, AI voices already made, your recordings and saved screen-off tracks. (Recordings can be moved with <b>Download recordings</b>; see Backups.)</li>
+    <li><b>Recordings:</b> with <b>Back up my recordings too</b> ticked (Sync screen, on by default), your recordings are saved to your account as well and come back on any device you sign in on. Only you can hear them.</li>
+    <li><b>Stays on each device:</b> computer voices, AI voices already made, and saved screen-off tracks.</li>
     <li><b>The Sync button says "Sync problem"?</b> Tap it to see why. Usually it's no internet for a moment; it tries again by itself. If it says sync was refused, tell Shannon.</li>
     <li><b>Very long scripts:</b> one script bigger than about 900 KB of text (far longer than a normal play) can't sync; the app will say so. Use <b>Download backup</b> to keep it safe.</li>
     <li><b>Advanced:</b> people who already use GitHub can sync through it instead (Sync &gt; <b>Advanced: sync with GitHub instead</b>). Most people don't need this.</li></ul>
@@ -117,7 +118,8 @@ const SYNC_HELP = topic('Sync, groups and backups', `<h2>Syncing your devices</h
   <h2>Backups</h2>
   <ul>
     <li><b>Download backup</b> (Sync screen) saves your scripts, progress and settings to a file you can keep, then <b>Restore</b> on any device, signed in or not.</li>
-    <li><b>Not in the backup:</b> your recordings. Use <b>Download recordings</b> next to it for those (the same Restore button brings them back).</li></ul>`);
+    <li><b>Not in the backup:</b> your recordings. Use <b>Download recordings</b> next to it for those (the same Restore button brings them back), or let Google sync back them up.</li>
+    <li><b>iPhone and iPad:</b> removing the app's home screen icon deletes everything it saved on the device (recordings, your OpenAI key, saved tracks and AI voices), and the phone can clear it when space runs low. Keep Google sync on, or download a backup and your recordings first.</li></ul>`);
 
 const ACCESS_HELP = topic('Accessibility', `<ul>
     <li><b>Screen readers and keyboard:</b> every button works from the keyboard, and in the player, results like <i>"Not quite, 60 percent. Missed: glad, see"</i> are announced. Shortcuts: <kbd>Space</kbd> play/pause, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> move, <kbd>H</kbd> hint, <kbd>L</kbd> hear the line, <kbd>Enter</kbd> done speaking. Turn them off under <b>Practice settings</b> &gt; <b>Advanced</b> if they get in the way of a screen reader or voice control.</li>
@@ -142,14 +144,14 @@ const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.p
   <p><b>Stays on your device</b> (in this browser):</p>
   <ul>
     <li>Your scripts, songs, categories and practice progress</li>
-    <li>Your voice recordings (they never leave your device unless you download them yourself)</li>
+    <li>Your voice recordings (backed up to your own account only if you turn on Google sync with <b>Back up my recordings too</b>; never shared with anyone)</li>
     <li>Saved screen-off tracks and AI voice audio</li>
     <li>Your own OpenAI key, if you add one, and your Spotify connection</li>
   </ul>
   <p><b>If you sign in with Google</b> (optional, ages 13 and up), Shannon's Firebase project (run by Google) keeps:</p>
   <ul>
     <li>Your name, email and when you last used the app, so Shannon can see who's using it</li>
-    <li>Your synced scripts, songs, categories and progress. Other people can't see them. Shannon, as the app's admin, has access to them and to your account details, and uses it only to delete data you ask to have removed or to fix a problem you report</li>
+    <li>Your synced scripts, songs, categories and progress, and your recordings if you back them up. Other people can't see them. Shannon, as the app's admin, has access to them and to your account details, and uses it only to delete data you ask to have removed or to fix a problem you report</li>
     <li>The groups you're in, and anything you <b>Share to group</b>, which everyone in that group can see</li>
   </ul>
   <p><b>Sent to other services, only when you use a feature that needs them:</b></p>
@@ -250,6 +252,8 @@ const UPDATES = [
     '<b>Accessibility:</b> better screen reader support, keyboard focus and headings throughout.',
     '<b>Privacy notice</b> rewritten in plain language, with privacy and copyright requests in Send feedback.',
     '<b>Home screen icon:</b> theatre masks instead of a gray letter (remove and re-add the app to see it).',
+    '<b>Recordings backup:</b> with Google sync on, your recordings are backed up to your account too and come back on any device you sign in on (Sync screen, <b>Back up my recordings too</b>).',
+    '<b>Warning on iPhone:</b> removing the home screen icon deletes the app\'s recordings, key and tracks on that device; Help and the Sync screen now say so.',
     '<b>Licensed show reminder</b> next to Read pages, AI voices and screen-off tracks: these send text to OpenAI, and some show licenses don\'t allow that.',
     '<b>Screen-off tracks</b> now start and end with a short spoken notice, "For private, non-commercial use only", and the title (and author, for library plays). Remake a track to add it.',
     '<b>About Line Learner</b> page and this <b>What\'s new</b> page.',

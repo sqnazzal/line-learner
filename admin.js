@@ -84,6 +84,9 @@ Object.assign(fb, {
     const snap = await F.getDocs(F.collection(db, 'users', uid, 'scripts'));
     for (const d of snap.docs) await F.deleteDoc(d.ref);
     await F.deleteDoc(F.doc(db, 'users', uid, 'meta', 'deleted')).catch(() => {});
+    const recs = await F.getDocs(F.collection(db, 'users', uid, 'recordings'));
+    for (const d of recs.docs) await F.deleteDoc(d.ref);
+    await F.deleteDoc(F.doc(db, 'users', uid, 'meta', 'recordings')).catch(() => {});
     return snap.size;
   },
 });

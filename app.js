@@ -994,7 +994,7 @@ async function toggleRecord(key) {
     if (app.rec?.recorder === recorder) app.rec = null;
     const blob = new Blob(chunks, { type: recorder.mimeType });
     if (blob.size) {
-      try { await recordings.put(key, blob); recorded.add(key); } catch { toast('Could not save that recording.'); }
+      try { await recordings.put(key, blob); recorded.add(key); window.backupRecording?.(key, blob); } catch { toast('Could not save that recording.'); }
     }
     if (app.view === 'script') render();
   };
@@ -2039,7 +2039,7 @@ function renderScript() {
       <summary>Voices for each character</summary>
       ${aiPanelHtml()}
       ${aiRightsNote('With AI voices, the lines being voiced')}
-      <p class="muted small">Want a real voice instead? The record button on any line records it on this device (recordings are never uploaded or shared). Recording a friend or castmate? Ask them first.</p>
+      <p class="muted small">Want a real voice instead? The record button on any line records it on this device. Recordings are never shared with anyone; with Google sync on, they're also backed up to your own account (Sync screen). Recording a friend or castmate? Ask them first.</p>
       ${voices.length || aiReady() ? chars.map(([c]) => {
         const { gender, voice: auto } = cast.get(c);
         const lockAttr = voiceEditsLocked() ? ' disabled title="Locked: unlock with the PIN above to change AI voices"' : '';
@@ -2807,7 +2807,7 @@ const actions = {
     for (const l of s.lines) {
       if (l.type !== 'line') continue;
       const k = lineKey(l);
-      if (!keep.has(k) && recorded.has(k)) { recorded.delete(k); recordings.del(k).catch(() => {}); }
+      if (!keep.has(k) && recorded.has(k)) { recorded.delete(k); recordings.del(k).catch(() => {}); window.forgetRecording?.(k); }
     }
     app.view = 'library';
     render();
@@ -2870,6 +2870,7 @@ const actions = {
     const key = lineKey(current().lines[i]);
     await recordings.del(key).catch(() => {});
     recorded.delete(key);
+    window.forgetRecording?.(key);
     render();
   },
   'test-voice'(b) {
@@ -3209,6 +3210,7 @@ function backupCardHtml() {
   return `<div class="card stack-sm">
     <b>Backup file</b>
     <p class="muted small">Save all ${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}, your progress and settings to a file (keep it in Files, iCloud or email it to yourself). Restoring adds anything missing and keeps the newest version of each script.</p>
+    <p class="note small"><b>On iPhone and iPad:</b> removing the app's home screen icon deletes everything it saved on the device (recordings, keys, saved tracks), and the phone can clear it when space runs low. Keep Google sync on with recordings backed up, or download a backup and your recordings now and then.</p>
     <p class="note small"><b>Not in the backup:</b> your voice recordings${recorded.size ? ` (${recorded.size} on this device)` : ''}, AI voices already made, saved tracks and keys.${recorded.size ? ' Recordings have their own file: <b>Download recordings</b>.' : ''}</p>
     <div class="row wrap"><button class="btn" data-action="backup-download">Download backup</button>
       ${recorded.size ? `<button class="btn" data-action="backup-recordings">Download recordings (${recorded.size})</button>` : ''}
@@ -3239,6 +3241,7 @@ async function restoreRecordings(data) {
     try { await recordings.put(key, await (await fetch(url)).blob()); recorded.add(key); n++; } catch { /* skip a damaged one */ }
   }
   toast(`Recordings restored: ${n}.`);
+  if (typeof syncRecordings === 'function') syncRecordings();
   render();
 }
 
@@ -3273,7 +3276,7 @@ function renderSync() {
   if (syncConf.token) {
     return `<section class="stack">
       <h1>Sync and backup</h1>
-    <p class="lede">Optional. Your scripts are always saved on this device. Sync keeps your scripts, songs, categories and progress the same on your phone and computer. Voices, recordings and saved tracks stay on each device.</p>
+    <p class="lede">Optional. Your scripts are always saved on this device. Sync keeps your scripts, songs, categories and progress the same on your phone and computer, and Google sync can back up your recordings too. AI voices already made and saved tracks stay on each device.</p>
       ${googleSyncPanel()}
       <div class="card stack-sm">
         <b>GitHub sync</b>
@@ -3300,7 +3303,7 @@ function renderSync() {
   }
   return `<section class="stack">
     <h1>Sync and backup</h1>
-    <p class="lede">Optional. Your scripts are always saved on this device. Sync keeps your scripts, songs, categories and progress the same on your phone and computer. Voices, recordings and saved tracks stay on each device.</p>
+    <p class="lede">Optional. Your scripts are always saved on this device. Sync keeps your scripts, songs, categories and progress the same on your phone and computer, and Google sync can back up your recordings too. AI voices already made and saved tracks stay on each device.</p>
     ${googleSyncPanel()}
     ${sync.error ? `<p class="note">${esc(sync.error)}</p>` : ''}
     <details class="card stack-sm">
@@ -3503,7 +3506,8 @@ async function checkStorage() {
     + ` · protected from cleanup: ${kept == null ? 'unknown' : kept ? 'yes' : 'no'}${est ? `, using ${(est.usage / 1048576).toFixed(1)} MB` : ''}, local settings ${Math.round(local / 1024)} KB`;
   return storageInfo;
 }
-checkStorage();
+// Ask the device not to clear the app's storage when space runs low (recordings, keys and tracks live only here).
+Promise.resolve(navigator.storage?.persist?.()).catch(() => {}).finally(checkStorage);
 render();
 applyTheme(savedTheme());
 showSyncStatus();

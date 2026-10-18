@@ -109,10 +109,11 @@ Tap **+ New song**.
 
 ## Sync and backup
 
-- **Sync:** tap **Sign in** at the top and sign in with Google on each device, with the same account. Scripts, songs, categories and progress sync automatically (a few seconds after changes and when you open the app; **Sync > Sync now** for right away). Only you can see your synced scripts. Newest edit wins, progress combines, deletes carry over. Voices, recordings and saved tracks stay on each device.
+- **Sync:** tap **Sign in** at the top and sign in with Google on each device, with the same account. Scripts, songs, categories and progress sync automatically (a few seconds after changes and when you open the app; **Sync > Sync now** for right away). Only you can see your synced scripts. Newest edit wins, progress combines, deletes carry over. Recordings are backed up to your account too (untick **Back up my recordings too** on the Sync screen to keep them on the device only). AI voices already made and saved tracks stay on each device.
 - **Advanced:** people who already use GitHub can sync through it instead (Sync > **Advanced: sync with GitHub instead**).
 - **Backup file:** **Download backup** saves your scripts, progress and settings to a file. It does **not** include recordings: **Download recordings** saves those to their own file. **Restore** brings either back on any device.
 - Your scripts live in the browser, so clearing the site's data removes them from that device. Sync or a backup file keeps them safe.
+- **iPhone and iPad:** removing the home screen icon deletes everything the app saved on that device (recordings, OpenAI key, saved tracks and AI voices), and the phone can clear it when space runs low. Keep Google sync on, or download a backup and your recordings first.
 
 ## Groups (cast, friends and family)
 
@@ -130,7 +131,7 @@ Designed toward WCAG 2.2 AA (not certified, and not a legal ADA determination): 
 
 ## Privacy
 
-The full note is in the app (**Privacy** at the bottom of every page). In short: no ads, no tracking, nothing sold. Scripts and progress stay on your device unless you sign in to sync them; recordings never leave it. Signing in (optional) stores your name, email and synced scripts in Shannon's Firebase project. AI voices, page reading, mic checking, lyrics and Spotify only receive what each feature needs. To have your synced data deleted, send feedback asking Shannon.
+The full note is in the app (**Privacy** at the bottom of every page). In short: no ads, no tracking, nothing sold. Scripts, progress and recordings stay on your device unless you sign in to sync them, and recordings are never shared with anyone. Signing in (optional) stores your name, email and synced scripts in Shannon's Firebase project. AI voices, page reading, mic checking, lyrics and Spotify only receive what each feature needs. To have your synced data deleted, send feedback asking Shannon.
 
 ## Tip jar
 

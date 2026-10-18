@@ -179,6 +179,7 @@ async function googleSync() {
     Object.assign(gsync.conf, { pushed, last: Date.now() });
     saveGsync();
     if (tooBig.length) gsync.error = `"${tooBig[0].title}" is too big to sync. Keep it safe with Download backup.`;
+    syncRecordings();
     if (app.view === 'script' && !current()) app.view = 'library';
     if (['library', 'script', 'sync'].includes(app.view) && !app.rec) render();
   } catch (e) {
@@ -214,9 +215,81 @@ function googleSyncHtml() {
     ${c.on ? `<p class="small">${gsync.busy ? 'Syncing now…' : c.last ? `Last synced ${ago(c.last)}. ${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}.` : 'Not synced yet.'}</p>
       ${gsync.error ? `<p class="note small">${esc(gsync.error)}</p>` : ''}
       <div><button class="btn" data-action="gsync-now"${gsync.busy ? ' disabled' : ''}>Sync now</button></div>
-      <p class="muted small">Sign in with the same Google account on your other devices and they fill in by themselves. Only you can see your synced scripts. Voices and recordings stay on each device.</p>` : ''}
+      <label class="check-row"><input type="checkbox" id="gsync-recs" ${recsOn() ? 'checked' : ''}><span>Back up my recordings too${recSync.busy ? ' <span class="muted">(backing up…)</span>' : ''}</span></label>
+      <p class="muted small">Sign in with the same Google account on your other devices and they fill in by themselves, recordings included if that's ticked. Only you can see your synced scripts and recordings. AI voices already made and saved tracks stay on each device.</p>` : ''}
   </div>`;
 }
+
+// ---------- Recordings backup (in your Google account, alongside synced scripts) ----------
+// Each recording is one document (as base64 text) plus an entry in an index document, so a device only
+// downloads the ones it's missing. A take over about 700 KB (well over a minute) stays on the device only.
+const REC_MAX = 700000;
+const recSync = { busy: false, again: false };
+const recsOn = () => !!(fb.user && gsync.conf.on && gsync.conf.recs !== false);
+const blobToDataUrl = blob => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(r.result);
+  r.onerror = () => reject(r.error);
+  r.readAsDataURL(blob);
+});
+
+Object.assign(fb, {
+  async recIndex() {
+    const { F, db } = fb.api;
+    const d = await F.getDoc(F.doc(db, 'users', fb.user.uid, 'meta', 'recordings'));
+    return d.exists() ? d.data().keys || {} : {};
+  },
+  async putRec(key, blob) {
+    const { F, db } = fb.api, uid = fb.user.uid, at = Date.now();
+    await F.setDoc(F.doc(db, 'users', uid, 'recordings', key), { data: await blobToDataUrl(blob), at });
+    await F.setDoc(F.doc(db, 'users', uid, 'meta', 'recordings'), { keys: { [key]: at } }, { merge: true });
+  },
+  async getRec(key) {
+    const { F, db } = fb.api;
+    const d = await F.getDoc(F.doc(db, 'users', fb.user.uid, 'recordings', key));
+    return d.exists() ? (await fetch(d.data().data)).blob() : null;
+  },
+  async delRec(key) {
+    const { F, db } = fb.api, uid = fb.user.uid;
+    await F.deleteDoc(F.doc(db, 'users', uid, 'recordings', key));
+    await F.updateDoc(F.doc(db, 'users', uid, 'meta', 'recordings'), { [`keys.${key}`]: F.deleteField() }).catch(() => {});
+  },
+});
+
+// Bring down recordings this device is missing, and back up ones the account doesn't have yet.
+async function syncRecordings() {
+  if (!recsOn()) return;
+  if (recSync.busy) { recSync.again = true; return; }
+  recSync.busy = true;
+  let got = 0;
+  try {
+    const remote = await fb.recIndex();
+    for (const k of Object.keys(remote)) {
+      if (recorded.has(k)) continue;
+      const blob = await fb.getRec(k);
+      if (blob) { await recordings.put(k, blob); recorded.add(k); got++; }
+    }
+    for (const k of await recordings.keys()) {
+      if (k in remote) continue;
+      const blob = await recordings.get(k);
+      if (blob && blob.size <= REC_MAX) await fb.putRec(k, blob);
+    }
+  } catch (e) {
+    noteError('Recordings backup: ' + (e?.code || e?.message || e));
+  } finally {
+    recSync.busy = false;
+    if (got && ['script', 'sync'].includes(app.view) && !app.rec && !P.running) render();
+    if (recSync.again) { recSync.again = false; syncRecordings(); }
+  }
+}
+
+// Called by the recorder and by Delete, so a new or re-recorded take is backed up right away.
+window.backupRecording = (key, blob) => {
+  if (!recsOn()) return;
+  if (blob.size > REC_MAX) { toast('Saved on this device. That take is too long to back up to your account.'); return; }
+  fb.putRec(key, blob).catch(e => noteError('Recording backup: ' + (e?.code || e?.message || e)));
+};
+window.forgetRecording = key => { if (recsOn()) fb.delRec(key).catch(() => {}); };
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && fb.user && gsync.conf.on && Date.now() - (gsync.conf.last || 0) > 30000) googleSync();
@@ -580,6 +653,12 @@ document.addEventListener('change', e => {
     if (gsync.conf.on) googleSync();
     render();
     showSyncStatus();
+  }
+  if (e.target.id === 'gsync-recs') {
+    gsync.conf.recs = e.target.checked;
+    saveGsync();
+    if (recsOn()) syncRecordings();
+    render();
   }
 });
 
