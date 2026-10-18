@@ -129,10 +129,16 @@ async function spotifyApi(path, opts = {}, retried = false) {
     const said = (await res.json().catch(() => ({}))).error?.message || '';
     // Since February 2026 Spotify only serves personal (Development Mode) apps whose owner has Premium,
     // and only to the few users added in the app's User Management.
-    const err = new Error(res.status === 403
+    // "Restriction violated" isn't about access: Spotify says it when a command doesn't fit what's playing
+    // (play while already playing, pause while paused). Callers treat it as already done.
+    const restricted = res.status === 403 && /restriction/i.test(said);
+    const err = new Error(restricted
+      ? "Spotify didn't take that tap (it may already be playing or paused). Tap play or pause again."
+      : res.status === 403
       ? `Spotify refused${said ? ` ("${said}")` : ''}. Spotify only allows personal apps like this one when the app's owner has Spotify Premium, and only for people added under User Management. Not on the list? Set up your own Spotify app (under Connect Spotify in the song editor).`
       : `Spotify answered with an error (${res.status}${said ? `: ${said}` : ''}).`);
     err.status = res.status;
+    err.restricted = restricted;
     throw err;
   }
   // Player commands answer with no body ("204 No Content"); so does currently-playing when nothing plays.
@@ -197,6 +203,9 @@ document.addEventListener('visibilitychange', () => {
   setTimeout(() => sing.controller?.resume(), 500);
 });
 
+// Spotify sometimes swaps in a regional copy of a song (with its own ID) and names the original in linked_from.
+const isOurSong = (st, uri) => !!st?.item && (st.item.uri === uri || st.item.linked_from?.uri === uri);
+
 function appController(uri) {
   let stopped = false, loaded = false, queue = Promise.resolve();
   const run = job => (queue = queue.then(job).catch(e => toast(e.message || "Couldn't control Spotify.")));
@@ -209,7 +218,7 @@ function appController(uri) {
     if (stopped) return;
     const st = await spotifyApi('/me/player').catch(() => null);
     if (stopped) return;
-    const mine = st?.item?.uri === uri;
+    const mine = isOurSong(st, uri);
     loaded = mine;
     Object.assign(sing, { pos: mine ? st.progress_ms || 0 : sing.pos, at: performance.now(), paused: !mine || !st?.is_playing });
     // Spotify remembers the last device even after it's gone to sleep, so only name it while it's playing.
@@ -232,7 +241,10 @@ function appController(uri) {
     }
   };
   const ctl = {
-    togglePlay: () => (sing.paused ? ctl.resume() : run(async () => { await spotifyApi('/me/player/pause', { method: 'PUT' }); sing.paused = true; })),
+    togglePlay: () => (sing.paused ? ctl.resume() : run(async () => {
+      await spotifyApi('/me/player/pause', { method: 'PUT' }).catch(e => { if (!e.restricted) throw e; }); // already paused
+      sing.paused = true;
+    })),
     // Always names the device, so the song never starts on a speaker that just happened to be active.
     // Carries on if our song is already loaded there, otherwise starts it from the current lyric line.
     resume: () => run(async () => {
@@ -248,10 +260,11 @@ function appController(uri) {
         return;
       }
       const st = await spotifyApi('/me/player').catch(() => null);
-      const sameSpot = st?.item?.uri === uri && st?.device?.id === device.id;
+      const sameSpot = isOurSong(st, uri) && st?.device?.id === device.id;
       try {
         await startOn(device, sameSpot ? undefined : { uris: [uri], position_ms: Math.round(sing.pos) });
       } catch (e) {
+        if (e.restricted && sameSpot) { Object.assign(sing, { paused: false, at: performance.now() }); return; } // already playing
         if (!asleep(e)) throw e;
         showWake(uri, kind);
         return;
@@ -265,7 +278,7 @@ function appController(uri) {
     seek: sec => {
       Object.assign(sing, { pos: sec * 1000, at: performance.now() });
       if (!loaded) return queue; // not playing our song yet: Play will start it from here
-      return run(() => spotifyApi(`/me/player/seek?position_ms=${Math.round(sec * 1000)}`, { method: 'PUT' }).catch(e => { if (e.status !== 404) throw e; }));
+      return run(() => spotifyApi(`/me/player/seek?position_ms=${Math.round(sec * 1000)}`, { method: 'PUT' }).catch(e => { if (e.status !== 404 && !e.restricted) throw e; }));
     },
     destroy: () => { stopped = true; clearInterval(poll); },
   };
