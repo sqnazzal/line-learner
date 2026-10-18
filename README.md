@@ -153,6 +153,7 @@ The home screen lists your scripts under category tabs: **Current**, **Audition*
 
 - **Sync and backup** screen: **Download backup** saves all scripts, progress and settings to a file; **Restore backup** brings them back on any device.
 - **Voice lock:** add a PIN when saving the OpenAI key (or later, under Voices for each character). AI voices, notes, Female/Male and removing the key then need the PIN, so paid-for audio isn't re-made.
+- **Spending limit:** under Voices for each character, set a monthly limit for this device (default $5). The app keeps a rough estimate of OpenAI use; when it reaches the limit, new AI audio and page reading pause until next month, while everything already made still plays. For a hard limit, set a monthly budget in your OpenAI account (Settings > Limits).
 - **Your own Spotify app:** Spotify limits each personal app to 5 people. Others with Premium can make a free Spotify app and paste its Client ID under **Use your own Spotify app** when connecting.
 
 ## Help

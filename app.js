@@ -552,6 +552,7 @@ async function aiAudio(voice, instructions, input) {
   const cached = await ttsCache.get(key).catch(() => null);
   if (cached) return cached;
   if (aiInflight.has(key)) return aiInflight.get(key);
+  checkAiBudget();
   const job = (async () => {
     const res = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
@@ -569,10 +570,54 @@ async function aiAudio(voice, instructions, input) {
     }
     const blob = await res.blob();
     ttsCache.put(key, blob).catch(() => {});
+    countAiUse({ chars: input.length + instructions.length / 4 });
     return blob;
   })();
   aiInflight.set(key, job);
   try { return await job; } finally { aiInflight.delete(key); }
+}
+
+// ---------- Spending limit (an estimate, per device) ----------
+// OpenAI only shows exact charges in its own dashboard, so the app keeps a rough count: about $15 per
+// million characters of speech, and about a fifth of a cent per page read from a photo. When this month's
+// estimate reaches the limit, new AI audio and page reading pause; everything already made still plays.
+const COST_PER_CHAR = 15 / 1e6, COST_PER_PAGE = 0.002;
+const thisMonth = () => new Date().toISOString().slice(0, 7);
+
+function aiUsage() {
+  if (ai.usage?.month !== thisMonth()) ai.usage = { month: thisMonth(), chars: 0, pages: 0 };
+  return ai.usage;
+}
+const aiSpent = () => aiUsage().chars * COST_PER_CHAR + aiUsage().pages * COST_PER_PAGE;
+const aiCap = () => (ai.capUsd == null ? 5 : ai.capUsd); // dollars a month on this device; 0 means no limit
+
+function checkAiBudget() {
+  if (aiCap() > 0 && aiSpent() >= aiCap()) {
+    const err = new Error(`This month's OpenAI limit on this device (about $${aiCap()}) is reached. Lines already made still play; raise the limit under Voices for each character, or wait until next month.`);
+    err.status = 'limit';
+    throw err;
+  }
+}
+
+function countAiUse({ chars = 0, pages = 0 }) {
+  const u = aiUsage();
+  u.chars += chars;
+  u.pages += pages;
+  saveJSON(LS_AI, ai);
+}
+
+const money = n => (n < 0.01 && n > 0 ? 'under 1¢' : `$${n.toFixed(2)}`);
+
+function aiBudgetHtml() {
+  const spent = aiSpent(), cap = aiCap(), month = new Date().toLocaleString(undefined, { month: 'long' });
+  const pct = cap > 0 ? Math.min(100, Math.round(100 * spent / cap)) : 0;
+  return `<div class="stack-sm budget">
+    <div class="row wrap"><b class="small">Monthly limit on this device</b>
+      <span class="row"><span class="small">$</span><input id="ai-cap" type="number" min="0" step="1" value="${cap}" aria-label="Monthly limit in dollars" class="cap-input"${aiLocked() ? ' disabled' : ''}>
+      <button class="btn ghost" data-action="ai-cap"${aiLocked() ? ' disabled' : ''}>Set</button></span></div>
+    ${cap > 0 ? `<div class="bar" aria-hidden="true"><div style="width:${pct}%"></div></div>` : ''}
+    <p class="muted small">Used about ${money(spent)} in ${month}${cap > 0 ? ` of $${cap}` : ' (no limit set)'}. An estimate: for a hard limit, set a monthly budget in your OpenAI account (Settings &gt; Limits). 0 means no limit here.</p>
+  </div>`;
 }
 
 function aiFailed(e) {
@@ -642,6 +687,7 @@ function aiPanelHtml() {
     ${ai.on ? `<div class="row wrap">${prog
       ? `<span id="ai-progress" class="muted small">Preparing voices: ${prog.done} of ${prog.total}</span><button class="btn ghost" data-action="ai-stop">Stop</button>`
       : '<button class="btn" data-action="ai-prepare">Prepare all lines now</button><span class="muted small">Makes every line ahead of time, so practice starts instantly and works offline.</span>'}</div>` : ''}
+    ${aiBudgetHtml()}
     ${lockHtml}
     ${aiLocked() ? '' : '<div><button class="link-btn small" data-action="ai-remove">Remove key from this device</button></div>'}
   </div>`;
@@ -1377,6 +1423,7 @@ const markedTextRule = skipCuts => skipCuts
   : '\n- Keep all printed text, even where it has been highlighted, underlined, circled or crossed out by hand.';
 
 async function readScreenshots(images, prompt = SHOT_PROMPT) {
+  checkAiBudget();
   const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + ai.key, 'Content-Type': 'application/json' },
@@ -1393,6 +1440,7 @@ async function readScreenshots(images, prompt = SHOT_PROMPT) {
       : `OpenAI couldn't read the screenshots (${res.status}). ${detail}`);
   }
   const data = await res.json();
+  countAiUse({ pages: images.length });
   const text = data.output_text ?? (data.output || []).flatMap(o => o.content || []).filter(c => c.type === 'output_text').map(c => c.text).join('');
   return text.replace(/^```[a-z]*\n?|```\s*$/gi, '').trim();
 }
@@ -2785,6 +2833,14 @@ Object.assign(actions, {
     render();
   },
   'ai-prepare'() { aiPrepareAll(); },
+  'ai-cap'() {
+    if (aiLocked()) { toast('Unlock with the PIN first.'); return; }
+    const v = Math.max(0, Math.round(+$('#ai-cap').value || 0));
+    ai.capUsd = v;
+    saveJSON(LS_AI, ai);
+    toast(v ? `Limit set: about $${v} a month on this device.` : 'No monthly limit on this device. Keep a budget set in your OpenAI account.');
+    render();
+  },
   'ai-set-pin'() {
     const pin = $('#ai-pin').value.trim();
     if (pin.length < 4) { toast('Use at least 4 digits.'); return; }

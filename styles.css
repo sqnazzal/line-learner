@@ -172,7 +172,7 @@ details.card[open] > summary { margin-bottom: 12px; }
 /* Forms */
 .field { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 .field.inline { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 10px; }
-input:not([type]), input[type="search"], input[type="password"], textarea, select {
+input:not([type]), input[type="search"], input[type="password"], input[type="number"], textarea, select {
   font: 400 1rem var(--font-ui);
   color: var(--ink);
   background: var(--surface);
@@ -224,6 +224,8 @@ textarea { font-family: var(--font-script); line-height: 1.6; resize: vertical; 
 .voice-style { grid-column: 2 / -1; font: 400 .9rem var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px; min-width: 0; }
 .ai-card { background: var(--surface-2); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
 .ai-card input[type="password"] { flex: 1; min-width: 0; }
+.cap-input { width: 5.5em; }
+.budget .bar > div { background: var(--gold); }
 .check-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .check-row input { width: 18px; height: 18px; accent-color: var(--accent); }
 .link-btn { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; }
