@@ -26,7 +26,7 @@ const HELP = {
     ['Sound and voices', `<ul>
       <li>No sound? Turn the volume up and check the phone isn't in <b>Silent mode</b> (the switch or Action button); the chimes are quiet in Silent mode.</li>
       <li>Better built-in voices: open <b>Settings</b>, search <b>"Voices"</b>, choose <b>English</b>, and download an <b>Enhanced</b> or <b>Premium</b> US voice (such as Ava, Zoe or Evan).</li>
-      <li>Most natural: AI voices. Open a script &gt; <b>Voices for each character</b> &gt; add an OpenAI key.</li>
+      <li>Most natural: AI voices. In one of Shannon's groups? Sign in, then open a script &gt; <b>Voices for each character</b> &gt; tick <b>Use Shannon's shared voices</b>, no key needed (each person gets a monthly share). Or add your own OpenAI key there.</li>
       <li>Each character's voice, gender and speed can be changed in <b>Voices for each character</b>.</li>
       <li>Sharing a device? Add a <b>PIN</b> under Voices for each character so AI voices you've paid for can't be changed without it.</li></ul>`],
     ['Songs and Spotify', `<ul>
@@ -60,7 +60,7 @@ const HELP = {
       <li>Stuck in a scene? Say <i>"line"</i> and it reads your line to you.</li></ul>`],
     ['Sound and voices', `<ul>
       <li>Better built-in voices: phone <b>Settings</b> &gt; search <b>"Text-to-speech"</b> &gt; <b>Speech Services by Google</b> &gt; install <b>English (US)</b> voice data. (Menus differ a little between phones.)</li>
-      <li>Most natural: AI voices. Open a script &gt; <b>Voices for each character</b> &gt; add an OpenAI key.</li>
+      <li>Most natural: AI voices. In one of Shannon's groups? Sign in, then open a script &gt; <b>Voices for each character</b> &gt; tick <b>Use Shannon's shared voices</b>, no key needed (each person gets a monthly share). Or add your own OpenAI key there.</li>
       <li>Each character's voice, gender and speed can be changed in <b>Voices for each character</b>.</li>
       <li>Sharing a device? Add a <b>PIN</b> under Voices for each character so AI voices you've paid for can't be changed without it.</li></ul>`],
     ['Songs and Spotify', `<ul>
@@ -91,7 +91,7 @@ const HELP = {
       <li>Listen mode hears you say your line and moves on when you finish (turn it off in Practice settings). Stuck in a scene? Say <i>"line"</i>.</li></ul>`],
     ['Sound and voices', `<ul>
       <li><b>Edge</b> has natural-sounding voices built in; Chrome's are more robotic.</li>
-      <li>Most natural: AI voices. Open a script &gt; <b>Voices for each character</b> &gt; add an OpenAI key.</li>
+      <li>Most natural: AI voices. In one of Shannon's groups? Sign in, then open a script &gt; <b>Voices for each character</b> &gt; tick <b>Use Shannon's shared voices</b>, no key needed (each person gets a monthly share). Or add your own OpenAI key there.</li>
       <li>Each character's voice, gender and speed can be changed in <b>Voices for each character</b>.</li>
       <li>Sharing a device? Add a <b>PIN</b> under Voices for each character so AI voices you've paid for can't be changed without it.</li></ul>`],
     ['Songs and Spotify', `<ul>
