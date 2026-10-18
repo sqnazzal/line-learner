@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS = {
   useRecordings: true,
   loop: false,
   skipCuts: false,         // reading pages: leave out printed lines crossed out by hand
+  listenHears: true,       // Listen mode: hear you say your line and move on when you finish
 };
 
 function loadJSON(key, fallback) {
@@ -618,18 +619,36 @@ function aiPanelHtml() {
         <li>Tap <b>Create new secret key</b>, copy it, and paste it here.</li>
       </ol>
       <div class="row wrap"><input id="ai-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-…" aria-label="OpenAI key"><button class="btn primary" data-action="ai-save">Save key</button></div>
-      <p class="muted small">The key is saved only on this device. Tip: set a monthly spending limit in your OpenAI account.</p>
+      <label class="field small"><span>Voice lock PIN (recommended if anyone else uses this device)</span>
+        <input id="ai-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="4 or more digits" aria-label="Voice lock PIN"></label>
+      <p class="muted small">The key is saved only on this device. With a PIN, AI voices, "how they sound" notes and Female/Male can only be changed (and the key removed) by someone who knows it, so audio you've paid for isn't re-made. Tip: set a monthly spending limit in your OpenAI account.</p>
     </div>`;
   }
   const prog = app.aiProgress;
+  const lockHtml = !ai.pinHash
+    ? `<div class="row wrap"><input id="ai-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="New PIN" aria-label="New voice lock PIN" class="pin"><button class="btn ghost" data-action="ai-set-pin">Lock voices with a PIN</button></div>`
+    : aiLocked()
+      ? `<p class="small">🔒 <b>Voices are locked.</b> Only the key owner can change AI voices.</p>
+         <div class="row wrap"><input id="ai-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="Voice lock PIN" class="pin"><button class="btn ghost" data-action="ai-unlock">Unlock</button></div>`
+      : '<div class="row wrap"><span class="small">🔓 Voices unlocked on this device until you close the app.</span><button class="btn ghost" data-action="ai-lock">Lock now</button></div>';
   return `<div class="ai-card stack-sm">
     <label class="check-row"><input type="checkbox" id="ai-on" ${ai.on ? 'checked' : ''}><b>Use natural AI voices</b></label>
     ${ai.on ? `<div class="row wrap">${prog
       ? `<span id="ai-progress" class="muted small">Preparing voices: ${prog.done} of ${prog.total}</span><button class="btn ghost" data-action="ai-stop">Stop</button>`
       : '<button class="btn" data-action="ai-prepare">Prepare all lines now</button><span class="muted small">Makes every line ahead of time, so practice starts instantly and works offline.</span>'}</div>` : ''}
-    <div><button class="link-btn small" data-action="ai-remove">Remove key from this device</button></div>
+    ${lockHtml}
+    ${aiLocked() ? '' : '<div><button class="link-btn small" data-action="ai-remove">Remove key from this device</button></div>'}
   </div>`;
 }
+
+// ---------- Voice lock ----------
+// Once AI audio has been paid for, a PIN keeps others on this device from changing voices (which would
+// re-make, and re-pay for, every line). Unlocking lasts until the app is closed.
+const SS_AI_UNLOCKED = 'lineLearner.aiUnlocked';
+const pinHash = pin => hash('line-learner-pin|' + pin) + hash('|' + pin + '|pin');
+const aiLocked = () => !!ai.pinHash && sessionStorage.getItem(SS_AI_UNLOCKED) !== ai.pinHash;
+// Female/Male also picks the AI voice, so it stays locked even while AI voices are switched off.
+const voiceEditsLocked = () => !!ai.key && aiLocked();
 const speedLabel = v => (v === 1 ? 'Normal' : `${v.toFixed(2)}x`);
 const sayHello = speaker => preview(t => speakAs(speaker, `Hello. I'll be reading ${titleCase(speaker)}.`, t));
 
@@ -799,7 +818,7 @@ function characters(s) {
 function makeScript(title, raw) {
   const lines = parseScript(raw);
   const chars = [...characters({ lines }).keys()];
-  return { id: uid(), title: title || 'Untitled script', raw, lines, myChar: chars.length === 1 ? chars[0] : '', voices: {}, stats: {}, updated: Date.now() };
+  return { id: uid(), title: title || 'Untitled script', raw, lines, myChar: chars.length === 1 ? chars[0] : '', voices: {}, stats: {}, updated: Date.now(), category: defaultCategory() };
 }
 
 function rangeBounds(s) {
@@ -864,24 +883,78 @@ function supportNote() {
       : 'Checking your lines by microphone needs Google Chrome or Microsoft Edge. In this browser you can still rehearse and mark yourself.');
   }
   if (!synth) notes.push("This browser can't read lines aloud. Try Microsoft Edge or Google Chrome.");
-  if (location.protocol === 'file:') notes.push('Tip: open Line Learner with "Start Line Learner.cmd" so the microphone works smoothly and your scripts are always saved in the same place.');
+  if (location.protocol === 'file:') notes.push('Open Line Learner from its web address, https://sqnazzal.github.io/line-learner/, so the microphone works and your scripts sync.');
   return notes.map(n => `<p class="note">${esc(n)}</p>`).join('');
 }
 
-function renderLibrary() {
-  const cards = scripts.slice().sort((a, b) => b.updated - a.updated).map(s => {
-    const mine = s.lines.filter(l => isMine(s, l));
-    const solid = mine.filter(l => isSolid(s, l)).length;
-    return `<li><button class="card script-card" data-action="open" data-id="${s.id}">
+// ---------- Categories for your scripts ----------
+// Current, Audition, Fun, Other and Past, plus any you make (like a show's name). Past always comes last.
+const CAT_LABELS = { current: 'Current', audition: 'Audition', fun: 'Fun', other: 'Other', past: 'Past' };
+const LS_LIB_CAT = 'lineLearner.libraryCategory';
+const catOf = s => s.category || 'current';
+const catLabel = c => CAT_LABELS[c] || c;
+
+function allCategories() {
+  const custom = [...new Set([...(settings.customCats || []), ...scripts.map(catOf)])].filter(c => !CAT_LABELS[c]).sort((a, b) => a.localeCompare(b));
+  return ['current', 'audition', ...custom, 'fun', 'other', 'past'];
+}
+
+// New scripts go into the category you're looking at.
+function defaultCategory() {
+  const c = loadJSON(LS_LIB_CAT, 'all');
+  return c === 'all' ? 'current' : c;
+}
+
+const categoryOptions = sel => allCategories().map(c => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(catLabel(c))}</option>`).join('')
+  + '<option value="__new">New category…</option>';
+
+function scriptCardHtml(s) {
+  const mine = s.lines.filter(l => isMine(s, l));
+  const solid = mine.filter(l => isSolid(s, l)).length;
+  return `<li class="script-item"><button class="card script-card" data-action="open" data-id="${s.id}">
       <span class="card-title">${s.kind === 'song' ? '<span class="tag">Song</span> ' : ''}${esc(s.title)}</span>
       <span class="muted">${s.myChar ? `As ${esc(titleCase(s.myChar))}: ${solid} of ${mine.length} lines solid` : 'Pick your character to start'}</span>
       ${mine.length ? bar(solid / mine.length) : ''}
-    </button></li>`;
-  }).join('');
+    </button>
+    <select class="cat-pick" data-cat-id="${s.id}" aria-label="Category for ${esc(s.title)}">${categoryOptions(catOf(s))}</select></li>`;
+}
+
+function yourScriptsHtml() {
+  if (!scripts.length) return '';
+  const cats = allCategories(), sel = loadJSON(LS_LIB_CAT, 'all');
+  const counts = Object.fromEntries(cats.map(c => [c, scripts.filter(s => catOf(s) === c).length]));
+  const shown = sel !== 'all' && !counts[sel] && !(settings.customCats || []).includes(sel) && !CAT_LABELS[sel] ? 'all' : sel;
+  const tab = (c, label, n) => `<button class="chip${shown === c ? ' on' : ''}" data-action="lib-cat" data-cat="${esc(c)}" aria-pressed="${shown === c}">${esc(label)} <span class="muted">${n}</span></button>`;
+  const tabs = tab('all', 'All', scripts.length) + cats.filter(c => counts[c] || c === shown).map(c => tab(c, catLabel(c), counts[c])).join('');
+  const byNewest = list => list.sort((a, b) => b.updated - a.updated).map(scriptCardHtml).join('');
+  const body = shown === 'all'
+    ? cats.filter(c => counts[c]).map(c => `<h3 class="cat-head">${esc(catLabel(c))}</h3><ul class="cards">${byNewest(scripts.filter(s => catOf(s) === c))}</ul>`).join('')
+    : counts[shown] ? `<ul class="cards">${byNewest(scripts.filter(s => catOf(s) === shown))}</ul>` : `<p class="muted">Nothing in ${esc(catLabel(shown))} yet. Move a script here with its category menu.</p>`;
+  return `<div class="stack-sm"><h2>Your scripts</h2><div class="row wrap chips cat-tabs" role="group" aria-label="Categories">${tabs}</div>${body}</div>`;
+}
+
+function setCategory(s, value) {
+  if (value === '__new') {
+    const name = (prompt('Name the new category (for example, a show you\'re in):') || '').trim().slice(0, 30);
+    if (!name) { render(); return; }
+    const key = Object.keys(CAT_LABELS).find(k => CAT_LABELS[k].toLowerCase() === name.toLowerCase()) || name;
+    if (!CAT_LABELS[key]) settings.customCats = [...new Set([...(settings.customCats || []), key])];
+    saveSettings();
+    value = key;
+  }
+  s.category = value;
+  s.updated = Date.now();
+  saveScripts();
+  toast(`Moved to ${catLabel(value)}.`);
+  render();
+}
+
+function renderLibrary() {
+  const has = scripts.length > 0;
   return `<section class="stack">
     <div class="hero">
-      <h1>Learn your lines by ear.</h1>
-      <p class="lede">Paste a scene or monologue and pick your part. Listen to it like an audio track, then run it out loud while the app reads your cues and checks your lines.</p>
+      <h1>Because your family is tired of running lines with you.</h1>
+      <p class="lede">Paste your script, pick your part, and let’s rehearse. Listen on repeat, work through tricky speeches, or run the whole scene out loud. Forget a line? Just say “line.” We can do this all night.</p>
       <div class="row wrap">
         <button class="btn primary" data-action="new">+ New script</button>
         <button class="btn" data-action="new-song">+ New song</button>
@@ -896,8 +969,8 @@ function renderLibrary() {
       return d ? `<div class="note row between wrap"><span>You have an unsaved script${d.title ? ` ("${esc(d.title)}")` : ''}. It isn't in your list or synced until you save it.</span>
         <span class="row"><button class="btn primary" data-action="resume-draft">Continue editing</button><button class="btn ghost" data-action="discard-draft">Discard</button></span></div>` : '';
     })()}
-    ${scripts.length ? `<h2>Your scripts</h2><ul class="cards">${cards}</ul>` : ''}
-    <div class="card how">
+    ${yourScriptsHtml()}
+    ${has ? '' : `<div class="card how">
       <h2>How to practice</h2>
       <ol>
         <li><b>Listen</b> on repeat while you commute or cook. It pauses where your lines go so you can say them, then plays them so you hear how they go.</li>
@@ -905,7 +978,7 @@ function renderLibrary() {
         <li><b>Build up</b> long speeches and audition monologues one sentence at a time, always from the top.</li>
         <li><b>Drill weak lines</b> to go straight to the ones that need work.</li>
       </ol>
-    </div>
+    </div>`}
   </section>`;
 }
 
@@ -1165,7 +1238,7 @@ async function loadLibrary() {
     Object.assign(lib, { plays, monologues, error: '' });
   } catch {
     lib.error = location.protocol === 'file:'
-      ? 'The free library needs the app opened from its web address (or Start Line Learner.cmd), not as a file.'
+      ? 'The free library needs the app opened from its web address, https://sqnazzal.github.io/line-learner/.'
       : "Couldn't load the free library. Check your connection and try again.";
   } finally {
     lib.loading = false;
@@ -1579,6 +1652,7 @@ function renderScript() {
     ${typeof sharePanelHtml === 'function' ? sharePanelHtml(s) : ''}
     ${supportNote()}
     <div class="card stack-sm">
+      <label class="field inline"><span>Category</span><select data-cat-id="${s.id}" aria-label="Category">${categoryOptions(catOf(s))}</select></label>
       <label class="field inline"><span>I'm playing</span><select id="my-char">
         <option value="">Choose a character…</option>
         ${chars.map(([c, n]) => `<option value="${esc(c)}" ${c === s.myChar ? 'selected' : ''}>${esc(titleCase(c))} (${n} ${n === 1 ? 'line' : 'lines'})</option>`).join('')}
@@ -1590,6 +1664,7 @@ function renderScript() {
     <div class="modes">
       ${s.kind === 'song' ? `<button class="mode" data-action="sing">${icon('headphones')}<b>Sing along</b><span>${s.song?.spotify ? 'Play the real song with the lyrics highlighted, and hide words as you learn them.' : 'Learn the lyrics. Add the Spotify song (Edit) to sing with the track.'}</span></button>` : ''}
       <button class="mode" data-action="listen">${icon('headphones')}<b>Listen</b><span>Hear the scene like an audio track. It pauses for you to say your lines.</span></button>
+      ${s.kind !== 'song' ? `<button class="mode" data-action="track">${icon('headphones')}<b>Listen, screen off</b><span>One audio track of the scene that keeps playing when your phone locks, like a podcast.</span></button>` : ''}
       <button class="mode" data-action="rehearse" ${s.myChar ? '' : 'disabled'}>${icon('mic')}<b>Rehearse</b><span>Your cues are read aloud. Say your lines and the mic checks them.</span></button>
       <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line needs' : 'lines need'} work` : 'Nothing shaky right now') : 'Pick your character first'}</span></button>
     </div>
@@ -1598,13 +1673,14 @@ function renderScript() {
       ${aiPanelHtml()}
       ${voices.length || aiReady() ? chars.map(([c]) => {
         const { gender, voice: auto } = cast.get(c);
+        const lockAttr = voiceEditsLocked() ? ' disabled title="Locked: unlock with the PIN above to change AI voices"' : '';
         const label = esc(titleCase(c));
         let voicePicker;
         if (aiReady()) {
           const chosen = s.aiVoices?.[c] || '';
           const opt = v => `<option value="${v}" ${v === chosen ? 'selected' : ''}>${capital(v)}</option>`;
           const other = gender === 'f' ? 'm' : 'f';
-          voicePicker = `<select data-ai-voice-char="${esc(c)}" aria-label="${label}: voice">
+          voicePicker = `<select data-ai-voice-char="${esc(c)}"${lockAttr} aria-label="${label}: voice">
             <option value="">Automatic: ${capital(aiCast(s).get(c))}</option>
             <optgroup label="${gender === 'f' ? 'Female' : 'Male'} voices">${AI_VOICES[gender].map(opt).join('')}</optgroup>
             <optgroup label="${other === 'f' ? 'Female' : 'Male'} voices">${AI_VOICES[other].map(opt).join('')}</optgroup>
@@ -1620,13 +1696,13 @@ function renderScript() {
           </select>`;
         }
         return `<div class="voice-row"><span class="voice-name">${label}</span>
-          <select data-gender-char="${esc(c)}" aria-label="${label}: female or male">
+          <select data-gender-char="${esc(c)}"${lockAttr} aria-label="${label}: female or male">
             <option value="f" ${gender === 'f' ? 'selected' : ''}>Female</option>
             <option value="m" ${gender === 'm' ? 'selected' : ''}>Male</option>
           </select>
           ${voicePicker}
           <button class="icon-btn" data-action="test-voice" data-char="${esc(c)}" title="Test this voice" aria-label="Test this voice">${icon('speaker')}</button>
-          ${aiReady() ? `<input class="voice-style" data-style-char="${esc(c)}" value="${esc(s.aiStyles?.[c] || '')}" placeholder="How they sound (optional), e.g. warm and elderly, nervous teenager" aria-label="${label}: how they sound">` : ''}
+          ${aiReady() ? `<input class="voice-style" data-style-char="${esc(c)}"${lockAttr} value="${esc(s.aiStyles?.[c] || '')}" placeholder="How they sound (optional), e.g. warm and elderly, nervous teenager" aria-label="${label}: how they sound">` : ''}
           <label class="voice-speed"><span>Speed</span>
             <input type="range" min="0.5" max="1.5" step="0.05" value="${speedOf(c)}" data-speed-char="${esc(c)}" aria-label="${label}: speed">
             <output>${speedLabel(speedOf(c))}</output>
@@ -1711,7 +1787,7 @@ function lineStageHtml(s) {
     card = `<div class="card stage-card mine-card">
       <div class="card-head"><span class="who">You${s.myChar !== 'YOU' ? ` (${esc(titleCase(s.myChar))})` : ''}</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}</div>
       <p class="script-text">${myLineBody(item.text)}</p>
-      ${P.mode === 'rehearse' && SR ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
+      ${SR && (P.mode === 'rehearse' || (P.mode === 'listen' && settings.listenHears)) ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
       ${myActions()}
     </div>`;
   } else {
@@ -1775,6 +1851,7 @@ function settingsHtml() {
       <label class="check">${chk('readDirections')}<span>Read stage directions aloud</span></label>
       <label class="check">${chk('useRecordings')}<span>Use recorded voices when available</span></label>
       <label class="check">${chk('loop')}<span>Loop the scene in Listen mode</span></label>
+      <label class="check">${chk('listenHears')}<span>Listen mode: move on as soon as I finish my line</span></label>
     </div>
   </details>`;
 }
@@ -1885,8 +1962,15 @@ async function listenMine(item, token) {
   if (settings.myLines === 'skip') return;
   if (settings.myLines === 'speak') { P.status = 'you'; refreshPlayer(); return sayLine(item, token); }
   P.status = 'gap';
+  P.transcript = '';
   refreshPlayer();
-  await sleep(gapMs(item.text), token);
+  if (settings.listenHears && SR) {
+    // Hands-free: listen while you say it and carry on as soon as you finish (or after a pause if you don't).
+    const r = await listen(token, item.text);
+    if (r.reason.startsWith('error:')) await sleep(gapMs(item.text), token);
+  } else {
+    await sleep(gapMs(item.text), token);
+  }
   if (settings.myLines === 'gapThenSpeak' && !token.cancelled) {
     P.status = 'answer';
     refreshPlayer();
@@ -2083,6 +2167,8 @@ const actions = {
       toast("Couldn't download that play. Check your connection and try again.");
     }
   },
+  'backup-download'() { downloadBackup(); },
+  'lib-cat'(b) { saveJSON(LS_LIB_CAT, b.dataset.cat); render(); },
   'merge-chars'(b) {
     const from = b.dataset.from || $('#merge-from').value, to = b.dataset.to || $('#merge-to').value;
     if (!from || !to || from === to) { toast('Pick two different characters.'); return; }
@@ -2321,6 +2407,9 @@ document.addEventListener('change', e => {
     sayHello(el.dataset.voiceChar);
   } else if (el.dataset.speedChar) {
     sayHello(el.dataset.speedChar);
+  } else if ((el.dataset.aiVoiceChar || el.dataset.styleChar || el.dataset.genderChar) && voiceEditsLocked()) {
+    toast('AI voices are locked. Unlock with the PIN first.');
+    render(); // put the old choice back
   } else if (el.dataset.aiVoiceChar || el.dataset.styleChar) {
     const c = el.dataset.aiVoiceChar || el.dataset.styleChar;
     const field = el.dataset.aiVoiceChar ? 'aiVoices' : 'aiStyles';
@@ -2349,6 +2438,12 @@ document.addEventListener('change', e => {
   else if (el.dataset.setting) applySetting(el);
   else if (el.id === 'ed-file' && el.files[0]) {
     importFile(el.files[0]);
+    el.value = '';
+  } else if (el.dataset.catId) {
+    const target = scripts.find(x => x.id === el.dataset.catId);
+    if (target) setCategory(target, el.value);
+  } else if (el.id === 'restore-file' && el.files[0]) {
+    restoreBackup(el.files[0]);
     el.value = '';
   } else if ((el.id === 'ed-shots' || el.id === 'ed-cam') && el.files.length) {
     addPages([...el.files], el.id === 'ed-shots');
@@ -2553,10 +2648,48 @@ function showSyncStatus() {
   b.classList.toggle('problem', !!(syncConf.token && sync.error));
 }
 
+// ---------- Backup file ----------
+// A file with all your scripts, progress and settings (not keys or recordings), to keep somewhere safe
+// or move to a new device. Restoring merges it with what's here, the same way Sync does.
+function backupCardHtml() {
+  return `<div class="card stack-sm">
+    <b>Backup file</b>
+    <p class="muted small">Save all ${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}, your progress and settings to a file (keep it in Files, iCloud or email it to yourself). Restoring adds anything missing and keeps the newest version of each script. Keys and voice recordings aren't included.</p>
+    <div class="row wrap"><button class="btn" data-action="backup-download">Download backup</button>
+      <label class="btn ghost">Restore backup<input type="file" id="restore-file" accept=".json,application/json" hidden></label></div>
+  </div>`;
+}
+
+function downloadBackup() {
+  const data = { app: 'line-learner', kind: 'backup', version: 1, saved: Date.now(), scripts, deleted, settings };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+  a.download = `line-learner-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast('Backup saved. Keep the file somewhere safe.');
+}
+
+async function restoreBackup(file) {
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { data = null; }
+  if (data?.app !== 'line-learner' || !Array.isArray(data.scripts)) { toast("That file isn't a Line Learner backup."); return; }
+  const before = new Set(scripts.map(s => s.id));
+  mergeRemote({ scripts: data.scripts, deleted: data.deleted || {} });
+  // Bring back this device's voice choices where the backup has them.
+  for (const s of scripts) if (!before.has(s.id)) s.voices = data.scripts.find(b => b.id === s.id)?.voices || {};
+  saveScripts();
+  saveJSON(LS_DELETED, deleted);
+  const added = scripts.filter(s => !before.has(s.id)).length;
+  toast(`Backup restored: ${added} ${added === 1 ? 'script' : 'scripts'} added, the rest kept up to date.`);
+  render();
+}
+
 function renderSync() {
   if (syncConf.token) {
     return `<section class="stack">
-      <h1>Sync between devices</h1>
+      <h1>Sync and backup</h1>
       <div class="card stack-sm">
         <p><b>This device is connected.</b> ${sync.busy ? 'Syncing now…' : syncConf.lastSync ? `Last synced ${ago(syncConf.lastSync)}.` : 'Not synced yet.'}</p>
         ${syncConf.lastSync && !sync.busy ? `<p class="muted">${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'} on this device and in your GitHub copy.${pendingDraft() ? ' Your unsaved script is not included until you save it.' : ''}</p>` : ''}
@@ -2576,10 +2709,11 @@ function renderSync() {
         </div>
       </details>
       <p class="muted small">Your scripts and progress are kept in a secret Gist on your GitHub account. It isn't listed anywhere, but anyone with its link could read it, so don't share that link. Voices and recordings stay on each device.</p>
+      ${backupCardHtml()}
     </section>`;
   }
   return `<section class="stack">
-    <h1>Sync between devices</h1>
+    <h1>Sync and backup</h1>
     <p class="lede">Keep the same scripts and progress on your phone and computer. You set this up once on each device.</p>
     ${sync.error ? `<p class="note">${esc(sync.error)}</p>` : ''}
     <div class="card stack-sm">
@@ -2592,6 +2726,7 @@ function renderSync() {
       <div class="row"><button class="btn primary" data-action="sync-connect" ${sync.busy ? 'disabled' : ''}>${sync.busy ? 'Connecting…' : 'Connect'}</button></div>
     </div>
     <p class="muted small">Then do the same on your other device. Making a second key there is easiest; the app finds your existing scripts automatically. The key is saved only in this browser.</p>
+    ${backupCardHtml()}
   </section>`;
 }
 
@@ -2624,7 +2759,10 @@ Object.assign(actions, {
   'ai-save'() {
     const key = $('#ai-key').value.trim();
     if (!key) { toast('Paste your OpenAI key first.'); return; }
+    const pin = $('#ai-pin')?.value.trim() || '';
+    if (pin && pin.length < 4) { toast('Use at least 4 digits for the PIN, or leave it blank.'); return; }
     Object.assign(ai, { key, on: true });
+    if (pin) ai.pinHash = pinHash(pin);
     aiWarned = false;
     saveJSON(LS_AI, ai);
     app.voicesOpen = true;
@@ -2633,12 +2771,29 @@ Object.assign(actions, {
     if (first) sayHello(first);
   },
   'ai-remove'() {
+    if (aiLocked()) { toast('Unlock with the PIN first.'); return; }
     if (!confirm('Remove your OpenAI key from this device? Lines already made will keep playing.')) return;
     for (const k of Object.keys(ai)) delete ai[k];
     saveJSON(LS_AI, ai);
     render();
   },
   'ai-prepare'() { aiPrepareAll(); },
+  'ai-set-pin'() {
+    const pin = $('#ai-pin').value.trim();
+    if (pin.length < 4) { toast('Use at least 4 digits.'); return; }
+    ai.pinHash = pinHash(pin);
+    saveJSON(LS_AI, ai);
+    sessionStorage.removeItem(SS_AI_UNLOCKED);
+    toast('Voices locked. Changing them now needs the PIN.');
+    render();
+  },
+  'ai-unlock'() {
+    if (pinHash($('#ai-pin').value.trim()) !== ai.pinHash) { toast("That PIN isn't right."); return; }
+    sessionStorage.setItem(SS_AI_UNLOCKED, ai.pinHash);
+    toast('Unlocked until you close the app.');
+    render();
+  },
+  'ai-lock'() { sessionStorage.removeItem(SS_AI_UNLOCKED); render(); },
   'ai-stop'() { if (app.aiProgress) app.aiProgress.stop = true; },
   'sync-view'() { leave(); app.view = 'sync'; render(); },
   'sync-now'() { runSync(); },
@@ -2695,6 +2850,7 @@ function render() {
   if (app.view === 'edit') { merger.sig = ''; updatePreview(); }
   document.body.dataset.view = app.view;
   if (app.view === 'sing') mountSing();
+  if (app.view === 'track') setupTrackPlayer();
   $('#crumb').textContent = ['script', 'player', 'sing'].includes(app.view) ? current()?.title ?? '' : '';
 }
 

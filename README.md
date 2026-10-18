@@ -6,9 +6,9 @@ Nothing to install. It runs in Microsoft Edge or Google Chrome and uses the brow
 
 ## Start it
 
-Double-click **`Start Line Learner.cmd`**. A small window opens (keep it open while you practice) and the app opens in Google Chrome at <http://localhost:8765> (or your default browser if Chrome isn't installed).
+Open **<https://sqnazzal.github.io/line-learner/>** on any phone, tablet or computer. Use that same address everywhere, so Sync and groups see the same scripts.
 
-The first time you rehearse, the browser asks for microphone access. Click **Allow**.
+The first time you practice, the browser asks for microphone access. Click **Allow**.
 
 > Use Edge or Chrome. Firefox can read lines aloud but can't check them by microphone, so the app falls back to "Got it / Missed it" buttons there. Checking lines by microphone also needs an internet connection, because the browser sends the audio to its speech service.
 
@@ -32,7 +32,7 @@ Tap **Sync** at the top right and follow the steps. You create a GitHub access k
 - Syncing happens on its own a few seconds after a change, and whenever you open the app. **Sync now** pulls the latest right away.
 - If you edit the same script on both devices, the most recent edit wins. Practice progress merges line by line, so practice on either device counts.
 - Voices and recordings stay on each device.
-- On the PC, use the same web address as the phone (<https://sqnazzal.github.io/line-learner/>). The `Start Line Learner.cmd` version keeps its own separate copy unless you connect Sync there too.
+- On the PC, use the same web address as the phone (<https://sqnazzal.github.io/line-learner/>).
 
 ## Ways to practice
 
@@ -97,7 +97,7 @@ Scripts, progress and recordings are saved in your browser for `localhost:8765`.
 ## Files
 
 - `index.html`, `styles.css`, `app.js`: the app
-- `serve.ps1`, `Start Line Learner.cmd`: tiny local web server (PowerShell, built into Windows)
+- `serve.ps1`: tiny local web server (PowerShell) used by the library build tools
 - `sample-script.txt`: an example scene
 - `vendor/pdfjs`: Mozilla's PDF.js 3.11.174 (Apache 2.0 license), used to read PDF scripts
 
@@ -140,6 +140,20 @@ Tap **Sign in** at the top (next to Sync) and sign in with Google; it then says 
 - Each person's progress, recordings, voices and personal scripts stay private. Only what you share goes to the group.
 
 Groups use Google Firebase (project `line-learner-45bd1`): Authentication with Google sign-in, and Firestore for groups and shared items. Access is controlled by `firestore.rules`; paste it into **Databases and storage > Firestore > Rules** in the Firebase console and tap **Publish** whenever it changes. Sign-in only works from domains listed under **Security > Authentication > Settings > Authorized domains** (add `sqnazzal.github.io`).
+
+## Your scripts and categories
+
+The home screen lists your scripts under category tabs: **Current**, **Audition**, **Fun**, **Other** and **Past**, plus any you create (like a show's name) with **New category…**. Move a script with the small category menu on its card or on its page. New scripts go into the tab you're looking at.
+
+## Listen, screen off
+
+**Listen, screen off** on a script builds the scene (or the part chosen with Start at / Stop) into one audio file that keeps playing when your phone locks, with lock-screen controls, scene jumps and **Save as a file**. It uses the AI voices (and your recordings), following the Listen settings for your own lines. Listen mode itself now hears you say your line and moves on when you finish (Practice settings: **move on as soon as I finish my line**).
+
+## Backup, voice lock and your own Spotify
+
+- **Sync and backup** screen: **Download backup** saves all scripts, progress and settings to a file; **Restore backup** brings them back on any device.
+- **Voice lock:** add a PIN when saving the OpenAI key (or later, under Voices for each character). AI voices, notes, Female/Male and removing the key then need the PIN, so paid-for audio isn't re-made.
+- **Your own Spotify app:** Spotify limits each personal app to 5 people. Others with Premium can make a free Spotify app and paste its Client ID under **Use your own Spotify app** when connecting.
 
 ## Help
 

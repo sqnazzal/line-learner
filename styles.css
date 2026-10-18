@@ -336,10 +336,18 @@ button, .btn { touch-action: manipulation; }
 }
 body[data-view="sing"] .site-footer { padding-bottom: 130px; } /* clear of the player bar */
 .site-footer .link-btn { font-size: .85rem; margin-bottom: 4px; }
+.disclaimer { display: inline-block; max-width: 60ch; line-height: 1.5; margin-top: 4px; }
 .help-page .segmented { flex-wrap: wrap; }
 .help-topic > summary { font-size: 1.05rem; }
 .help-body { line-height: 1.6; }
 .help-body ul, .help-body ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Categories on Your scripts */
+.cat-tabs { gap: 6px; }
+.cat-head { margin: 10px 0 2px; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.script-item { position: relative; display: flex; }
+.script-item .script-card { padding-bottom: 46px; }
+.cat-pick { position: absolute; left: 18px; bottom: 12px; font-size: .8rem; padding: 3px 8px; border-radius: 999px; max-width: calc(100% - 36px); }
 
 /* Groups */
 .group-name { font-size: 1.15rem; }

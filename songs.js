@@ -5,7 +5,11 @@
 // Loaded after app.js and uses its helpers.
 
 // Your Spotify app's Client ID, from developer.spotify.com/dashboard. It isn't secret.
-const SPOTIFY_CLIENT_ID = '9ba62f10431b4c3c8812fc288e3b71de';
+// Spotify only lets 5 people use one personal app, so anyone else can make their own free Spotify app
+// and save its Client ID on their device instead.
+const SPOTIFY_DEFAULT_CLIENT = '9ba62f10431b4c3c8812fc288e3b71de';
+const LS_SPOTIFY_CLIENT = 'lineLearner.spotifyClient';
+const SPOTIFY_CLIENT_ID = loadJSON(LS_SPOTIFY_CLIENT, '') || SPOTIFY_DEFAULT_CLIENT;
 
 // ---------- Lyrics text ----------
 // Lyrics are kept as text, optionally in LRC format: "[01:23.45] a line" marks when each line starts.
@@ -126,7 +130,7 @@ async function spotifyApi(path, opts = {}, retried = false) {
     // Since February 2026 Spotify only serves personal (Development Mode) apps whose owner has Premium,
     // and only to the few users added in the app's User Management.
     const err = new Error(res.status === 403
-      ? `Spotify refused${said ? ` ("${said}")` : ''}. Spotify only allows personal apps like this one when the app's owner has Spotify Premium, and only for people added under User Management.`
+      ? `Spotify refused${said ? ` ("${said}")` : ''}. Spotify only allows personal apps like this one when the app's owner has Spotify Premium, and only for people added under User Management. Not on the list? Set up your own Spotify app (under Connect Spotify in the song editor).`
       : `Spotify answered with an error (${res.status}${said ? `: ${said}` : ''}).`);
     err.status = res.status;
     throw err;
@@ -319,9 +323,10 @@ function songPanelHtml(e) {
   if (!t) {
     findTrack = spotifyReady()
       ? `<div class="row wrap"><input id="sp-q" type="search" class="search" placeholder="Search Spotify for the song" aria-label="Search Spotify"><button class="btn" data-action="song-sp-search">Search</button></div>
-         <div class="row wrap"><button class="btn ghost" data-action="song-sp-playlists">My playlists</button><button class="btn ghost" data-action="song-sp-liked">Liked songs</button></div>`
+         <div class="row wrap"><button class="btn ghost" data-action="song-sp-playlists">My playlists</button><button class="btn ghost" data-action="song-sp-liked">Liked songs</button><button class="link-btn small" data-action="song-sp-disconnect">Disconnect Spotify</button></div>`
       : `<div class="row wrap"><input id="sp-link" type="search" class="search" placeholder="Paste a Spotify song link" aria-label="Spotify song link"><button class="btn" data-action="song-sp-link">Use this song</button></div>
-         ${SPOTIFY_CLIENT_ID ? '<div><button class="btn ghost" data-action="song-sp-login">Connect Spotify to pick from your playlists</button></div>' : '<p class="muted small">In Spotify, tap Share > Copy Song Link, then paste it here.</p>'}`;
+         <div><button class="btn ghost" data-action="song-sp-login">Connect Spotify to pick from your playlists</button></div>
+         ${ownSpotifyHtml()}`;
   }
   const results = songUi.resultKind ? `<ul class="pick-list">${songUi.results.map((r, i) => songUi.resultKind === 'playlists'
     ? `<li><button class="pick" data-action="song-sp-open-playlist" data-i="${i}" ${r.locked ? 'disabled' : ''}><b>${esc(r.name)}</b><span class="muted small">${r.locked
@@ -350,6 +355,30 @@ function songPanelHtml(e) {
     ${lyricHits}
     <p class="muted small">Or paste them below, or photograph them below. Timed lyrics highlight along with the music; untimed ones can be timed by tapping along.</p>
   </div>`;
+}
+
+function ownSpotifyHtml() {
+  const own = SPOTIFY_CLIENT_ID !== SPOTIFY_DEFAULT_CLIENT;
+  return `<details class="own-spotify small"${own ? ' open' : ''}>
+    <summary>Connect says you're not allowed? Use your own Spotify app</summary>
+    <div class="stack-sm">
+      <p class="muted">Line Learner's Spotify connection works for up to 5 people Shannon adds. Anyone with Spotify Premium can make their own free Spotify app instead:</p>
+      <ol class="steps-list">
+        <li>Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a>, sign in, and tap <b>Create app</b>.</li>
+        <li>Any name. Redirect URI exactly: <code>${esc(SPOTIFY_REDIRECT)}</code>. Tick <b>Web API</b>, agree, and save.</li>
+        <li>Open the app's <b>Settings</b>, copy the <b>Client ID</b>, and paste it here.</li>
+      </ol>
+      <div class="row wrap"><input id="sp-client" type="search" class="search" placeholder="Your Spotify Client ID" aria-label="Your Spotify Client ID" autocapitalize="off" spellcheck="false"><button class="btn" data-action="song-sp-own">Use my Spotify app</button></div>
+      ${own ? '<p class="small">Using your own Spotify app on this device. <button class="link-btn" data-action="song-sp-own-reset">Go back to the built-in one</button></p>' : ''}
+    </div></details>`;
+}
+
+// Switching Spotify apps means signing in again (sign-ins belong to one app).
+function setSpotifyClient(id) {
+  saveJSON(LS_SPOTIFY_CLIENT, id);
+  try { localStorage.removeItem(LS_SPOTIFY); } catch { /* nothing saved */ }
+  saveDraft();
+  location.reload();
 }
 
 function refreshSongPanel() {
@@ -402,7 +431,7 @@ function saveSong() {
   if (!lines.some(l => l.type === 'line')) { toast('Add the lyrics first: find them, paste them, or use screenshots.'); return; }
   let s = e.id && scripts.find(x => x.id === e.id);
   if (!s) {
-    s = { id: uid(), voices: {}, stats: {} };
+    s = { id: uid(), voices: {}, stats: {}, category: defaultCategory() };
     scripts.push(s);
   }
   const prev = e.song || {};
@@ -431,6 +460,18 @@ Object.assign(actions, {
     render();
   },
   'song-sp-login'() { spotifyLogin(); },
+  'song-sp-own'() {
+    const id = $('#sp-client').value.trim();
+    if (!/^[0-9a-f]{32}$/i.test(id)) { toast("That doesn't look like a Spotify Client ID (32 letters and numbers)."); return; }
+    toast('Switching to your Spotify app. Then tap Connect Spotify.');
+    setTimeout(() => setSpotifyClient(id), 600);
+  },
+  'song-sp-own-reset'() { setSpotifyClient(''); },
+  'song-sp-disconnect'() {
+    if (!confirm('Disconnect Spotify on this device?')) return;
+    try { localStorage.removeItem(LS_SPOTIFY); } catch { /* nothing saved */ }
+    location.reload();
+  },
   'song-clear-track'() { app.editing.song = { ...app.editing.song, spotify: null, instrumental: null }; songUi.inst = []; saveDraft(); refreshSongPanel(); },
   'song-find-inst'() {
     songBusy('Looking for instrumental versions…', async () => {

@@ -183,7 +183,7 @@ function takeItem(item) {
     const keepChar = s.myChar && fresh.lines.some(l => l.type === 'line' && l.speaker === s.myChar);
     Object.assign(s, fresh, { title: item.title, raw: item.raw, updated: Date.now() }, keepChar ? { myChar: s.myChar } : {});
   } else {
-    s = { id: uid(), voices: {}, stats: {}, ...fresh, title: item.title, raw: item.raw, updated: Date.now() };
+    s = { id: uid(), voices: {}, stats: {}, ...fresh, title: item.title, raw: item.raw, updated: Date.now(), category: defaultCategory() };
     scripts.push(s);
   }
   s.groupItem = { gid: grp.current, id: item.id, updated: item.updated };
