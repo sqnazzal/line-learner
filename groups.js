@@ -215,7 +215,7 @@ function renderGroup() {
     const state = !mine ? `<button class="btn primary" data-action="group-take" data-id="${esc(it.id)}">Add to my scripts</button>`
       : (mine.groupItem?.updated || 0) < it.updated && it.addedBy !== fb.user.uid ? `<button class="btn primary" data-action="group-take" data-id="${esc(it.id)}">Update my copy</button>`
       : `<button class="btn ghost" data-action="open" data-id="${esc(mine.id)}">Open</button>`;
-    const canRemove = it.addedBy === fb.user.uid || g.ownerUid === fb.user.uid;
+    const canRemove = it.addedBy === fb.user.uid; // only the person who shared it
     return `<li class="card lib-card"><div class="lib-main">
         <b>${it.kind === 'song' ? '<span class="tag">Song</span> ' : ''}${esc(it.title)}</b>
         <span class="muted small">Shared by ${esc(it.addedBy === fb.user.uid ? 'you' : it.addedByName || 'someone')}${it.updated ? ' · ' + ago(it.updated) : ''}</span></div>
@@ -256,18 +256,20 @@ function sharePanelHtml(s) {
   if (!fb.user || share.open !== s.id) return '';
   const rows = grp.groups.map(g => {
     const st = share.status[g.id];
-    const mineOrOwner = st && st !== 'loading' && (st.addedBy === fb.user.uid || g.ownerUid === fb.user.uid);
+    // Only the person who shared an item can update or unshare it (the security rules enforce this too).
+    const mine = st && st !== 'loading' && st.addedBy === fb.user.uid;
     const actionsHtml = st === 'loading' ? '<span class="muted small">Checking…</span>'
       : !st ? `<button class="btn primary" data-action="group-share-to" data-gid="${esc(g.id)}">Share</button>`
-      : `<button class="btn" data-action="group-share-to" data-gid="${esc(g.id)}">Update</button>
-         ${mineOrOwner ? `<button class="btn ghost" data-action="group-unshare" data-gid="${esc(g.id)}">Unshare</button>` : ''}`;
+      : mine ? `<button class="btn" data-action="group-share-to" data-gid="${esc(g.id)}">Update</button>
+         <button class="btn ghost" data-action="group-unshare" data-gid="${esc(g.id)}">Unshare</button>`
+      : '';
     const note = st && st !== 'loading'
       ? `Shared${st.addedBy === fb.user.uid ? '' : ` by ${esc(st.addedByName || 'someone')}`}${st.updated ? ' · ' + ago(st.updated) : ''}`
       : st === null ? 'Not shared' : '';
     return `<li class="share-row"><div class="lib-main"><b>${esc(g.name)}</b><span class="muted small">${note}</span></div><div class="row">${actionsHtml}</div></li>`;
   }).join('');
   return `<div class="card stack-sm share-panel"><b>Share “${esc(s.title)}” with</b><ul class="share-list">${rows}</ul>
-    <p class="muted small">Shared copies go to everyone in that group. Unsharing removes it from the group's list; copies people already added stay with them.</p></div>`;
+    <p class="muted small">Shared copies go to everyone in that group. Only you can update or unshare what you share. Unsharing removes it from the group's list; copies people already added stay with them.</p></div>`;
 }
 
 async function loadShareStatus(s) {
@@ -322,9 +324,8 @@ Object.assign(actions, {
     const s = current(), gid = b.dataset.gid, g = grp.groups.find(x => x.id === gid);
     try {
       const prev = share.status[gid];
+      if (prev && prev.addedBy !== fb.user.uid) { toast(`Only ${prev.addedByName || 'the person who shared it'} can change this.`); return; }
       const item = itemFromScript(s);
-      // Updating someone else's shared item keeps them as the person who shared it.
-      if (prev && prev.addedBy) Object.assign(item, { addedBy: prev.addedBy, addedByName: prev.addedByName });
       await fb.shareItem(gid, item);
       share.status[gid] = item;
       if (!s.groupItem) s.groupItem = { gid, id: item.id, updated: item.updated };

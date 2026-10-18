@@ -133,7 +133,7 @@ Connecting a Spotify account needs a Spotify developer app: set its Redirect URI
 Tap **Group** on the home screen and sign in with Google.
 
 - **Create a group** and share its invite code or link. People who open the link and sign in join automatically.
-- Open any script or song and tap **Share to group**: a panel lists all your groups, showing where it's shared, with **Share**, **Update** and **Unshare** for each. Everyone in a group sees shared items under **Shared scripts and songs** and taps **Add to my scripts** to practice them; after an update they get an **Update my copy** button that keeps their progress and character. Only the person who shared an item (or the group's owner) can unshare it.
+- Open any script or song and tap **Share to group**: a panel lists all your groups, showing where it's shared, with **Share**, **Update** and **Unshare** for each. Everyone in a group sees shared items under **Shared scripts and songs** and taps **Add to my scripts** to practice them; after an update they get an **Update my copy** button that keeps their progress and character. Only the person who shared an item can update or unshare it (enforced by the security rules, not just the app). Groups can't be deleted, and members can only remove themselves.
 - In more than one group? Switch between them with the tabs at the top of the Group screen.
 - Each person's progress, recordings, voices and personal scripts stay private. Only what you share goes to the group.
 
