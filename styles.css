@@ -466,3 +466,4 @@ a.btn { text-decoration: none; }
 }
 .find-split { border: 0; border-top: 1px solid var(--border); margin: 8px 0 2px; width: 100%; }
 [hidden] { display: none !important; }
+.player-choice { flex-wrap: wrap; border-radius: 18px; }

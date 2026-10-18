@@ -404,10 +404,10 @@ function songPanelHtml(e) {
   </div>`;
 }
 
-function ownSpotifyHtml() {
+function ownSpotifyHtml(summary = "Connect says you're not allowed? Use your own Spotify app") {
   const own = SPOTIFY_CLIENT_ID !== SPOTIFY_DEFAULT_CLIENT;
   return `<details class="own-spotify small"${own ? ' open' : ''}>
-    <summary>Connect says you're not allowed? Use your own Spotify app</summary>
+    <summary>${summary}</summary>
     <div class="stack-sm">
       <p class="muted">Line Learner's built-in Spotify connection is only for Shannon's Nazzal only group. Anyone with Spotify Premium can make their own free Spotify app instead:</p>
       <ol class="steps-list">
@@ -605,6 +605,7 @@ Object.assign(actions, {
   'sing-mode'(b) { sing.mode = b.dataset.mode; renderLyrics(); $$('.sing-modes .chip').forEach(c => c.classList.toggle('on', c.dataset.mode === sing.mode)); },
   'sing-loop'() { sing.loop = sing.loop == null ? sing.idx : null; updateSing(true); },
   'sing-line'(b) { seekToLine(+b.dataset.li); },
+  'sing-self-start'() { setFollow(true); sing.controller?.seek(0); sing.controller?.resume(); },
   'sing-time'() { startTiming(); },
   'sing-tap'() { tapTiming(); },
   'sing-play'() {
@@ -684,6 +685,7 @@ function renderSing() {
       <button class="seg${usingInst(s) ? ' on' : ''}" data-action="sing-version" data-v="instrumental" aria-pressed="${usingInst(s)}">Instrumental</button></div>` : ''}
     ${sp ? playerChoiceHtml() : ''}
     ${!sp ? '<p class="note">Add the song from Spotify (Edit, at the top of the song page) to sing along with the real track. For now you can read and learn the lyrics here.</p>'
+      : playsYourself() ? selfPlayerHtml(s)
       : playsInApp() ? `<div class="card app-player"><div class="row wrap">
           <button class="btn primary" id="app-play" data-action="sing-play">Play</button>
           <div class="lib-main"><b>${esc(versionTrack(s).title)}</b><span class="muted small">Plays in your Spotify app, full song. Keep this page open for the lyrics.</span>
@@ -706,21 +708,52 @@ function renderSing() {
   </section>`;
 }
 
-// Where the song plays: Spotify's player in this page (previews unless the browser is signed in to
-// Spotify, which iPhones block) or your own Spotify app via Spotify Connect (full songs, Premium).
+// Where the song plays: your own Spotify app via Spotify Connect (full songs, Premium, needs connecting),
+// your Spotify app on your own with no connection (any account; the lyrics run on a clock you start), or
+// Spotify's player in this page (previews unless the browser is signed in to Spotify, which iPhones block).
 const LS_PLAYER = 'lineLearner.songPlayer';
-const playsInApp = () => canControlApp() && (loadJSON(LS_PLAYER, 'app') === 'app');
+const IS_PHONE = /Android|iP(hone|ad|od)/i.test(navigator.userAgent) || IS_IOS;
+function playerKind() {
+  const saved = loadJSON(LS_PLAYER, '');
+  if (saved === 'app' && canControlApp()) return 'app';
+  if (saved === 'self' || saved === 'embed') return saved;
+  return canControlApp() ? 'app' : IS_PHONE ? 'self' : 'embed';
+}
+const playsInApp = () => playerKind() === 'app';
+const playsYourself = () => playerKind() === 'self';
 
 function playerChoiceHtml() {
-  if (!SPOTIFY_CLIENT_ID) return '';
-  if (!canControlApp()) {
-    return `<p class="note small">Only hearing a preview? ${spotifyReady() ? 'Reconnect' : 'Connect'} Spotify to play full songs in your Spotify app (needs Premium).
-      <button class="btn ghost" data-action="song-sp-login">${spotifyReady() ? 'Reconnect Spotify' : 'Connect Spotify'}</button></p>`;
-  }
-  const inApp = playsInApp();
-  return `<div class="segmented" role="group" aria-label="Where the song plays">
-    <button class="seg${inApp ? ' on' : ''}" data-action="sing-player" data-p="app" aria-pressed="${inApp}">Spotify app (full song)</button>
-    <button class="seg${inApp ? '' : ' on'}" data-action="sing-player" data-p="embed" aria-pressed="${!inApp}">This page</button></div>`;
+  const kind = playerKind();
+  const seg = (p, label) => `<button class="seg${kind === p ? ' on' : ''}" data-action="sing-player" data-p="${p}" aria-pressed="${kind === p}">${label}</button>`;
+  return `<div class="segmented player-choice" role="group" aria-label="Where the song plays">
+    ${canControlApp() ? seg('app', 'Spotify app, connected') : ''}${seg('self', 'Play it in Spotify yourself')}${seg('embed', 'This page')}</div>
+    ${kind === 'embed' && SPOTIFY_CLIENT_ID && !canControlApp() ? `<p class="muted small">Only hearing a preview? Choose <b>Play it in Spotify yourself</b> (works with any Spotify account), or ${spotifyReady() ? 'reconnect' : 'connect'} Spotify to control your Spotify app from here.
+      <button class="link-btn" data-action="song-sp-login">${spotifyReady() ? 'Reconnect Spotify' : 'Connect Spotify'}</button></p>` : ''}`;
+}
+
+// Play it in Spotify yourself: no connection, so the lyrics run on a clock. You start the song in Spotify,
+// then tap the line being sung (or Start as the music begins) and the highlight follows from there.
+function selfPlayerHtml(s) {
+  const t = versionTrack(s), id = t.uri.split(':').pop();
+  const href = IS_PHONE ? `spotify:track:${id}` : `https://open.spotify.com/track/${id}`;
+  return `<div class="card app-player stack-sm">
+    <div class="row wrap"><a class="btn" href="${href}"${IS_PHONE ? '' : ' target="_blank" rel="noopener"'}>Open in Spotify</a>
+      <button class="btn primary" data-action="sing-self-start">Start from the top</button></div>
+    <div class="lib-main"><b>${esc(t.title)}</b>
+      <span class="muted small">Play the song in Spotify, come back, and <b>tap the line being sung</b> to lock the lyrics on (or tap <b>Start from the top</b> the moment the music begins). If you pause or skip in Spotify, pause or tap the right line here too.${IS_IOS ? ' To get back from Spotify, tap <b>◀ Safari</b> in the top-left corner.' : ''}</span></div>
+    ${!canControlApp() && (!usingBuiltInSpotify() || inSpotifyGroup()) ? `<p class="muted small">You can also <button class="link-btn" data-action="song-sp-login">connect Spotify</button> so this page controls your Spotify app and stays in step by itself (Premium).</p>`
+      : !canControlApp() ? ownSpotifyHtml('Want it to stay in step by itself? Set up your own Spotify app (Premium, about 5 minutes)') : ''}
+  </div>`;
+}
+
+function selfController() {
+  const ctl = {
+    togglePlay: () => (sing.paused ? ctl.resume() : Object.assign(sing, { pos: estimatePos(), paused: true })),
+    resume: () => Object.assign(sing, { paused: false, at: performance.now() }),
+    seek: sec => Object.assign(sing, { pos: sec * 1000, at: performance.now() }),
+    destroy: () => {},
+  };
+  return ctl;
 }
 
 function nudgeLabel(s) {
@@ -889,6 +922,7 @@ async function mountSing() {
   clearInterval(sing.timer);
   sing.timer = setInterval(() => updateSing(false), 200);
   if (s.song?.spotify && playsInApp()) { sing.controller = appController(versionTrack(s).uri); return; }
+  if (s.song?.spotify && playsYourself()) { sing.controller = selfController(); return; }
   const box = $('#sp-embed');
   if (!box || !s.song?.spotify) return;
   const api = await loadIframeApi();

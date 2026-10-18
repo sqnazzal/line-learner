@@ -93,7 +93,8 @@ Tap **+ New song**.
 
 **Sing along** highlights the current line in time with the music, hides words as you learn (**First letters**, **Fill in as I sing**, **Hidden**), jumps to a tapped line, and loops a tricky one (**Repeat this line**). A player bar at the bottom has Play/Pause and previous/next line; scrolling yourself pauses following (tap **Follow along** to pick it back up).
 
-- **Full songs:** the player inside the page plays previews on iPhone. Choose **Spotify app (full song)** (Spotify Premium) to play in your own Spotify app while the lyrics follow along. If Spotify is asleep, tap **Open Spotify** and come straight back. Wrong speaker? **Change device**.
+- **Full songs, any Spotify account:** choose **Play it in Spotify yourself**: open the song in Spotify, play it, come back and tap the line being sung, and the lyrics follow from there (pause or skip here too if you do in Spotify). The player inside the page only plays previews on iPhone.
+- **Connected:** people in the Nazzal only group, or with their own Spotify app set up, can choose **Spotify app, connected** (Premium) so the lyrics stay in step with Spotify automatically. If Spotify is asleep, tap **Open Spotify** and come straight back. Wrong speaker? **Change device**.
 - **Original | Instrumental** switch; if the highlight is out of step, tap **It's early** / **It's late**, or **Re-time lyrics** by tapping along.
 - Line Learner's built-in Spotify connection is only for people signed in and in Shannon's **Nazzal only** group (Spotify also caps it at 5 people Shannon adds). Anyone else with Premium can follow **Use your own Spotify app** when connecting.
 

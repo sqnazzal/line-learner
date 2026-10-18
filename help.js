@@ -31,7 +31,7 @@ const HELP = {
       <li>Sharing a device? Add a <b>PIN</b> under Voices for each character so AI voices you've paid for can't be changed without it.</li></ul>`],
     ['Songs and Spotify', `<ul>
       <li>The player inside the page only plays <b>previews</b> on iPhone (Apple blocks it from seeing your Spotify login).</li>
-      <li>For full songs: <b>Connect Spotify</b> (needs Premium), then in Sing along choose <b>Spotify app (full song)</b>.</li>
+      <li>For full songs with any Spotify account: in Sing along choose <b>Play it in Spotify yourself</b>, tap <b>Open in Spotify</b>, play the song, come back and tap the line being sung. The lyrics follow from there; if you pause or skip in Spotify, do the same here. (In the Nazzal only group, or set up with your own Spotify app? <b>Connect Spotify</b> and choose <b>Spotify app, connected</b> to stay in step automatically.)</li>
       <li>"Spotify is asleep"? Tap <b>Open Spotify</b>, then come straight back (tap <b>◀ Safari</b> in the top-left corner, or swipe right along the bottom edge); the song starts by itself. iPhones can't switch back automatically.</li>
       <li>Playing on the wrong speaker? Tap <b>Change device</b>.</li>
       <li>"Not allowed" when connecting? Line Learner's own Spotify connection is only for Shannon's Nazzal only group (signed in); anyone else with Premium can tap <b>Use your own Spotify app</b> and follow the steps.</li>
@@ -65,7 +65,7 @@ const HELP = {
       <li>Sharing a device? Add a <b>PIN</b> under Voices for each character so AI voices you've paid for can't be changed without it.</li></ul>`],
     ['Songs and Spotify', `<ul>
       <li>If you're signed in to Spotify in Chrome, the page player may play full songs; otherwise it plays previews.</li>
-      <li>For full songs either way: <b>Connect Spotify</b> (needs Premium), then choose <b>Spotify app (full song)</b> in Sing along.</li>
+      <li>For full songs with any Spotify account: choose <b>Play it in Spotify yourself</b> in Sing along, start the song in Spotify, then tap the line being sung. (Connected to Spotify? Choose <b>Spotify app, connected</b> to stay in step automatically.)</li>
       <li>Playing on the wrong speaker? Tap <b>Change device</b>.</li>
       <li>"Not allowed" when connecting? Line Learner's own Spotify connection is only for Shannon's Nazzal only group (signed in); anyone else with Premium can tap <b>Use your own Spotify app</b> and follow the steps.</li></ul>`],
     ['Importing a script', `<ul>
@@ -96,7 +96,7 @@ const HELP = {
       <li>Sharing a device? Add a <b>PIN</b> under Voices for each character so AI voices you've paid for can't be changed without it.</li></ul>`],
     ['Songs and Spotify', `<ul>
       <li>Signed in at <b>open.spotify.com</b> in the same browser? The page player plays full songs. Otherwise it plays previews.</li>
-      <li>Or: <b>Connect Spotify</b> (Premium) and choose <b>Spotify app (full song)</b> to play in the Spotify desktop app.</li>
+      <li>Or: choose <b>Play it in Spotify yourself</b>, play the song in Spotify, and tap the line being sung. Connected to Spotify? <b>Spotify app, connected</b> keeps in step by itself.</li>
       <li>"Not allowed" when connecting? Line Learner's own Spotify connection is only for Shannon's Nazzal only group (signed in); anyone else with Premium can use <b>Use your own Spotify app</b>.</li></ul>`],
     ['Importing a script', `<ul>
       <li><b>PDF or .txt:</b> New script &gt; <b>Import PDF or .txt</b>, or drag the file onto the text box.</li>
