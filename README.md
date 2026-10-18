@@ -153,6 +153,13 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | `vendor/pdfjs` | Mozilla's PDF.js 3.11.174 (Apache 2.0), for reading PDFs |
 | `sample-script.txt` | An example scene |
 | `serve.ps1` | A tiny local web server used by the library build tools |
+| `LICENSE.md` | The license (below) |
+
+## License
+
+Line Learner is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md): anyone can use, copy and change it for personal, educational, charitable or other noncommercial purposes, but not to make money from it. For any other use, ask Shannon.
+
+Not covered by that license: PDF.js in `vendor/pdfjs` keeps its own Apache 2.0 license, and the plays and monologues in `library/` are public domain texts from Project Gutenberg.
 
 ---
 
