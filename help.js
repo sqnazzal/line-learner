@@ -251,6 +251,7 @@ const UPDATES = [
     '<b>Privacy notice</b> rewritten in plain language, with privacy and copyright requests in Send feedback.',
     '<b>Home screen icon:</b> theatre masks instead of a gray letter (remove and re-add the app to see it).',
     '<b>Licensed show reminder</b> next to Read pages, AI voices and screen-off tracks: these send text to OpenAI, and some show licenses don\'t allow that.',
+    '<b>Screen-off tracks</b> now start and end with a short spoken notice, "For private, non-commercial use only", and the title (and author, for library plays). Remake a track to add it.',
     '<b>About Line Learner</b> page and this <b>What\'s new</b> page.',
     '<b>Fixed:</b> Check could stop responding after skipping lines in Type mode, and going back could bounce forward again.',
   ]],

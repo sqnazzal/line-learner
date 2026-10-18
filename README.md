@@ -58,7 +58,7 @@ On a script, choose who you're playing (**I'm playing**) and, optionally, a scen
 | Mode | What happens |
 | --- | --- |
 | **Listen** | The scene is read aloud. At your lines it waits for you to say them (it hears you and moves on when you finish), then plays the line so you hear how it goes. Turn on **Loop** and leave it running. |
-| **Listen, screen off** | Makes the scene (pick **From** / **Stop**) into one audio track that keeps playing with your phone locked, with lock-screen and AirPods controls. Tracks are saved on the device under **Saved tracks** to play any time, offline, or **Delete**; **Save as a file** keeps a copy. Uses the AI voices. |
+| **Listen, screen off** | Makes the scene (pick **From** / **Stop**) into one audio track that keeps playing with your phone locked, with lock-screen and AirPods controls. Tracks are saved on the device under **Saved tracks** to play any time, offline, or **Delete**; **Save as a file** keeps a copy. Uses the AI voices. Each track starts and ends with a short spoken notice: "For private, non-commercial use only", then the title (and author, for library plays). |
 | **Rehearse** | Your cues are read aloud and the mic listens to you, with a word-by-word check (green right, red missed). Miss it and you hear the line, then try again. |
 | **Type your lines** | The quiet way (on a train, say): cues show on screen, you type your lines and get the same word-by-word check. No microphone needed. Cues can be read aloud instead (Practice settings, with headphones). |
 | **Build up** | For long speeches and monologues: hear one sentence, say it from the top; add the next, from the top again. Tap the stairs icon on a long line. |

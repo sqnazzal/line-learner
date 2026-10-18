@@ -1611,9 +1611,10 @@ function libResultsHtml(q) {
     </div></li>`).join('')}</ul>`;
 }
 
-function addLibraryScript(title, raw, myChar) {
+function addLibraryScript(title, raw, myChar, author) {
   const s = makeScript(title, raw);
   if (myChar) s.myChar = myChar;
+  if (author) s.author = author; // read out at the start and end of screen-off tracks
   scripts.push(s);
   saveScripts();
   openScript(s.id);
@@ -2649,7 +2650,7 @@ const actions = {
   'lib-add-mono'(b, i) {
     const m = lib.monologues[i];
     addLibraryScript(`${titleCase(m.character)}: ${m.firstWords.split(' ').slice(0, 5).join(' ')}… (${m.play})`,
-      `# ${m.play} (${m.author})\n\n${m.character}: ${m.text}\n`, m.character);
+      `# ${m.play} (${m.author})\n\n${m.character}: ${m.text}\n`, m.character, m.author);
     toast('Added. Try Build up to learn it a sentence at a time.');
   },
   async 'lib-add-play'(b) {
@@ -2659,7 +2660,7 @@ const actions = {
     try {
       const res = await fetch(`library/plays/${p.slug}.txt`, { cache: 'no-cache' });
       if (!res.ok) throw new Error(res.status);
-      addLibraryScript(`${p.title} (${p.author})`, await res.text());
+      addLibraryScript(`${p.title} (${p.author})`, await res.text(), '', p.author);
       toast('Added. Choose your character, and pick a scene with "Start at".');
     } catch {
       b.disabled = false;

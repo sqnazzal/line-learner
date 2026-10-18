@@ -50,7 +50,7 @@ function partLabel(s, [from, to]) {
 
 // What a track depends on: the part, the lines, their voices, and the Listen settings that shape it.
 function trackSig(s, part) {
-  return hash(JSON.stringify([s.id, s.updated, part, s.myChar, track.cuesOnly && !!s.myChar, s.aiVoices, s.aiStyles, s.genders,
+  return hash(JSON.stringify(['announced', s.id, s.updated, part, s.myChar, track.cuesOnly && !!s.myChar, s.aiVoices, s.aiStyles, s.genders,
     settings.myLines, settings.rate, settings.useRecordings, aiReady()]));
 }
 
@@ -144,6 +144,23 @@ function renderTrack() {
 }
 
 // ---------- Building the audio ----------
+// Spoken at the start and end of every track (with AI voices): the use notice and what the track is.
+// Scripts from the library know their author; plays are titled "Title (Author)", read as "Title, by Author".
+const ANNOUNCER = ['alloy', 'Voice: a calm, clear announcer. Accent: General American. Read this like the opening announcement of an audiobook.'];
+function trackWho(s) {
+  if (!s.author) return `${s.title}.`;
+  const title = s.title.endsWith(` (${s.author})`) ? s.title.slice(0, -s.author.length - 3) : s.title;
+  return `${title}, by ${s.author}.`;
+}
+function trackAnnouncements(s, part) {
+  const whole = part[0] === 0 && part[1] >= s.lines.length, label = partLabel(s, part);
+  return [
+    `For private, non-commercial use only. ${trackWho(s)}${whole ? '' : ` ${label}.`}`,
+    `${whole ? 'The end.' : `End of ${label}.`} ${trackWho(s)} For private, non-commercial use only.`,
+  ];
+}
+const sayAnnouncement = async text => [await decode(await aiAudio(...ANNOUNCER, text))];
+
 const silence = sec => new Int16Array(Math.max(0, Math.round(sec * TRACK_RATE)));
 
 function toInt16(buf) {
@@ -200,7 +217,9 @@ async function buildTrack() {
   const add = a => { parts.push(a); samples += a.length; };
   // Gaps are sped up along with the track at playback, so stretch them to match.
   const gapSec = l => gapMs(l.text) / 1000 * settings.rate;
+  const [intro, outro] = trackAnnouncements(s, part);
   try {
+    if (aiReady()) { for (const a of await sayAnnouncement(intro)) add(a); add(silence(1)); }
     for (const l of items) {
       if (track.stop) break;
       if (samples / TRACK_RATE / 60 > TRACK_MAX_MIN) { track.error = `Stopped at ${TRACK_MAX_MIN} minutes to keep the file manageable. Make the rest as another track.`; break; }
@@ -218,7 +237,8 @@ async function buildTrack() {
       track.done++;
       if (track.done % 3 === 0 || track.done === track.total) render();
     }
-    if (!samples) throw new Error('Nothing to play in this part of the script.');
+    if (!track.done) throw new Error('Nothing to play in this part of the script.');
+    if (aiReady()) { add(silence(1)); for (const a of await sayAnnouncement(track.stop || track.error ? outro.replace(/^(The end|End of [^.]*)\./, 'End of this track.') : outro)) add(a); }
     if (!sections.length || sections[0].t > 0) sections.unshift({ label: 'Start', t: 0 });
     const saved = {
       id: uid(), scriptId: s.id, label: trackName(s, part) + (track.stop ? ' (stopped early)' : ''), created: Date.now(),
