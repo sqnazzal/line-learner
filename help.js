@@ -201,6 +201,27 @@ Object.assign(actions, {
 
 VIEWS.help = renderHelp;
 
+// ---------- About ----------
+const renderAbout = () => `<section class="stack about-page">
+  <div class="row between wrap"><h1>About Line Learner</h1><button class="btn ghost" data-action="home">${icon('back')} Your scripts</button></div>
+  <div class="card stack">
+    <h2>About the creator</h2>
+    <p>Hi, I'm Shannon Nazzal, an actor and audiobook narrator. Learning lines always meant finding someone free to read the other parts, so I built the rehearsal partner I wanted: one that reads your cues, listens for your lines, and is ready whenever you are. It's free for every actor.</p>
+    <ul class="about-links">
+      <li><a href="https://www.instagram.com/shannonnazzal.music/" target="_blank" rel="noopener">Instagram @shannonnazzal.music</a>: follow my acting, voiceover &amp; music</li>
+      <li><a href="https://www.backstage.com/tal/shannon-nazzal" target="_blank" rel="noopener">Backstage profile</a>: for casting and bookings</li>
+    </ul>
+  </div>
+  <div class="card stack">
+    <h2>Say hello or help out</h2>
+    <p>Ideas, bugs and kind words all help make it better.</p>
+    <div class="row wrap"><button class="btn" data-action="feedback">Send feedback</button><a class="btn" href="${TIP_URL}" target="_blank" rel="noopener">☕ Tip jar on Venmo</a></div>
+  </div>
+</section>`;
+
+actions.about = () => { leave(); app.view = 'about'; render(); window.scrollTo(0, 0); };
+VIEWS.about = renderAbout;
+
 // ---------- Send feedback / Report a bug ----------
 // Goes to the app's Firestore 'feedback' inbox, which only the admin can read (Admin screen). Works signed
 // in or not. Device details help track down bugs; no scripts are included.

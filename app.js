@@ -3485,7 +3485,7 @@ document.addEventListener('visibilitychange', () => {
 // version is out, reload (only on the home, script or library screens, so nothing in progress is cut off).
 async function checkForUpdate() {
   if (location.protocol === 'file:' || new URLSearchParams(location.search).has('code')) return;
-  if (!['library', 'script', 'browse', 'sync', 'help'].includes(app.view)) return;
+  if (!['library', 'script', 'browse', 'sync', 'help', 'about'].includes(app.view)) return;
   try {
     const mine = (document.querySelector('script[src*="app.js?v="]')?.getAttribute('src') || '').split('v=')[1];
     const html = await (await fetch(location.pathname, { cache: 'no-store' })).text();
