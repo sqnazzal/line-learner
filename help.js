@@ -32,7 +32,7 @@ const HELP = {
     ['Songs and Spotify', `<ul>
       <li>The player inside the page only plays <b>previews</b> on iPhone (Apple blocks it from seeing your Spotify login).</li>
       <li>For full songs: <b>Connect Spotify</b> (needs Premium), then in Sing along choose <b>Spotify app (full song)</b>.</li>
-      <li>"Spotify is asleep"? Tap <b>Open Spotify</b>, then come straight back; the song starts by itself.</li>
+      <li>"Spotify is asleep"? Tap <b>Open Spotify</b>, then come straight back (tap <b>◀ Safari</b> in the top-left corner, or swipe right along the bottom edge); the song starts by itself. iPhones can't switch back automatically.</li>
       <li>Playing on the wrong speaker? Tap <b>Change device</b>.</li>
       <li>"Not allowed" when connecting? Spotify lets 5 people use Line Learner's connection; anyone else with Premium can tap <b>Use your own Spotify app</b> and follow the steps.</li>
       <li>Highlight out of step? Tap <b>It's early</b> / <b>It's late</b>, or <b>Re-time lyrics</b>.</li></ul>`],

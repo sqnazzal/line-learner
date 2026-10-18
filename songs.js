@@ -189,6 +189,7 @@ function showWake(uri, kind) {
   const href = kind === 'phone' ? `spotify:track:${id}` : `https://open.spotify.com/track/${id}`;
   box.innerHTML = `<div class="note small wake">
     <p>Spotify on this ${kind} is asleep. Tap <b>Open Spotify</b>, then come straight back here and the song will start by itself.</p>
+    ${kind === 'phone' && IS_IOS ? '<p>iPhones can\'t switch back by themselves: in Spotify, tap <b>◀ Safari</b> (or ◀ Chrome) in the very top-left corner, or swipe right along the bottom edge of the screen.</p>' : ''}
     <div class="row wrap"><a class="btn primary" href="${href}"${kind === 'phone' ? '' : ' target="_blank" rel="noopener"'}>Open Spotify</a>
     <button class="btn ghost" data-action="sing-devices-list">Choose another device</button></div></div>`;
 }
