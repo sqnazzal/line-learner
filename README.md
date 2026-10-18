@@ -1,73 +1,33 @@
 # Line Learner
 
-An app for learning lines for shows and auditions, built for people who learn by **listening** and **saying it out loud**.
+**Because your family is tired of running lines with you.**
 
-Nothing to install. It runs in Microsoft Edge or Google Chrome and uses the browser's built-in voices and speech recognition.
+Line Learner helps actors learn lines for shows and auditions by **listening** and **saying them out loud**. Paste or scan your script, pick your part, and it reads your cues, checks your lines, and plays scenes like a podcast.
 
-## Start it
+Open it at **<https://sqnazzal.github.io/line-learner/>**. Nothing to install.
 
-Open **<https://sqnazzal.github.io/line-learner/>** on any phone, tablet or computer. Use that same address everywhere, so Sync and groups see the same scripts.
+---
 
-The first time you practice, the browser asks for microphone access. Click **Allow**.
+## Getting started
 
-> Use Edge or Chrome. Firefox can read lines aloud but can't check them by microphone, so the app falls back to "Got it / Missed it" buttons there. Checking lines by microphone also needs an internet connection, because the browser sends the audio to its speech service.
+- Open the address above on any phone, tablet or computer, and use that same address everywhere.
+- **iPhone/iPad:** use **Safari** (best for checking your lines). For an app icon: **Share > Add to Home Screen**. Tap **Play** to start anything; iPhones only play sound after a tap.
+- **Android:** use **Chrome**. For an app icon: **⋮ > Add to Home screen**.
+- **Computer:** use **Chrome** or **Edge** (Firefox can read lines but can't check them by microphone).
+- The first time you practice, allow the **microphone**. Checking your lines needs an internet connection.
+- Stuck at any point? **Help & troubleshooting** (home screen and bottom of every page) has steps for each kind of device.
 
-## On your iPhone
+## Adding a script
 
-Open **<https://sqnazzal.github.io/line-learner/>** in **Safari** (Safari is the browser that can check your lines by microphone on iPhone).
+On the home screen tap **+ New script** (or **+ New song**, below). Then any of these:
 
-- To get an app icon: tap the Share button, then **Add to Home Screen**.
-- When Safari asks for the microphone, tap **Allow**. To stop it asking every visit: Settings > Apps > Safari > Microphone > Allow.
-- Tap **Play** to start; iPhones only allow sound that starts from a tap.
-- The screen stays on while a scene plays. If the phone locks, the speech stops, so keep the screen on.
-- Headphones with a mic work well for Listen mode on the go.
-- Tap the sun/moon button at the top to switch between Light, Dark, and matching your phone.
-- Turn on **Sync** (below) to have the same scripts and progress on your phone and PC.
+- **Paste** the text, or **Import PDF or .txt** (or drag a file onto the text box).
+- **Paper script or screenshots:** in the pages section, tap **Take photo** for each page (again for the next page) or **Choose photos** for many at once, then **Read pages**. A progress bar shows how far it's got. Handwriting (blocking, notes, arrows) is ignored; tick **Leave out lines crossed out by hand (cuts)** if your copy marks cuts that way. Uses AI (your own OpenAI key or Shannon's shared voices).
+- **Long paper script?** Scan it with the iPhone **Notes** app (camera > **Scan Documents**), save it to Files as a PDF, and import that. Scanned PDFs are read page by page the same way.
+- **Free scripts & monologues:** 31 classic public-domain plays and 44 audition monologues, searchable by gender and tone. Tap **Add**. (Translated plays use older public-domain translations.)
+- **Try a sample scene** to see how it works.
 
-## Sync between phone and PC
-
-**Easiest:** tap **Sign in** at the top and sign in with Google on each device. Scripts, songs, categories and progress then sync automatically through your own private area (only you can read it). Voices and recordings stay on each device.
-
-**Advanced (GitHub):** on the Sync and backup screen, open **Advanced: sync with GitHub instead**. You create a GitHub access key that can only touch Gists and paste it in, once on each device.
-
-- Your scripts and progress are stored in one secret Gist on your GitHub account. It isn't listed anywhere, but anyone with its link could read it, so don't share that link.
-- Syncing happens on its own a few seconds after a change, and whenever you open the app. **Sync now** pulls the latest right away.
-- If you edit the same script on both devices, the most recent edit wins. Practice progress merges line by line, so practice on either device counts.
-- Voices and recordings stay on each device.
-- On the PC, use the same web address as the phone (<https://sqnazzal.github.io/line-learner/>).
-
-## Ways to practice
-
-| Mode | What happens | Good for |
-| --- | --- | --- |
-| **Listen** | The whole scene is read aloud like an audio track. At your lines it pauses so you can say them, then plays them so you hear how they go. Turn on **Loop** and leave it running. | Commuting, chores, the first week of learning |
-| **Rehearse** | Your cue lines are read aloud, then the mic listens to you. You get a word-by-word check (green = right, red = missed). Miss it and you hear the line, then try again. | Running lines with a partner who never gets tired |
-| **Build up** | For long speeches and audition monologues. Hear one sentence, say it from the top; hear the next, say it all from the top again, until you have the whole thing. Click the stairs icon on any of your longer lines. | Monologues, big speeches |
-| **Drill weak lines** | Only the lines you missed last time, each with its cue. | Right before rehearsal |
-
-**Stuck mid-rehearsal?** Say **"line"** (just like calling for a line in a real rehearsal) and it will feed it to you.
-
-### Natural AI voices (optional)
-
-For voices that sound like real actors, open a script, expand **Voices for each character**, and paste an OpenAI key (from <https://platform.openai.com/api-keys>, with a few dollars of credit added under Billing).
-
-- Each character gets a female or male AI voice with an American accent. You can pick a different one, and add a note on how they sound ("warm and elderly", "nervous teenager").
-- Stage directions in a line, like *(angrily)* or *(whispering)*, are acted out.
-- Each line is made once and saved on the device, so replays are free and work offline. **Prepare all lines now** makes the whole script ahead of time.
-- Your script text is sent to OpenAI to make the audio. The key is saved only on that device (enter it on each device). Setting a monthly spending limit in your OpenAI account is a good idea.
-- If OpenAI can't be reached, the app falls back to the device's built-in voices.
-
-### Record real voices
-
-Click the mic icon on any line to record it. Recordings play instead of the computer voice. Record your own lines to hear yourself saying them, or have a castmate record their cues so you practice with the real rhythm.
-
-### Keyboard shortcuts (while practicing)
-
-`Space` play/pause, `Left`/`Right` previous/next line, `H` hint, `L` hear the line, `Enter` "I'm done speaking".
-
-## Formatting a script
-
-Paste the text, or import a **PDF** or `.txt` file (click **Import PDF or .txt**, or drag the file onto the text box). Any of these work:
+**Formatting**, if you're typing or pasting:
 
 ```
 ROMEO: But soft, what light through yonder window breaks?
@@ -77,91 +37,118 @@ NURSE
 Madam! Your mother calls.
 ```
 
-- Stage directions go in `(parentheses)` or `[brackets]`. They're shown but never read as part of a line.
-- A line starting with `#`, or like `Act 1` / `Scene 2`, starts a section. You can choose which section to practice.
-- For an audition monologue, paste it with no names. Each paragraph becomes one of your lines.
+- Stage directions go in `(parentheses)` or `[brackets]`; they show but are never read as your line.
+- A line starting with `#`, or like `Act 1` / `Scene 2`, starts a section you can practice on its own.
+- An audition monologue can be pasted with no names: each paragraph becomes one of your lines.
 
-- **Paper scripts and screenshots:** in the editor, tap **Take photo** for each page (tap it again for the next page) or **Choose photos** to pick many at once, then **Read pages**. Pages are read in order with your OpenAI key, six at a time, with progress shown; if it stops, what's read is kept and the rest stay ready to continue. A progress bar shows how far it's got and roughly how long is left. To correct misread words (like a character's name), open **Find and fix** above the text box: Previous/Next step through matches, **Replace** or **Replace all** (with **Undo**), and **Match case**. Handwriting is ignored (blocking notes, arrows, margin notes, pencil marks); only the printed script is read. Tick **Leave out lines crossed out by hand (cuts)** if crossed-out lines in your copy are cuts. For a long paper script, scanning it with the iPhone Notes app (Scan Documents, then share as PDF) is quickest: import that PDF and its pages are read the same way.
-- **PDFs:** the text is pulled out of the PDF, wrapped lines are rejoined, and page numbers and repeated page headers are removed. Skim the result before saving, since title pages, cast lists or unusual layouts may need a quick tidy. Scanned PDFs (photos of pages with no selectable text) can't be read.
+**Tidying up** after importing:
 
-- **Same character under two names** (like "MRS" and "MRS. PECK")? Under the character list in the editor, **Merge characters** suggests likely duplicates and moves all of one character's lines to another, with **Undo**. On a saved script, tap **Fix or merge character names**.
+- **Find and fix** (above the text box): step through matches, **Replace** one or **Replace all** (with **Undo**).
+- **Merge characters** (under the character list): suggests duplicates like "MRS" and "MRS. PECK" and moves one character's lines to another. On a saved script: **Fix or merge character names**.
+- Unsaved work is never lost: the home screen offers **Continue editing**.
 
-See `sample-script.txt` for a complete example.
+**Categories:** scripts sit under tabs on the home screen: **Current**, **Audition**, **Fun**, **Other**, **Past**, plus your own (**New category…**). Move one with the category menu on its card or page.
 
-## Settings
+## Practicing
 
-Open **Practice settings** under the player to change reading speed, how much of your line is shown as a hint, how strict the scoring is, how long it waits after you stop talking, and more.
+On a script, choose who you're playing (**I'm playing**) and, optionally, a scene (**Start at** / **Stop**). Then:
 
-## Where your stuff is saved
+| Mode | What happens |
+| --- | --- |
+| **Listen** | The scene is read aloud. At your lines it waits for you to say them (it hears you and moves on when you finish), then plays the line so you hear how it goes. Turn on **Loop** and leave it running. |
+| **Listen, screen off** | Makes the scene (pick **From** / **Stop**) into one audio track that keeps playing with your phone locked, with lock-screen and AirPods controls. Tracks are saved on the device under **Saved tracks** to play any time, offline, or **Delete**; **Save as a file** keeps a copy. Uses the AI voices. |
+| **Rehearse** | Your cues are read aloud and the mic listens to you, with a word-by-word check (green right, red missed). Miss it and you hear the line, then try again. |
+| **Build up** | For long speeches and monologues: hear one sentence, say it from the top; add the next, from the top again. Tap the stairs icon on a long line. |
+| **Drill weak lines** | Only the lines you missed last time, each with its cue. |
 
-Scripts, progress and recordings are saved in your browser for `localhost:8765`. They stay there between sessions, but are tied to that browser. Clearing your browser's site data for localhost will remove them, so keep a copy of your script text.
+- **Stuck?** Say **"line"** and it feeds you the line.
+- **Practice settings** (under the player): reading speed, how much of your line shows as a hint, how strict the check is, how long it waits after you stop talking, and more.
+- **Keyboard** (computer): `Space` play/pause, `←` `→` lines, `H` hint, `L` hear the line, `Enter` done speaking.
+- **Record real voices:** tap the mic icon on any line to record it (yours, or a castmate reading cues). Recordings play instead of the computer voice.
 
-## Files
+## Voices
 
-- `index.html`, `styles.css`, `app.js`: the app
-- `serve.ps1`: tiny local web server (PowerShell) used by the library build tools
-- `sample-script.txt`: an example scene
-- `vendor/pdfjs`: Mozilla's PDF.js 3.11.174 (Apache 2.0 license), used to read PDF scripts
+Open **Voices for each character** on a script.
 
-## Free script library
-
-**Browse free scripts & monologues** on the home screen offers 31 classic plays (Shakespeare, Wilde, Ibsen, Chekhov, Shaw, Molière, Rostand and more) and 44 well-known audition monologues, searchable and filterable by gender and tone. Tap **Add** and it's ready to practice. All are public domain; translated plays use older public-domain translations, so check which translation your production or audition uses.
-
-The library lives in `library/`. To rebuild it (for example after adding a play to the list in `tools/build-library.html`), run:
-
-```
-powershell -ExecutionPolicy Bypass -File tools\build-library.ps1
-```
-
-It downloads the source texts from Project Gutenberg into `tools/raw/` (not committed), converts them with `tools/convert.js`, and writes `library/plays/*.txt`, `library/plays.json` and `library/monologues.json`.
+- **Every character** gets a female or male voice matched to their name, with an American accent. Change **Female/Male**, pick a specific voice, or set a **Speed** per character.
+- **Natural AI voices** sound like real actors and act out directions like *(angrily)*. Two ways to get them:
+  - **Shannon's shared voices:** sign in with Google, join one of Shannon's groups, and tick **Use Shannon's shared voices**. No key needed; each person has a monthly share.
+  - **Your own OpenAI key:** create one at <https://platform.openai.com/api-keys> (with a few dollars of credit) and paste it under **Or use your own OpenAI key**. It's saved only on that device.
+- Each AI line is made once and saved on the device, so replays are free and work offline. **Prepare all lines now** makes a whole script ahead of time.
+- **Voice lock (own key):** add a PIN so AI voices, notes, Female/Male, the spending limit and the key can't be changed without it.
+- **Spending limit (own key):** a monthly limit for the device (default $5) with a running estimate. For a hard limit, set a monthly budget in your OpenAI account (Settings > Limits).
+- On iPhone, better built-in voices: Settings > search "Voices" > English > download an **Enhanced** or **Premium** voice.
 
 ## Songs
 
-Tap **+ New song** on the home screen.
+Tap **+ New song**.
 
-1. **The song:** paste a Spotify song link (in Spotify: Share > Copy Song Link). Once Spotify is connected you can search Spotify or pick from your playlists and liked songs instead.
-2. **The lyrics:** they're looked up automatically on LRCLIB (a free lyrics database), or tap **Find lyrics**, paste them, or use **From screenshots**. Timed lyrics highlight along with the music; untimed lyrics can be timed by tapping along (**Time the lyrics**).
+1. **The song:** paste a Spotify song link (Share > Copy Song Link), or **Connect Spotify** to search and pick from your playlists and liked songs.
+2. **The lyrics:** found automatically (LRCLIB, a free lyrics database), or **Find lyrics**, paste them, or photograph them.
+3. **Instrumental:** with Spotify connected, the app looks for instrumental/karaoke versions (or paste a link to one).
 
-**Full songs on iPhone:** Spotify's player inside a web page can only play previews on iPhone (every iPhone browser blocks it from seeing your Spotify login). With Spotify connected (Premium), Sing along offers **Spotify app (full song)**: the song plays in your own Spotify app and the lyrics follow along on the page. If it says Spotify isn't open anywhere, open the Spotify app, play any song for a second, and come back. Songs play on this device's own Spotify app (so through your AirPods if they're connected), never on a speaker just because it was last used; tap **Change device** to pick another, like a speaker or your computer.
+**Sing along** highlights the current line in time with the music, hides words as you learn (**First letters**, **Fill in as I sing**, **Hidden**), jumps to a tapped line, and loops a tricky one (**Repeat this line**). A player bar at the bottom has Play/Pause and previous/next line; scrolling yourself pauses following (tap **Follow along** to pick it back up).
 
-**Instrumental:** with Spotify connected, the app looks for instrumental and karaoke versions when you pick a song (or paste a link to one). Sing along then has an **Original | Instrumental** switch. Each version keeps its own timing: if the highlight is out of step on the instrumental, tap **It's early** / **It's late** to nudge it, or re-time it by tapping along.
+- **Full songs:** the player inside the page plays previews on iPhone. Choose **Spotify app (full song)** (Spotify Premium) to play in your own Spotify app while the lyrics follow along. If Spotify is asleep, tap **Open Spotify** and come straight back. Wrong speaker? **Change device**.
+- **Original | Instrumental** switch; if the highlight is out of step, tap **It's early** / **It's late**, or **Re-time lyrics** by tapping along.
+- Spotify allows 5 people per personal app. Anyone else with Premium can follow **Use your own Spotify app** when connecting.
 
-A **player bar** stays at the bottom of the screen while you sing: Play/Pause, previous and next line, and where you are. Scrolling the lyrics yourself stops the page from jumping to the current line; tap **Follow along** (or wait a few seconds) to pick it back up.
+## Sync and backup
 
-**Sing along** plays the real track in Spotify's player with the current line highlighted. Hide words as you learn (**First letters**, **Fill in as I sing**, **Hidden**), tap a line to jump there, and **Repeat this line** to loop a tricky bit. Spotify decides whether the player plays the full track or a preview, depending on whether you're signed in to Spotify in that browser.
-
-Connecting a Spotify account needs a Spotify developer app: set its Redirect URI to `https://sqnazzal.github.io/line-learner/`, put its Client ID in `SPOTIFY_CLIENT_ID` at the top of `songs.js`, and add anyone else who signs in under User Management. Since February 2026 Spotify only runs personal developer apps like this when the app's owner has Spotify Premium, allows 5 users per app, and only lets apps open playlists you own or collaborate on. Pasting a song link works without any of this.
+- **Sync:** tap **Sign in** at the top and sign in with Google on each device, with the same account. Scripts, songs, categories and progress sync automatically (a few seconds after changes and when you open the app; **Sync > Sync now** for right away). Only you can see your synced scripts. Newest edit wins, progress combines, deletes carry over. Voices, recordings and saved tracks stay on each device.
+- **Advanced:** people who already use GitHub can sync through it instead (Sync > **Advanced: sync with GitHub instead**).
+- **Backup file:** **Download backup** saves everything (not keys or recordings) to a file; **Restore backup** brings it back on any device.
+- Your scripts live in the browser, so clearing the site's data removes them from that device. Sync or a backup file keeps them safe.
 
 ## Groups (cast, friends and family)
 
-Tap **Sign in** at the top (next to Sync) and sign in with Google; it then says **Group**.
+Sign in, then tap **Group**.
 
-- **Create a group** and share its invite code or link. People who open the link and sign in join automatically.
-- Open any script or song and tap **Share to group**: a panel lists all your groups, showing where it's shared, with **Share**, **Update** and **Unshare** for each. Everyone in a group sees shared items under **Shared scripts and songs** and taps **Add to my scripts** to practice them; after an update they get an **Update my copy** button that keeps their progress and character. Only the person who shared an item can update or unshare it (enforced by the security rules, not just the app). Groups can't be deleted, and members can only remove themselves.
-- In more than one group? Switch between them with the tabs at the top of the Group screen.
-- Each person's progress, recordings, voices and personal scripts stay private. Only what you share goes to the group.
-
-Groups use Google Firebase (project `line-learner-45bd1`): Authentication with Google sign-in, and Firestore for groups and shared items. Access is controlled by `firestore.rules`; paste it into **Databases and storage > Firestore > Rules** in the Firebase console and tap **Publish** whenever it changes. Sign-in only works from domains listed under **Security > Authentication > Settings > Authorized domains** (add `sqnazzal.github.io`).
-
-## Your scripts and categories
-
-The home screen lists your scripts under category tabs: **Current**, **Audition**, **Fun**, **Other** and **Past**, plus any you create (like a show's name) with **New category…**. Move a script with the small category menu on its card or on its page. New scripts go into the tab you're looking at.
-
-## Listen, screen off
-
-**Listen, screen off** on a script builds the part you pick with **From** / **Stop** into one audio file that keeps playing when your phone locks, with lock-screen controls, scene jumps and **Save as a file**. Finished tracks are saved on the device, listed under **Saved tracks** to play any time (even offline), and each has **Delete**. It uses the AI voices (and your recordings), following the Listen settings for your own lines. Listen mode itself now hears you say your line and moves on when you finish (Practice settings: **move on as soon as I finish my line**).
-
-## Backup, voice lock and your own Spotify
-
-- **Sync and backup** screen: **Download backup** saves all scripts, progress and settings to a file; **Restore backup** brings them back on any device.
-- **Voice lock:** add a PIN when saving the OpenAI key (or later, under Voices for each character). AI voices, notes, Female/Male and removing the key then need the PIN, so paid-for audio isn't re-made.
-- **Spending limit:** under Voices for each character, set a monthly limit for this device (default $5). The app keeps a rough estimate of OpenAI use; when it reaches the limit, new AI audio and page reading pause until next month, while everything already made still plays. For a hard limit, set a monthly budget in your OpenAI account (Settings > Limits).
-- **Your own Spotify app:** Spotify limits each personal app to 5 people. Others with Premium can make a free Spotify app and paste its Client ID under **Use your own Spotify app** when connecting.
+- **Create a group** and share its invite code or link; people who open the link and sign in join automatically. In several groups? Switch with the tabs.
+- On any script or song, **Share to group** shows all your groups with **Share**, **Update** and **Unshare** for each. Others tap **Add to my scripts**, and later **Update my copy** (keeping their progress and character).
+- Only the person who shared something can update or unshare it. Groups can't be deleted, and members can only remove themselves.
+- Each person's progress, recordings, voices and personal scripts stay private.
 
 ## Tip jar
 
-A Venmo tip link (https://venmo.com/u/shannonnazzal) is in the footer, on the Help screen and on the AI voices panel, to help cover the voices.
+Line Learner is free. The AI voices cost a little to run, so a tip is welcome: <https://venmo.com/u/shannonnazzal> (also in the footer and Help).
 
-## Help
+---
 
-**Help & troubleshooting** (on the home screen and at the bottom of every page) has setup steps and fixes for each kind of device, with tabs for iPhone & iPad, Android and computers. It opens on the tab for the device you're using.
+## For Shannon: setup and upkeep
+
+The app is a static site on GitHub Pages (this repository), with these outside services:
+
+| Service | What for | Where to manage it |
+| --- | --- | --- |
+| **Google Firebase** (project `line-learner-45bd1`) | Google sign-in, groups, shared items, Google sync | console.firebase.google.com: **Security > Authentication** (Google enabled; `sqnazzal.github.io` under Authorized domains), **Databases and storage > Firestore > Rules** |
+| **Cloudflare Worker** (`line-learner-voices`) | Shared voices: holds the OpenAI key for group members | See `server/README.md` |
+| **OpenAI** | AI voices and reading pages | platform.openai.com: keep a **monthly budget** on the shared project (Settings > Limits) |
+| **Spotify developer app** | Connecting Spotify (Client ID in `songs.js`) | developer.spotify.com/dashboard: **User Management** (up to 5 people; owner needs Premium) |
+| **GitHub** | Hosting, and the optional GitHub sync | This repository; Pages builds from `main` |
+
+- **Security rules:** `firestore.rules` is the source of truth. After changing it, paste it into Firestore > Rules and **Publish**.
+- **Shared voices server:** code in `server/voices-worker.js`; settings, allowances and how it decides in `server/README.md`.
+- **Free script library:** lives in `library/`. To rebuild it (for example after adding a play to `tools/build-library.html`), run `powershell -ExecutionPolicy Bypass -File tools\build-library.ps1`. It downloads the Project Gutenberg texts into `tools/raw/` (not committed), converts them with `tools/convert.js`, and writes `library/plays/*.txt`, `library/plays.json` and `library/monologues.json`.
+- **Publishing a change:** push to `main`; GitHub Pages rebuilds in about a minute. Bump the `?v=` numbers in `index.html` so phones load the new files (the app also checks for updates and reloads itself on safe screens).
+
+### Files
+
+| File | What it is |
+| --- | --- |
+| `index.html`, `styles.css` | The page and its look (light and dark) |
+| `app.js` | Scripts, practice modes, voices, AI, editor, import, sync, backup, categories |
+| `track.js` | Listen, screen off (building and saving audio tracks) |
+| `songs.js` | Songs: lyrics, Spotify, Sing along |
+| `groups.js` | Google sign-in, groups, sharing, Google sync |
+| `help.js` | The Help & troubleshooting screen |
+| `firestore.rules` | Firebase security rules |
+| `server/` | The shared voices Cloudflare Worker and its setup guide |
+| `library/`, `tools/` | The free script library and the tools that build it |
+| `vendor/pdfjs` | Mozilla's PDF.js 3.11.174 (Apache 2.0), for reading PDFs |
+| `sample-script.txt` | An example scene |
+| `serve.ps1` | A tiny local web server used by the library build tools |
+
+---
+
+Built by Shannon Nazzal © 2026, an actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Not for commercial use.
