@@ -82,6 +82,8 @@ Madam! Your mother calls.
 - **Paper scripts and screenshots:** in the editor, tap **Take photo** for each page (tap it again for the next page) or **Choose photos** to pick many at once, then **Read pages**. Pages are read in order with your OpenAI key, six at a time, with progress shown; if it stops, what's read is kept and the rest stay ready to continue. A progress bar shows how far it's got and roughly how long is left. To correct misread words (like a character's name), open **Find and fix** above the text box: Previous/Next step through matches, **Replace** or **Replace all** (with **Undo**), and **Match case**. Handwriting is ignored (blocking notes, arrows, margin notes, pencil marks); only the printed script is read. Tick **Leave out lines crossed out by hand (cuts)** if crossed-out lines in your copy are cuts. For a long paper script, scanning it with the iPhone Notes app (Scan Documents, then share as PDF) is quickest: import that PDF and its pages are read the same way.
 - **PDFs:** the text is pulled out of the PDF, wrapped lines are rejoined, and page numbers and repeated page headers are removed. Skim the result before saving, since title pages, cast lists or unusual layouts may need a quick tidy. Scanned PDFs (photos of pages with no selectable text) can't be read.
 
+- **Same character under two names** (like "MRS" and "MRS. PECK")? Under the character list in the editor, **Merge characters** suggests likely duplicates and moves all of one character's lines to another, with **Undo**. On a saved script, tap **Fix or merge character names**.
+
 See `sample-script.txt` for a complete example.
 
 ## Settings

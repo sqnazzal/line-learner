@@ -330,6 +330,12 @@ button, .btn { touch-action: manipulation; }
 .thumb figcaption { position: absolute; left: 4px; bottom: 4px; font: 600 .7rem var(--font-ui); background: var(--surface); color: var(--ink); border-radius: 4px; padding: 0 4px; }
 .thumb-x { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer; line-height: 1; }
 
+.site-footer {
+  text-align: center; color: var(--muted); font-size: .8rem;
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+body[data-view="sing"] .site-footer { padding-bottom: 130px; } /* clear of the player bar */
+
 /* Groups */
 .group-name { font-size: 1.15rem; }
 .code { font-family: ui-monospace, Consolas, monospace; letter-spacing: .12em; font-size: 1.05rem; }

@@ -927,6 +927,7 @@ JULIET: Ay me!</pre>
     ${findBarHtml()}
     <label class="field"><span>Script</span><textarea id="ed-raw" rows="16" spellcheck="false" placeholder="Paste your scene or monologue here">${esc(e.raw)}</textarea></label>
     <p id="ed-preview" class="muted"></p>
+    <div id="merge-box"></div>
     <div class="row wrap">
       <span class="spacer"></span>
       <button class="btn ghost" data-action="cancel-edit">Cancel</button>
@@ -950,7 +951,71 @@ function updatePreview() {
   const n = lines.filter(l => l.type === 'line').length;
   const chars = [...characters({ lines })].map(([c, k]) => `${esc(titleCase(c))} (${k})`).join(', ');
   el.innerHTML = n ? `Found <b>${n}</b> speeches. Characters: ${chars}` : 'No lines found yet. See the format tips above.';
+  updateMergeBox(lines);
 }
+
+// ---------- Merging characters (e.g. "MRS" and "MRS. PECK" are the same person) ----------
+const merger = { sig: '', undo: null };
+
+// Writes parsed lines back as plain text in the app's own format, so a merge can rewrite who says what.
+function scriptToText(lines) {
+  return lines.map(l => (l.type === 'section' ? `# ${l.text}` : l.type === 'direction' ? `(${l.text})` : `${l.speaker}: ${l.text}`)).join('\n\n') + '\n';
+}
+
+const nameKey = n => n.replace(/\([^)]*\)/g, '').replace(/[^\p{L}\p{N}]+/gu, '').toLowerCase();
+
+function editDistance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  }
+  return d[a.length][b.length];
+}
+
+// Pairs that are probably the same character: one name starts the other ("MRS" / "MRS. PECK"), the same
+// name with extras ("HAMLET (CONT'D)"), or a near-misspelling ("HAMLLET"). The rarer one merges into the commoner.
+function mergeSuggestions(chars) {
+  const out = [];
+  for (const [a, na] of chars) {
+    for (const [b, nb] of chars) {
+      if (a === b || na > nb || (na === nb && a > b)) continue;
+      const ka = nameKey(a), kb = nameKey(b);
+      if (!ka || !kb) continue;
+      const alike = ka === kb || kb.startsWith(ka) || ka.startsWith(kb)
+        || (Math.min(ka.length, kb.length) >= 4 && editDistance(ka, kb) <= (Math.min(ka.length, kb.length) >= 7 ? 2 : 1));
+      if (alike) out.push({ from: a, to: b, nFrom: na, nTo: nb });
+    }
+  }
+  return out.slice(0, 6);
+}
+
+function updateMergeBox(lines) {
+  const box = $('#merge-box');
+  if (!box) return;
+  const chars = [...characters({ lines })];
+  const sig = chars.map(c => c.join('=')).join('|');
+  if (sig === merger.sig) return; // only redraw when the cast changes, so choices aren't reset while typing
+  merger.sig = sig;
+  if (chars.length < 2) { box.innerHTML = merger.undo != null ? undoMergeHtml() : ''; return; }
+  const opts = sel => chars.map(([c, n]) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(titleCase(c))} (${n})</option>`).join('');
+  const sugg = mergeSuggestions(chars);
+  box.innerHTML = `<details class="card merge"${app.mergeOpen || sugg.length ? ' open' : ''}>
+    <summary>Merge characters${sugg.length ? ` <span class="muted small">· ${sugg.length} possible ${sugg.length === 1 ? 'duplicate' : 'duplicates'}</span>` : ''}</summary>
+    <div class="stack-sm">
+      ${sugg.length ? `<p class="small">These look like the same person:</p><ul class="share-list">${sugg.map(s => `<li class="share-row">
+          <span>${esc(titleCase(s.from))} (${s.nFrom}) <span class="muted">into</span> <b>${esc(titleCase(s.to))}</b> (${s.nTo})</span>
+          <button class="btn" data-action="merge-chars" data-from="${esc(s.from)}" data-to="${esc(s.to)}">Merge</button></li>`).join('')}</ul>` : ''}
+      <p class="small">Or move every line from one character to another:</p>
+      <div class="row wrap"><select id="merge-from" aria-label="Move lines from">${opts(sugg[0]?.from || chars[chars.length - 1][0])}</select>
+        <span class="muted small">to</span>
+        <select id="merge-to" aria-label="Move lines to">${opts(sugg[0]?.to || chars[0][0])}</select>
+        <button class="btn" data-action="merge-chars">Move lines</button></div>
+      ${merger.undo != null ? undoMergeHtml() : ''}
+    </div></details>`;
+}
+
+const undoMergeHtml = () => '<div><button class="btn ghost" data-action="merge-undo">Undo merge</button></div>';
 
 // ---------- Importing files ----------
 let pdfjsPromise;
@@ -1495,6 +1560,7 @@ function renderScript() {
         <option value="">Choose a character…</option>
         ${chars.map(([c, n]) => `<option value="${esc(c)}" ${c === s.myChar ? 'selected' : ''}>${esc(titleCase(c))} (${n} ${n === 1 ? 'line' : 'lines'})</option>`).join('')}
       </select></label>
+      ${s.kind !== 'song' && chars.length > 1 ? '<div><button class="link-btn small" data-action="fix-names">Fix or merge character names</button></div>' : ''}
       ${rangeHtml}
       ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${solid} of ${mine.length} lines solid</span></div>` : ''}
     </div>
@@ -1991,6 +2057,34 @@ const actions = {
       toast("Couldn't download that play. Check your connection and try again.");
     }
   },
+  'merge-chars'(b) {
+    const from = b.dataset.from || $('#merge-from').value, to = b.dataset.to || $('#merge-to').value;
+    if (!from || !to || from === to) { toast('Pick two different characters.'); return; }
+    const box = $('#ed-raw');
+    const lines = parseScript(box.value);
+    const moved = lines.filter(l => l.type === 'line' && l.speaker === from).length;
+    merger.undo = box.value;
+    for (const l of lines) if (l.type === 'line' && l.speaker === from) l.speaker = to;
+    box.value = scriptToText(lines);
+    merger.sig = '';
+    textChanged();
+    toast(`Moved ${moved} ${moved === 1 ? 'line' : 'lines'} from ${titleCase(from)} to ${titleCase(to)}.`);
+  },
+  'merge-undo'() {
+    if (merger.undo == null) return;
+    $('#ed-raw').value = merger.undo;
+    merger.undo = null;
+    merger.sig = '';
+    textChanged();
+    toast('Merge undone.');
+  },
+  'fix-names'() {
+    actions['edit-script']();
+    app.mergeOpen = true;
+    merger.sig = '';
+    updatePreview();
+    $('#merge-box')?.scrollIntoView({ block: 'start' });
+  },
   'find-next'() { showMatch(1); },
   'find-prev'() { showMatch(-1); },
   'find-replace'() {
@@ -2270,6 +2364,7 @@ document.addEventListener('input', e => {
 document.addEventListener('toggle', e => {
   if (e.target.id === 'voices') app.voicesOpen = e.target.open;
   if (e.target.id === 'find-box') { app.findOpen = e.target.open; if (e.target.open) $('#find-q')?.focus(); }
+  if (e.target.classList?.contains('merge')) app.mergeOpen = e.target.open;
 }, true);
 
 // Find and fix: Enter jumps to the next match; Match case recounts.
@@ -2571,7 +2666,8 @@ const VIEWS = { library: renderLibrary, edit: renderEdit, script: renderScript, 
 function render() {
   $('#app').innerHTML = VIEWS[app.view]();
   if (app.view === 'player') refreshPlayer();
-  if (app.view === 'edit') updatePreview();
+  if (app.view === 'edit') { merger.sig = ''; updatePreview(); }
+  document.body.dataset.view = app.view;
   if (app.view === 'sing') mountSing();
   $('#crumb').textContent = ['script', 'player', 'sing'].includes(app.view) ? current()?.title ?? '' : '';
 }
