@@ -83,6 +83,9 @@ applyTextSize();
 // Where you stopped in each script's Listen or Rehearse run, so a long scene can pick up from there.
 const LS_RESUME = 'lineLearner.resume';
 const resumeAt = loadJSON(LS_RESUME, {});
+// Your last run (script, mode, cues only), for the "Continue" shortcut on the home screen.
+const LS_LAST = 'lineLearner.lastRun';
+let lastRun = loadJSON(LS_LAST, null);
 
 // Recordings live in IndexedDB, keyed by a hash of speaker + line text so they survive script edits.
 // AI-generated line audio is cached there too ('tts'), so each line is only paid for once.
@@ -946,6 +949,7 @@ const lostMic = code => ['not-allowed', 'service-not-allowed', 'audio-capture'].
 function carryOnWithoutMic(code) {
   noMic = true;
   P.note = `${code === 'audio-capture' ? 'No microphone found.' : 'The microphone is blocked.'} ${NO_MIC_FALLBACK[P.mode === 'listen' ? 'listen' : 'rehearse']}`;
+  if (app.view === 'player') render(); // the mode label and settings show it's off for now
 }
 
 function micError(code) {
@@ -1033,6 +1037,32 @@ function rangeBounds(s) {
   const end = clamp(s.rangeEnd ?? s.lines.length, start + 1, s.lines.length);
   return [start, end];
 }
+// When a script's text changes (an edit, or the group's updated copy), keeps your place: Start at / Stop and
+// Pick up where you left off follow the same lines, matched by who says them and the words, not by position.
+// Progress needs nothing: it's kept per line by speaker and words, so unchanged lines keep theirs and changed
+// lines start fresh.
+function keepPlace(s, oldLines) {
+  const placeKey = l => `${l.type}|${l.speaker || ''}|${spokenText(l.text)}`;
+  const follow = i => {
+    const l = oldLines[i];
+    if (!l) return -1;
+    const k = placeKey(l), nth = oldLines.slice(0, i).filter(x => placeKey(x) === k).length;
+    const hits = s.lines.map((x, j) => (placeKey(x) === k ? j : -1)).filter(j => j >= 0);
+    return hits.length ? hits[Math.min(nth, hits.length - 1)] : -1;
+  };
+  if (s.rangeStart) { const j = follow(s.rangeStart); if (j > 0) s.rangeStart = j; else delete s.rangeStart; }
+  if (s.rangeEnd != null) {
+    const j = s.rangeEnd >= oldLines.length ? -1 : follow(s.rangeEnd);
+    if (j > (s.rangeStart || 0)) s.rangeEnd = j; else delete s.rangeEnd;
+  }
+  const r = resumeAt[s.id];
+  if (r) {
+    const j = follow(r.line);
+    if (j >= 0) r.line = j; else delete resumeAt[s.id];
+    saveJSON(LS_RESUME, resumeAt);
+  }
+}
+
 const span = (a, b) => Array.from({ length: Math.max(0, b - a) }, (_, k) => a + k);
 const rangeOrder = s => span(...rangeBounds(s));
 
@@ -1171,6 +1201,22 @@ function accountLineHtml() {
   return `<p class="muted small account-line">Signing in is optional. Everything works on this device without it. <button class="link-btn" data-action="group">Sign in with Google</button> to keep your scripts in sync across your devices and to share with a cast or group.</p>`;
 }
 
+// "Continue Hamlet as Horatio · Act 1, Scene 2 · Rehearse": straight back into your last run, same mode,
+// section and Just my cues setting, from where you stopped if it was a long scene.
+function continueHtml() {
+  const s = lastRun && scripts.find(x => x.id === lastRun.id);
+  if (!s || s.kind === 'song' || (lastRun.mode !== 'listen' && !s.myChar)) return '';
+  const r = resumeAt[s.id]?.mode === lastRun.mode ? resumeAt[s.id] : null;
+  const at = r ? r.line : rangeBounds(s)[0];
+  let section = '';
+  for (let i = at; i >= 0; i--) if (s.lines[i]?.type === 'section') { section = s.lines[i].text; break; }
+  const bits = [s.myChar && `as ${titleCase(s.myChar)}`, section, { listen: 'Listen', rehearse: 'Rehearse', type: 'Type' }[lastRun.mode] + (lastRun.cuesOnly ? ', cues only' : ''), r && `line ${r.pos} of ${r.total}`].filter(Boolean);
+  return `<div class="card resume-card">
+    <span><b>Continue ${esc(s.title)}</b> <span class="muted">${esc(bits.join(' · '))}</span></span>
+    <button class="btn primary" data-action="continue-last">${icon('play')} Continue</button>
+  </div>`;
+}
+
 function renderLibrary() {
   const has = scripts.length > 0;
   return `<section class="stack">
@@ -1185,6 +1231,7 @@ function renderLibrary() {
       </div>
       ${accountLineHtml()}
     </div>
+    ${continueHtml()}
     ${supportNote()}
     ${(() => {
       const d = pendingDraft();
@@ -1673,12 +1720,20 @@ function addPages(files, sortByTime) {
 // Kept for any caller that hands over images directly.
 const importScreenshots = files => addPages(files, true);
 
+// Who pays for reading photos and scanned pages: Shannon's shared access (it covers reading pages as well as
+// voices) or your own OpenAI key.
+function readingAccessNote() {
+  if (ai.key) return 'Uses your OpenAI key.';
+  if (usingShared()) return "Uses Shannon's shared access (it covers reading pages, not just voices), from your monthly share.";
+  return "Needs one of these, both under <b>Voices for each character</b> on any script: in one of Shannon's groups, sign in and turn on <b>Use Shannon's shared voices</b> (that covers reading pages too, no key needed); or add your own OpenAI key.";
+}
+
 function trayHtml() {
   const n = tray.pages.length, song = app.editing?.kind === 'song';
   const shown = tray.pages.slice(0, 48);
   return `<div class="card stack-sm tray" id="tray">
     <b>${song ? 'Lyrics from photos or screenshots' : 'Script from photos or screenshots'}${n ? ` <span class="muted small">· ${n} ${n === 1 ? 'page' : 'pages'} ready</span>` : ''}</b>
-    <p class="muted small">Take a photo of each page (tap Take photo again for the next one), or choose screenshots. They're read in order and added to the end of the text. Uses your OpenAI key.</p>
+    <p class="muted small">Take a photo of each page (tap Take photo again for the next one), or choose screenshots. They're read in order and added to the end of the text. ${readingAccessNote()}</p>
     <div class="row wrap">
       <label class="btn">Take photo<input type="file" id="ed-cam" accept="image/*" capture="environment" hidden></label>
       <label class="btn">Choose photos<input type="file" id="ed-shots" accept="image/*" multiple hidden></label>
@@ -2031,7 +2086,7 @@ function renderPlayer() {
     <p id="sr-status" class="sr-only" aria-live="polite"></p>
     <div class="row between">
       <button class="btn ghost" data-action="back">${icon('back')} Script</button>
-      <span class="mode-tag">${label}${s.myChar ? ` · as ${esc(titleCase(s.myChar))}` : ''}${P.drill ? ' · weak lines' : P.cuesOnly ? ' · cues only' : ''}</span>
+      <span class="mode-tag">${label}${s.myChar ? ` · as ${esc(titleCase(s.myChar))}` : ''}${P.drill ? ' · weak lines' : P.cuesOnly ? ' · cues only' : ''}${noMic && P.mode !== 'type' ? ` · ${P.mode === 'listen' ? 'timed pauses, ' : ''}no microphone` : ''}</span>
     </div>
     <div id="stage" class="stage"></div>
     <div id="controls" class="controls"></div>
@@ -2185,7 +2240,9 @@ function settingsHtml() {
     m === 'type' && `<label><span>Cues</span>${sel('typeCues', [['show', 'Show them on screen (silent)'], ['speak', 'Read them aloud (headphones)']])}</label>`,
     m === 'rehearse' && `<label><span>Cue before your line</span>${sel('cueLength', [['full', 'Read the whole line'], ['last', 'Last sentence only']])}</label>`,
     m === 'listen' && `<label class="check">${chk('loop')}<span>Loop the scene</span></label>`,
-    m === 'listen' && SR && `<label class="check">${chk('listenHears')}<span>Move on as soon as I finish my line (uses the microphone)</span></label>`,
+    m === 'listen' && SR && (noMic
+      ? '<label class="check"><input type="checkbox" disabled><span>Move on as soon as I finish my line: <b>off for now, microphone unavailable</b> (timed pauses instead)</span></label>'
+      : `<label class="check">${chk('listenHears')}<span>Move on as soon as I finish my line (uses the microphone)</span></label>`),
   ];
   const advanced = [
     checked && `<label><span>Score needed to pass</span>${rng('passScore', 50, 100, 5)}</label>`,
@@ -2257,6 +2314,7 @@ async function startPlayer(mode, order, from = 0, drill = false) {
   leave();
   P = newPlayer(mode, order);
   Object.assign(P, { drill, cuesOnly });
+  if (!drill && !s.sample) saveJSON(LS_LAST, lastRun = { id: s.id, mode, cuesOnly, at: Date.now() });
   app.view = 'player';
   render();
   headphoneControls();
@@ -2722,9 +2780,9 @@ const actions = {
     if (!lines.some(l => l.type === 'line')) { toast("I couldn't find any lines yet. Check the format tips."); return; }
     let s = app.editing.id && scripts.find(x => x.id === app.editing.id);
     if (s) {
+      const oldLines = s.lines;
       Object.assign(s, { title: title || s.title, raw, lines, updated: Date.now() });
-      delete s.rangeStart;
-      delete s.rangeEnd;
+      keepPlace(s, oldLines);
     } else {
       s = makeScript(title, raw);
       scripts.push(s);
@@ -2740,6 +2798,13 @@ const actions = {
   type() { startPlayer('type'); },
   weak() { startPlayer(app.view === 'player' && P.mode === 'type' ? 'type' : 'rehearse', weakOrder(current()), 0, true); },
   'type-check'() { P.choose?.({ text: P.typed = $('#typed')?.value ?? P.typed ?? '' }); },
+  'continue-last'() {
+    const { id, mode, cuesOnly } = lastRun;
+    openScript(id);
+    app.cuesOnly = !!cuesOnly;
+    if (resumeAt[id]?.mode === mode) actions['resume-run']();
+    else startPlayer(mode);
+  },
   'resume-run'() {
     const r = resumeAt[current().id], order = playOrder(current());
     startPlayer(r.mode, order, Math.max(0, order.indexOf(r.line)));

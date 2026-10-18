@@ -39,7 +39,7 @@ const HELP = {
     ['Importing a script', `<ul>
       <li><b>PDF:</b> New script &gt; <b>Import PDF or .txt</b>.</li>
       <li><b>Paper script:</b> in the <b>Notes</b> app, tap the camera icon &gt; <b>Scan Documents</b>, save, then <b>Share</b> &gt; <b>Save to Files</b> as a PDF. Import that PDF and tap <b>Read pages</b>.</li>
-      <li><b>A few pages or screenshots:</b> use <b>Take photo</b> (again for each page) or <b>Choose photos</b>, then <b>Read pages</b>. Uses your OpenAI key.</li>
+      <li><b>A few pages or screenshots:</b> use <b>Take photo</b> (again for each page) or <b>Choose photos</b>, then <b>Read pages</b>. Reading pages uses Shannon's shared access (sign in, in one of Shannon's groups, with shared voices on) or your own OpenAI key.</li>
       <li>Afterwards, check the character list and use <b>Find and fix</b> (in Edit) to tidy text and character names.</li></ul>`],
   ],
   android: [
@@ -66,7 +66,7 @@ const HELP = {
     ['Importing a script', `<ul>
       <li><b>PDF:</b> New script &gt; <b>Import PDF or .txt</b>.</li>
       <li><b>Paper script:</b> in the <b>Google Drive</b> app, tap <b>+</b> &gt; <b>Scan</b> to make a PDF, then import it and tap <b>Read pages</b>.</li>
-      <li><b>A few pages or screenshots:</b> use <b>Take photo</b> or <b>Choose photos</b>, then <b>Read pages</b>. Uses your OpenAI key.</li>
+      <li><b>A few pages or screenshots:</b> use <b>Take photo</b> or <b>Choose photos</b>, then <b>Read pages</b>. Reading pages uses Shannon's shared access (sign in, in one of Shannon's groups, with shared voices on) or your own OpenAI key.</li>
       <li>Afterwards, use <b>Find and fix</b> (in Edit) to tidy text and character names.</li></ul>`],
   ],
   computer: [
@@ -91,7 +91,7 @@ const HELP = {
       <li>"Not allowed" when connecting? Line Learner's own Spotify connection is only for Shannon's Nazzal only group (signed in); anyone else with Premium can use <b>Use your own Spotify app</b>.</li></ul>`],
     ['Importing a script', `<ul>
       <li><b>PDF or .txt:</b> New script &gt; <b>Import PDF or .txt</b>, or drag the file onto the text box.</li>
-      <li><b>Scanned PDF or screenshots:</b> they go into the pages list; tap <b>Read pages</b> (uses your OpenAI key).</li>
+      <li><b>Scanned PDF or screenshots:</b> they go into the pages list; tap <b>Read pages</b> (uses Shannon's shared access if you're in one of Shannon's groups, or your own OpenAI key).</li>
       <li>Afterwards, use <b>Find and fix</b> (in Edit) to tidy text and character names.</li></ul>`],
   ],
 };
