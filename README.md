@@ -158,4 +158,4 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 
 Built by Shannon Nazzal · © 2026
 
-An actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Not for commercial use.
+An actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Free for every actor. Please don't sell it, charge for it, or otherwise make money off it.
