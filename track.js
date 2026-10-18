@@ -127,6 +127,7 @@ function renderTrack() {
         <label class="field inline"><span>Stop</span><select id="track-to">${toOpts}</select></label></div>` : ''}
       ${s.myChar ? `<label class="check-row"><input type="checkbox" id="track-cues" ${track.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines</b> (skip the rest of the scene)</span></label>` : ''}
       <p class="small">“${esc(trackName(s, part))}”: ${lines} lines. Other characters in their voices; for your lines, ${myLinesText} (change this in Listen's Practice settings).</p>
+      ${aiRightsNote('New lines in the track')}
       ${track.error ? `<p class="note small">${esc(track.error)}</p>` : ''}
       ${already ? `<p class="small">This part is already saved. <button class="link-btn" data-action="track-play" data-id="${esc(already.id)}">Play it</button></p>` : ''}
       <div><button class="btn ${already ? '' : 'primary'}" data-action="track-make">${already ? 'Make it again' : 'Make the track'}</button></div>

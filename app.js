@@ -1734,6 +1734,9 @@ const importScreenshots = files => addPages(files, true);
 
 // Who pays for reading photos and scanned pages: Shannon's shared access (it covers reading pages as well as
 // voices) or your own OpenAI key.
+// Some show licenses don't allow putting the script into AI tools, so remind people where text goes to OpenAI.
+const aiRightsNote = what => `<p class="muted small ai-rights"><b>Licensed show?</b> ${what} go to OpenAI, an AI service. Some show licenses don't allow putting scripts or lyrics into AI tools, so check yours (or ask the publisher) first.</p>`;
+
 function readingAccessNote() {
   if (ai.key) return 'Uses your OpenAI key.';
   if (usingShared()) return "Uses Shannon's shared access (it covers reading pages, not just voices), from your monthly share.";
@@ -1746,6 +1749,7 @@ function trayHtml() {
   return `<div class="card stack-sm tray" id="tray">
     <b>${song ? 'Lyrics from photos or screenshots' : 'Script from photos or screenshots'}${n ? ` <span class="muted small">· ${n} ${n === 1 ? 'page' : 'pages'} ready</span>` : ''}</b>
     <p class="muted small">Take a photo of each page (tap Take photo again for the next one), or choose screenshots. They're read in order and added to the end of the text. ${readingAccessNote()}</p>
+    ${aiRightsNote(song ? 'The photos' : 'The page photos')}
     <div class="row wrap">
       <label class="btn">Take photo<input type="file" id="ed-cam" accept="image/*" capture="environment" hidden></label>
       <label class="btn">Choose photos<input type="file" id="ed-shots" accept="image/*" multiple hidden></label>
@@ -2022,6 +2026,7 @@ function renderScript() {
     <details id="voices" class="card" ${app.voicesOpen ? 'open' : ''}>
       <summary>Voices for each character</summary>
       ${aiPanelHtml()}
+      ${aiRightsNote('With AI voices, the lines being voiced')}
       <p class="muted small">Want a real voice instead? The record button on any line records it on this device (recordings are never uploaded or shared). Recording a friend or castmate? Ask them first.</p>
       ${voices.length || aiReady() ? chars.map(([c]) => {
         const { gender, voice: auto } = cast.get(c);

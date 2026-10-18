@@ -491,3 +491,5 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 .about-links li + li { margin-top: .4rem; }
 .update-list { margin: 0; padding-left: 1.2rem; }
 .update-list li + li { margin-top: .5rem; }
+.ai-rights { margin: .75rem 0; }
+.stack-sm > .ai-rights, .stack > .ai-rights { margin: 0; }
