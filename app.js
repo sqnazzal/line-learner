@@ -2410,8 +2410,19 @@ const readMs = text => Math.max(1500, words(text).length * 300 / settings.rate +
 // Quiet Type mode: leaves text on screen long enough to read, or until Continue / Try again is tapped.
 async function waitRead(ms, token) {
   refreshPlayer();
-  await new Promise(resolve => { P.choose = resolve; setTimeout(resolve, ms); token.onCancel(resolve); });
-  P.choose = null;
+  await waitChoice(token, ms);
+}
+
+// Waits for a tap that answers P.choose (Check, Got it, Continue…), the run being cancelled ('cancel'), or ms.
+// Only clears P.choose if it's still this wait's: skipping starts the next line's wait straight away, before
+// this one finishes, and clearing that one would leave its buttons doing nothing.
+function waitChoice(token, ms = 0) {
+  return new Promise(resolve => {
+    const done = v => { if (P.choose === done) P.choose = null; resolve(v); };
+    P.choose = done;
+    if (ms) setTimeout(() => done(undefined), ms);
+    token.onCancel(() => done('cancel'));
+  });
 }
 
 // Feeds you the line: read aloud, or in quiet Type mode shown in full for a moment.
@@ -2448,8 +2459,7 @@ async function attempt(expected, token) {
     P.status = 'typing';
     P.typed = '';
     refreshPlayer();
-    const typed = await new Promise(resolve => { P.choose = resolve; token.onCancel(() => resolve('cancel')); });
-    P.choose = null;
+    const typed = await waitChoice(token);
     if (typeof typed === 'string') return { reason: typed }; // 'cancel' or 'prompt' (Show me)
     if (!typed.text.trim()) return { reason: 'prompt' };
     P.result = compare(expected, typed.text);
@@ -2458,8 +2468,7 @@ async function attempt(expected, token) {
   if (!micOn()) {
     P.status = 'self';
     refreshPlayer();
-    const choice = await new Promise(resolve => { P.choose = resolve; token.onCancel(() => resolve('cancel')); });
-    P.choose = null;
+    const choice = await waitChoice(token);
     if (choice === 'got') return { score: 100 };
     if (choice === 'miss') return { score: 0 };
     return { reason: choice === 'hear' ? 'prompt' : 'cancel' };
@@ -2592,8 +2601,14 @@ function jump(delta) {
     if (wasRunning) return runBuildUp(P.bu.k);
   } else {
     const s = current();
+    // Lands on a line that's actually played or waits for you: not a heading or stage direction, and in quiet
+    // Type mode not the cue just before your line (that cue shows on your line's card and is passed straight by).
+    const passedBy = q => {
+      const l = s.lines[P.order[q]], next = s.lines[P.order[q + 1]];
+      return l.type !== 'line' || (quiet() && !isMine(s, l) && !!next && isMine(s, next));
+    };
     let p = P.orderPos;
-    do { p += delta; } while (p > 0 && p < P.order.length - 1 && s.lines[P.order[p]].type !== 'line');
+    do { p += delta; } while (p > 0 && p < P.order.length - 1 && passedBy(p));
     P.orderPos = clamp(p, 0, P.order.length - 1);
     if (wasRunning) return run(P.orderPos);
   }
