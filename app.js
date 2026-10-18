@@ -1163,7 +1163,6 @@ function renderEdit() {
   return `<section class="stack">
     <h1>${e.id ? 'Edit script' : 'New script'}</h1>
     <label class="field"><span>Title</span><input id="ed-title" value="${esc(e.title)}" placeholder="e.g. Romeo and Juliet, balcony scene"></label>
-    ${e.id ? '<div id="merge-box"></div>' : ''}
     <details class="help card">
       <summary>How should I format it?</summary>
       <p>Put each speech on its own line, starting with the character's name:</p>
@@ -1181,10 +1180,9 @@ JULIET: Ay me!</pre>
     </details>
     <div class="row wrap"><label class="btn">Import PDF or .txt<input type="file" id="ed-file" accept=".pdf,.txt,application/pdf,text/plain" hidden></label></div>
     ${trayHtml()}
-    ${findBarHtml()}
+    ${findBarHtml(true)}
     <label class="field"><span>Script</span><textarea id="ed-raw" rows="16" spellcheck="false" placeholder="Paste your scene or monologue here">${esc(e.raw)}</textarea></label>
     <p id="ed-preview" class="muted"></p>
-    ${e.id ? '' : '<div id="merge-box"></div>'}
     <div class="row wrap">
       <span class="spacer"></span>
       <button class="btn ghost" data-action="cancel-edit">Cancel</button>
@@ -1254,22 +1252,24 @@ function updateMergeBox(lines) {
   const sig = chars.map(c => c.join('=')).join('|');
   if (sig === merger.sig) return; // only redraw when the cast changes, so choices aren't reset while typing
   merger.sig = sig;
-  if (chars.length < 2) { box.innerHTML = merger.undo != null ? undoMergeHtml() : ''; return; }
+  const dupes = $('#find-dupes');
+  if (chars.length < 2) { box.innerHTML = merger.undo != null ? undoMergeHtml() : ''; if (dupes) dupes.textContent = ''; return; }
   const opts = sel => chars.map(([c, n]) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(titleCase(c))} (${n})</option>`).join('');
   const sugg = mergeSuggestions(chars);
-  box.innerHTML = `<details class="card merge"${(app.mergeOpen ?? !!app.editing?.id) || sugg.length ? ' open' : ''}>
-    <summary>Fix or merge character names${sugg.length ? ` <span class="muted small">· ${sugg.length} possible ${sugg.length === 1 ? 'duplicate' : 'duplicates'}</span>` : ''}</summary>
+  if (dupes) dupes.textContent = sugg.length ? ` · ${sugg.length} possible duplicate ${sugg.length === 1 ? 'name' : 'names'}` : '';
+  if (sugg.length && !$('#find-box')?.open) { merger.autoOpened = true; $('#find-box')?.setAttribute('open', ''); }
+  box.innerHTML = `<hr class="find-split"><b>Fix or merge character names</b>
     <div class="stack-sm">
       ${sugg.length ? `<p class="small">These look like the same person:</p><ul class="share-list">${sugg.map(s => `<li class="share-row">
           <span>${esc(titleCase(s.from))} (${s.nFrom}) <span class="muted">into</span> <b>${esc(titleCase(s.to))}</b> (${s.nTo})</span>
           <button class="btn" data-action="merge-chars" data-from="${esc(s.from)}" data-to="${esc(s.to)}">Merge</button></li>`).join('')}</ul>` : ''}
-      <p class="small">Or move every line from one character to another:</p>
+      <p class="small">${sugg.length ? "Or move" : "Move"} every line from one character to another:</p>
       <div class="row wrap"><select id="merge-from" aria-label="Move lines from">${opts(sugg[0]?.from || chars[chars.length - 1][0])}</select>
         <span class="muted small">to</span>
         <select id="merge-to" aria-label="Move lines to">${opts(sugg[0]?.to || chars[0][0])}</select>
         <button class="btn" data-action="merge-chars">Move lines</button></div>
       ${merger.undo != null ? undoMergeHtml() : ''}
-    </div></details>`;
+    </div>`;
 }
 
 const undoMergeHtml = () => '<div><button class="btn ghost" data-action="merge-undo">Undo merge</button></div>';
@@ -1699,9 +1699,10 @@ async function pdfPagesToImages(file) {
 // ---------- Find and fix (in the editor) ----------
 const finder = { idx: -1, undo: null };
 
-function findBarHtml() {
+// Find and replace in the text box. In the script editor it also holds Fix or merge character names.
+function findBarHtml(names = false) {
   return `<details class="card find" id="find-box"${app.findOpen ? ' open' : ''}>
-    <summary>Find and fix</summary>
+    <summary>Find and fix<span id="find-dupes" class="muted small"></span></summary>
     <div class="stack-sm">
       <div class="row wrap"><input id="find-q" type="search" class="search" placeholder="Find, e.g. a misread name" aria-label="Find" autocapitalize="off" spellcheck="false">
         <span id="find-count" class="muted small" role="status"></span></div>
@@ -1714,6 +1715,7 @@ function findBarHtml() {
         <label class="check-row small"><input type="checkbox" id="find-case"><span>Match case</span></label>
         <button class="btn ghost" data-action="find-undo" id="find-undo" hidden>Undo replace all</button>
       </div>
+      ${names ? '<div id="merge-box" class="stack-sm"></div>' : ''}
     </div>
   </details>`;
 }
@@ -2709,8 +2711,11 @@ document.addEventListener('input', e => {
 
 document.addEventListener('toggle', e => {
   if (e.target.id === 'voices') app.voicesOpen = e.target.open;
-  if (e.target.id === 'find-box') { app.findOpen = e.target.open; if (e.target.open) $('#find-q')?.focus(); }
-  if (e.target.classList?.contains('merge')) app.mergeOpen = e.target.open;
+  if (e.target.id === 'find-box') {
+    app.findOpen = e.target.open;
+    if (e.target.open && !merger.autoOpened) $('#find-q')?.focus(); // not when it opened itself for duplicate names
+    merger.autoOpened = false;
+  }
 }, true);
 
 // Find and fix: Enter jumps to the next match; Match case recounts.
