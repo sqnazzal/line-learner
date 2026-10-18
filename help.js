@@ -126,6 +126,7 @@ const SYNC_HELP = topic('Syncing between your devices', `<ol>
 const REAL_HELP = topic('Rehearsing for real: phone on a stand, headphones, long scenes', `<ul>
     <li><b>Phone on a stand:</b> open <b>Practice settings</b> (under the player) &gt; <b>Text size</b> &gt; <b>Extra large</b>. The play button stays at the bottom of the screen, and the screen stays on while a scene plays. Hands busy? Say <i>"line"</i> when you're stuck.</li>
     <li><b>Headphones:</b> wired or Bluetooth both work. On many phones the play/pause and skip buttons on them work the player too (most reliably with the AI voices). Bluetooth earbuds use their own microphone, which can be less clear; if good lines keep getting marked wrong, lower <b>Score needed to pass</b> a little.</li>
+    <li><b>Just your part:</b> on a script, tick <b>Just my cues and lines</b> and Listen and Rehearse play only the line before each of yours, then yours, skipping the rest of the show.</li>
     <li><b>Long scenes:</b> leave any time and the script page offers <b>Pick up where you left off</b>. Lines like <code># Act 2</code> or <code>Scene 3</code> in the script make sections you can pick with <b>Start at</b>, and the play icon on any of your lines starts Rehearse from there.</li></ul>`);
 
 const COMMON = topic("Something's not working?", `<ul>

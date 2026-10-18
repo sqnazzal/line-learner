@@ -55,6 +55,7 @@ const DEFAULT_SETTINGS = {
   skipCuts: false,         // reading pages: leave out printed lines crossed out by hand
   listenHears: true,       // Listen mode: hear you say your line and move on when you finish
   textSize: 'normal',      // normal | large | huge (bigger words for a phone on a stand)
+  cuesOnly: false,        // Listen and Rehearse: only your lines and the line before each
 };
 
 function loadJSON(key, fallback) {
@@ -983,17 +984,22 @@ function prevLineIndex(s, i) {
 }
 
 // Your shaky lines in the current range, each preceded by the cue line that leads into it.
-function weakOrder(s) {
+// Each of your lines with the line just before it (your cue), skipping the rest of the scene. With onlyWeak,
+// just the lines you haven't got solid yet (Drill weak lines).
+function cueOrder(s, onlyWeak = false) {
   const order = [];
   for (const i of rangeOrder(s)) {
     const l = s.lines[i];
-    if (!isMine(s, l) || isSolid(s, l)) continue;
+    if (!isMine(s, l) || (onlyWeak && isSolid(s, l))) continue;
     const cue = prevLineIndex(s, i);
     if (cue >= 0 && !isMine(s, s.lines[cue]) && order[order.length - 1] !== cue) order.push(cue);
     order.push(i);
   }
   return order;
 }
+const weakOrder = s => cueOrder(s, true);
+// What Listen and Rehearse play: the whole scene, or just your cues and lines (a setting on the script page).
+const playOrder = s => (settings.cuesOnly && s.myChar ? cueOrder(s) : rangeOrder(s));
 const weakCount = s => weakOrder(s).filter(i => isMine(s, s.lines[i])).length;
 
 // ---------- Icons ----------
@@ -1830,6 +1836,7 @@ function renderScript() {
       </select></label>
       ${s.kind !== 'song' && !s.sample && chars.length > 1 ? '<div><button class="link-btn small" data-action="fix-names">Fix or merge character names</button></div>' : ''}
       ${rangeHtml}
+      ${s.kind !== 'song' && s.myChar ? `<label class="check-row"><input type="checkbox" data-setting="cuesOnly" ${settings.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines.</b> Listen and Rehearse play only the line before each of yours, then yours, and skip the rest.</span></label>` : ''}
       ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${solid} of ${mine.length} lines solid</span></div>` : ''}
     </div>
     ${resumeHtml(s)}
@@ -1915,7 +1922,7 @@ function renderPlayer() {
   return `<section class="player stack">
     <div class="row between">
       <button class="btn ghost" data-action="back">${icon('back')} Script</button>
-      <span class="mode-tag">${label}${s.myChar ? ` · as ${esc(titleCase(s.myChar))}` : ''}</span>
+      <span class="mode-tag">${label}${s.myChar ? ` · as ${esc(titleCase(s.myChar))}` : ''}${P.drill ? ' · weak lines' : P.cuesOnly ? ' · cues only' : ''}</span>
     </div>
     <div id="stage" class="stage"></div>
     <div id="controls" class="controls"></div>
@@ -2087,13 +2094,14 @@ function leave() {
 async function startPlayer(mode, order, from = 0, drill = false) {
   const s = current();
   if (mode !== 'listen' && !s.myChar) { toast('Who are you playing? Pick your character under "I\'m playing" first.'); return false; }
-  order ||= rangeOrder(s);
+  const cuesOnly = !order && settings.cuesOnly && !!s.myChar;
+  order ||= playOrder(s);
   if (!order.length) { toast('Empty stage: nothing to practice here yet. Tap Edit to add some lines.'); return false; }
   // Every mode settles microphone permission before anything plays, so it never pops up mid-scene.
   if (!(await ensureMic())) return false;
   leave();
   P = newPlayer(mode, order);
-  P.drill = drill;
+  Object.assign(P, { drill, cuesOnly });
   app.view = 'player';
   render();
   headphoneControls();
@@ -2540,7 +2548,7 @@ const actions = {
   rehearse() { startPlayer('rehearse'); },
   weak() { startPlayer('rehearse', weakOrder(current()), 0, true); },
   'resume-run'() {
-    const r = resumeAt[current().id], order = rangeOrder(current());
+    const r = resumeAt[current().id], order = playOrder(current());
     startPlayer(r.mode, order, Math.max(0, order.indexOf(r.line)));
   },
   'from-here'(b, i) {

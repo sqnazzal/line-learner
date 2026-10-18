@@ -63,6 +63,7 @@ On a script, choose who you're playing (**I'm playing**) and, optionally, a scen
 | **Drill weak lines** | Only the lines you missed last time, each with its cue. |
 
 - **Stuck?** Say **"line"** and it feeds you the line.
+- **Just your part:** tick **Just my cues and lines** on a script and Listen and Rehearse play only each cue line and your line, skipping the rest.
 - **Long scenes:** leave mid-scene and the script page offers **Pick up where you left off**.
 - **Headphones:** wired or Bluetooth work; on many phones their play/pause and skip buttons work the player.
 - **Practice settings** (under the player): text size (up to **Extra large** for a phone on a stand), reading speed, how much of your line shows as a hint, how strict the check is, how long it waits after you stop talking, and more.
