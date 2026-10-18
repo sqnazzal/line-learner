@@ -47,7 +47,7 @@ const fb = {
   watchGroups(cb) {
     const { F, db } = fb.api;
     return F.onSnapshot(F.query(F.collection(db, 'groups'), F.where('members', 'array-contains', fb.user.uid)),
-      snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => groupError(e));
+      snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(it => !it.removed)), e => groupError(e));
   },
 
   // Live list of what's shared in a group.
@@ -84,21 +84,30 @@ const fb = {
     return F.updateDoc(F.doc(db, 'groups', gid), { members: F.arrayRemove(fb.user.uid) });
   },
 
-  shareItem(gid, item) {
+  // Sharing again keeps the version it replaces (prevRaw), so a bad update can be undone; the security
+  // rules require this, so no one can quietly overwrite a shared script.
+  async shareItem(gid, item) {
     const { F, db } = fb.api;
-    return F.setDoc(F.doc(db, 'groups', gid, 'items', item.id), item);
+    const ref = F.doc(db, 'groups', gid, 'items', item.id);
+    const snap = await F.getDoc(ref);
+    const prev = snap.exists() ? snap.data() : null;
+    const full = { ...item };
+    if (prev && prev.raw !== item.raw) Object.assign(full, { prevRaw: prev.raw, prevTitle: prev.title || '', prevUpdated: prev.updated || 0 });
+    else if (prev?.prevRaw != null) Object.assign(full, { prevRaw: prev.prevRaw, prevTitle: prev.prevTitle || '', prevUpdated: prev.prevUpdated || 0 });
+    return F.setDoc(ref, full);
   },
 
+  // Unsharing hides an item rather than deleting it, so only the admin can delete for good (and can restore it).
   removeItem(gid, id) {
     const { F, db } = fb.api;
-    return F.deleteDoc(F.doc(db, 'groups', gid, 'items', id));
+    return F.updateDoc(F.doc(db, 'groups', gid, 'items', id), { removed: Date.now() });
   },
 
   // The shared copy of an item in a group, or null if it isn't shared there.
   async getItem(gid, id) {
     const { F, db } = fb.api;
     const snap = await F.getDoc(F.doc(db, 'groups', gid, 'items', id));
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    return snap.exists() && !snap.data().removed ? { id: snap.id, ...snap.data() } : null;
   },
 };
 
@@ -397,7 +406,7 @@ function sharePanelHtml(s) {
     return `<li class="share-row"><div class="lib-main"><b>${esc(g.name)}</b><span class="muted small">${note}</span></div><div class="row">${actionsHtml}</div></li>`;
   }).join('');
   return `<div class="card stack-sm share-panel"><b>Share “${esc(s.title)}” with</b><ul class="share-list">${rows}</ul>
-    <p class="muted small">Shared copies go to everyone in that group. Only you can update or unshare what you share. Unsharing removes it from the group's list; copies people already added stay with them.</p></div>`;
+    <p class="muted small">Shared copies go to everyone in that group. Only you can update or unshare what you share. Unsharing removes it from the group's list; copies people already added stay with them. Nobody's copy changes until they choose <b>Update my copy</b>.</p></div>`;
 }
 
 async function loadShareStatus(s) {

@@ -53,6 +53,18 @@ Object.assign(fb, {
     const { F, db } = fb.api;
     return F.deleteDoc(F.doc(db, 'groups', gid, 'items', id));
   },
+  // Brings back something its sharer unshared.
+  adminRestoreItem(gid, id) {
+    const { F, db } = fb.api;
+    return F.updateDoc(F.doc(db, 'groups', gid, 'items', id), { removed: F.deleteField() });
+  },
+  // Puts back the version before the last update (and keeps the undone one, so it can be swapped back).
+  adminUndoItem(gid, it) {
+    const { F, db } = fb.api;
+    return F.updateDoc(F.doc(db, 'groups', gid, 'items', it.id), {
+      raw: it.prevRaw, title: it.prevTitle || it.title, updated: Date.now(), prevRaw: it.raw, prevTitle: it.title, prevUpdated: it.updated || 0,
+    });
+  },
   async adminDeleteGroup(g) {
     const { F, db } = fb.api;
     for (const it of await fb.adminItems(g.id)) await F.deleteDoc(F.doc(db, 'groups', g.id, 'items', it.id));
@@ -83,7 +95,10 @@ async function voicesAdmin(path, body) {
 }
 
 // ---------- Screen ----------
-const adm = { data: null, usage: {}, loading: false, error: '', open: null, items: {} };
+const adm = { data: null, usage: {}, loading: false, error: '', open: null, items: {}, sort: loadJSON('lineLearner.peopleSort', 'recent') };
+document.addEventListener('change', e => {
+  if (e.target.id === 'people-sort') { adm.sort = e.target.value; saveJSON('lineLearner.peopleSort', adm.sort); render(); }
+});
 
 async function loadAdmin() {
   if (adm.loading) return;
@@ -115,7 +130,22 @@ function allPeople() {
     if (p) p.lastSignIn = a.lastSignIn;
     else byId.set(a.uid, { id: a.uid, name: a.name, email: a.email, lastSignIn: a.lastSignIn });
   }
-  return [...byId.values()].sort((a, b) => Math.max(b.lastSeen || 0, b.lastSignIn || 0) - Math.max(a.lastSeen || 0, a.lastSignIn || 0));
+  return [...byId.values()];
+}
+
+// How the People list is ordered (remembered on this device).
+const PEOPLE_SORTS = { recent: 'Most recently active', name: 'Name (A to Z)', email: 'Email', groups: 'Most groups', voices: 'Most shared voices use', blocked: 'Blocked first' };
+function sortPeople(list, groupsOf) {
+  const active = p => Math.max(p.lastSeen || 0, p.lastSignIn || 0);
+  const by = {
+    recent: (a, b) => active(b) - active(a),
+    name: (a, b) => (a.name || '~').localeCompare(b.name || '~'),
+    email: (a, b) => (a.email || '~').localeCompare(b.email || '~'),
+    groups: (a, b) => groupsOf(b.id).length - groupsOf(a.id).length,
+    voices: (a, b) => (adm.usage[b.id] || 0) - (adm.usage[a.id] || 0),
+    blocked: (a, b) => adm.data.blocked.has(b.id) - adm.data.blocked.has(a.id),
+  }[adm.sort] || ((a, b) => active(b) - active(a));
+  return list.sort((a, b) => by(a, b) || active(b) - active(a));
 }
 
 const nameOf = uid => adm.data?.profiles.find(p => p.id === uid)?.name || adm.accounts?.find(a => a.uid === uid)?.name || 'Unknown person';
@@ -128,7 +158,7 @@ function renderAdmin() {
   if (adm.error) return `<section class="stack">${head}<p class="note">${esc(adm.error)}</p><div><button class="btn" data-action="admin-reload">Try again</button></div></section>`;
   const { groups, blocked } = adm.data, profiles = allPeople();
   const groupsOf = uid => groups.filter(g => (g.members || []).includes(uid));
-  const people = profiles.map(p => {
+  const people = sortPeople(profiles, groupsOf).map(p => {
     const gs = groupsOf(p.id), isBlocked = blocked.has(p.id), me = p.id === fb.user.uid;
     return `<li class="card admin-row">
       <div class="lib-main"><b>${esc(p.name || 'Unknown')}${me ? ' (you)' : ''}${isBlocked ? ' <span class="tag">Blocked</span>' : ''}</b>
@@ -153,8 +183,10 @@ function renderAdmin() {
         <ul class="share-list">${(g.members || []).map(uid => `<li class="share-row"><span>${esc(g.memberNames?.[uid] || nameOf(uid))}${uid === g.ownerUid ? ' <span class="muted small">(made the group)</span>' : ''}</span>
           <button class="btn ghost" data-action="admin-kick" data-gid="${esc(g.id)}" data-uid="${esc(uid)}">Remove</button></li>`).join('')}</ul>
         <b class="small">Shared scripts and songs</b>
-        ${!items ? '<p class="muted small">Loading…</p>' : items.length ? `<ul class="share-list">${items.map(it => `<li class="share-row"><span>${esc(it.title)} <span class="muted small">by ${esc(it.addedByName || nameOf(it.addedBy))}</span></span>
-          <button class="btn ghost" data-action="admin-del-item" data-gid="${esc(g.id)}" data-id="${esc(it.id)}">Delete</button></li>`).join('')}</ul>` : '<p class="muted small">Nothing shared.</p>'}
+        ${!items ? '<p class="muted small">Loading…</p>' : items.length ? `<ul class="share-list">${items.map(it => `<li class="share-row"><span>${esc(it.title)} <span class="muted small">by ${esc(it.addedByName || nameOf(it.addedBy))}${it.updated ? ` · updated ${ago(it.updated)}` : ''}</span>${it.removed ? ` <span class="tag">Unshared ${ago(it.removed)}</span>` : ''}</span>
+          <span class="row wrap">${it.removed ? `<button class="btn" data-action="admin-restore-item" data-gid="${esc(g.id)}" data-id="${esc(it.id)}">Restore</button>` : ''}
+          ${it.prevRaw != null ? `<button class="btn ghost" data-action="admin-undo-item" data-gid="${esc(g.id)}" data-id="${esc(it.id)}" title="Version from ${it.prevUpdated ? ago(it.prevUpdated) : 'before'}">Undo last update</button>` : ''}
+          <button class="btn ghost" data-action="admin-del-item" data-gid="${esc(g.id)}" data-id="${esc(it.id)}">Delete for good</button></span></li>`).join('')}</ul>` : '<p class="muted small">Nothing shared.</p>'}
       </div>` : ''}
     </li>`;
   }).join('');
@@ -162,7 +194,8 @@ function renderAdmin() {
     ${head}
     <p class="muted">You're the app's admin. Changes here affect other people right away. <button class="link-btn" data-action="admin-reload">Refresh</button></p>
     ${feedbackHtml()}
-    <h2>People (${profiles.length})</h2>
+    <div class="row between wrap"><h2>People (${profiles.length})</h2>
+      <label class="field inline small"><span>Sort by</span><select id="people-sort">${Object.entries(PEOPLE_SORTS).map(([k, v]) => `<option value="${k}"${adm.sort === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label></div>
     ${adm.accounts ? '' : '<p class="muted small">Showing people who have opened the app since the Admin screen was added. To list everyone who has ever signed in, set up GOOGLE_SERVICE_ACCOUNT on the voices server (server/README.md, step 7).</p>'}
     <ul class="lib-list">${people || '<li class="muted">No one has signed in yet.</li>'}</ul>
     <p class="muted small"><b>Block</b> stops someone using groups, sharing and the shared voices (their own scripts on their own device are unaffected). To delete someone's Google sign-in completely, use <a href="${FIREBASE_USERS_URL}" target="_blank" rel="noopener">Firebase > Authentication > Users</a> after removing and blocking them here.</p>
@@ -237,9 +270,23 @@ Object.assign(actions, {
         toast(`Deleted: ${n} synced ${n === 1 ? 'script' : 'scripts'}, their profile and group memberships. To remove their Google sign-in too, use Firebase > Authentication > Users.`);
       });
   },
+  'admin-restore-item'(b) {
+    const { gid, id } = b.dataset, it = adm.items[gid]?.find(x => x.id === id);
+    adminDo(`Restore "${it?.title}" to the group?`, async () => {
+      await fb.adminRestoreItem(gid, id);
+      delete it.removed;
+    }, 'Restored.');
+  },
+  'admin-undo-item'(b) {
+    const { gid, id } = b.dataset, it = adm.items[gid]?.find(x => x.id === id);
+    adminDo(`Put "${it?.title}" back to the version from ${it?.prevUpdated ? ago(it.prevUpdated) : 'before its last update'}? (You can undo this the same way.)`, async () => {
+      await fb.adminUndoItem(gid, it);
+      Object.assign(it, { raw: it.prevRaw, title: it.prevTitle || it.title, prevRaw: it.raw, prevTitle: it.title, prevUpdated: it.updated, updated: Date.now() });
+    }, 'Put back. People see "Update my copy" for it.');
+  },
   'admin-del-item'(b) {
     const { gid, id } = b.dataset, it = adm.items[gid]?.find(x => x.id === id);
-    adminDo(`Delete "${it?.title}" from the group? Copies people already added stay with them.`, async () => {
+    adminDo(`Delete "${it?.title}" from the group for good? This can't be undone. Copies people already added stay with them.`, async () => {
       await fb.adminDeleteItem(gid, id);
       adm.items[gid] = adm.items[gid].filter(x => x.id !== id);
     }, 'Deleted.');

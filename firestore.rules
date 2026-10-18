@@ -80,15 +80,27 @@ service cloud.firestore {
       // Only the admin can delete a group, so no one else can make shared scripts disappear that way.
       allow delete: if isAdmin();
 
-      // Shared scripts and songs: members can see them; only the person who shared one (or the admin) can
-      // change or remove it.
+      // Shared scripts and songs: members can see them; only the person who shared one can change it.
+      // Failsafes: an update must keep the version it replaces (prevRaw), so the admin can undo it;
+      // "Unshare" only marks it removed; and only the admin can delete one for good.
       match /items/{itemId} {
+        function validItem(d) {
+          return d.keys().hasOnly(['id', 'title', 'raw', 'kind', 'updated', 'addedBy', 'addedByName', 'song', 'prevRaw', 'prevTitle', 'prevUpdated', 'removed'])
+            && d.title is string && d.title.size() <= 300
+            && d.raw is string && d.raw.size() <= 450000
+            && d.kind in ['script', 'song']
+            && d.addedByName is string && d.addedByName.size() <= 100
+            && (!('prevRaw' in d) || (d.prevRaw is string && d.prevRaw.size() <= 450000));
+        }
         allow read: if memberOf(gid) || isAdmin();
-        allow create: if memberOf(gid) && request.resource.data.addedBy == request.auth.uid;
-        allow update: if memberOf(gid)
+        allow create: if memberOf(gid) && request.resource.data.addedBy == request.auth.uid
+          && validItem(request.resource.data) && !('removed' in request.resource.data);
+        allow update: if isAdmin() || (memberOf(gid)
           && resource.data.addedBy == request.auth.uid
-          && request.resource.data.addedBy == request.auth.uid;
-        allow delete: if (signedIn() && resource.data.addedBy == request.auth.uid) || isAdmin();
+          && request.resource.data.addedBy == request.auth.uid
+          && validItem(request.resource.data)
+          && (request.resource.data.raw == resource.data.raw || request.resource.data.get('prevRaw', null) == resource.data.raw));
+        allow delete: if isAdmin();
       }
     }
   }
