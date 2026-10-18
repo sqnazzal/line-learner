@@ -230,9 +230,8 @@ async function addUsage(env, uid, month, usd) {
 }
 
 // ---------- Email Shannon when someone sends feedback (only with RESEND_API_KEY and FEEDBACK_EMAIL) ----------
-// The app sends just the new note's ID. The note is read from Firestore (the rules let anyone holding a
-// note's random ID read that one note), and only notes from the last 10 minutes are emailed, so the
-// email can't be faked or replayed later.
+// The app sends just the new note's ID. The note is read from Firestore, and only notes from the last
+// 10 minutes are emailed, so the email can't be faked or replayed later.
 const emailed = new Set();
 // Feedback notes are private (only the admin can read them in the app), so the Worker reads each one with its
 // own Google service account, never as the public. At most EMAILS_PER_HOUR alerts go out, so a flood of

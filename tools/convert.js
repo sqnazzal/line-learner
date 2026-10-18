@@ -71,6 +71,7 @@ function gutenbergToScript(raw) {
   if (start >= 0) text = text.slice(text.indexOf('\n', start) + 1);
   const end = text.search(/\*\*\* ?END OF (THE|THIS) PROJECT GUTENBERG/i);
   if (end >= 0) text = text.slice(0, end);
+  text = text.replace(/^\s*End of (the )?Project Gutenberg[^\n]*\n?/gim, ''); // some texts add their own closing line
 
   const pars = text.split(/\n[ \t]*\n+/).map(p => p.replace(/^\n+|\s+$/g, '')).filter(p => p.trim());
 

@@ -531,6 +531,7 @@ Object.assign(actions, {
       if (prev && prev.addedBy !== fb.user.uid) { toast(`Only ${prev.addedByName || 'the person who shared it'} can change this.`); return; }
       if (!share.ok || !share.ends) { toast("Add the show's last performance date and tick the permission box first."); return; }
       const item = { ...itemFromScript(s), licenseEnds: share.ends, permission: true };
+      if (item.raw.length > 450000) { toast('This is too long to share (the limit is about 450,000 characters). Share it in parts instead.'); return; }
       await fb.shareItem(gid, item);
       share.status[gid] = item;
       if (!s.groupItem) s.groupItem = { gid, id: item.id, updated: item.updated };

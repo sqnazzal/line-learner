@@ -17,6 +17,7 @@ Open it at **<https://sqnazzal.github.io/line-learner/>**. Nothing to install.
 - The first time you practice, allow the **microphone**. Checking your lines needs an internet connection.
 - Stuck at any point? **Help & troubleshooting** (bottom of every page) has steps for each kind of device.
 - Found a bug or have an idea? **Send feedback / Report a bug** (bottom of every page) sends a note, with an optional screenshot, straight to Shannon.
+- **What's new** (bottom of every page) lists recent changes, and **About Line Learner** says who made it and why.
 
 ## Adding a script
 
@@ -129,7 +130,7 @@ Designed toward WCAG 2.2 AA (not certified, and not a legal ADA determination): 
 
 ## Privacy
 
-The full note is in the app (**Privacy** at the bottom of every page). In short: no ads, no tracking, nothing sold. Scripts, progress and recordings stay on your device; recordings never leave it. Signing in (optional) stores your name, email and synced scripts in Shannon's Firebase project. AI voices, page reading, mic checking, lyrics and Spotify only receive what each feature needs. To have your synced data deleted, send feedback asking Shannon.
+The full note is in the app (**Privacy** at the bottom of every page). In short: no ads, no tracking, nothing sold. Scripts and progress stay on your device unless you sign in to sync them; recordings never leave it. Signing in (optional) stores your name, email and synced scripts in Shannon's Firebase project. AI voices, page reading, mic checking, lyrics and Spotify only receive what each feature needs. To have your synced data deleted, send feedback asking Shannon.
 
 ## Tip jar
 
@@ -165,7 +166,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | `songs.js` | Songs: lyrics, Spotify, Sing along |
 | `groups.js` | Google sign-in, groups, sharing, Google sync |
 | `admin.js` | The admin screen (Shannon only) |
-| `help.js` | The Help & troubleshooting screen |
+| `help.js` | Help & troubleshooting, Privacy, About, What's new and Send feedback |
 | `firestore.rules` | Firebase security rules |
 | `server/` | The shared voices Cloudflare Worker and its setup guide |
 | `library/`, `tools/` | The free script library and the tools that build it |

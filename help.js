@@ -1,6 +1,7 @@
 'use strict';
 
-// Help & troubleshooting: instructions for each kind of device, opening on the one you're using.
+// Help & troubleshooting (instructions for each kind of device, opening on the one you're using), plus the
+// About, What's new and Send feedback screens.
 // Loaded after app.js and uses its helpers.
 
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
@@ -71,7 +72,7 @@ const HELP = {
   ],
   computer: [
     ['Getting started', `<ol>
-      <li>Use <b>Google Chrome</b> or <b>Microsoft Edge</b> (Firefox can read lines aloud but can't check them).</li>
+      <li>Use <b>Google Chrome</b> or <b>Microsoft Edge</b> (Firefox can read lines aloud but can't check them by microphone; <b>Type your lines</b> works everywhere).</li>
       <li>Keyboard shortcuts while practicing: <kbd>Space</kbd> play/pause, <kbd>←</kbd> <kbd>→</kbd> lines, <kbd>H</kbd> hint, <kbd>L</kbd> hear the line, <kbd>Enter</kbd> done speaking. Turn them off under <b>Practice settings</b> &gt; <b>Advanced</b> if they get in the way of a screen reader or voice control.</li>
       <li>Bookmark the page, or in Chrome/Edge use the <b>Install</b> icon in the address bar for an app window.</li></ol>`],
     ['Microphone (checking your lines)', `<ul>
@@ -157,6 +158,7 @@ const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.p
     <li><b>Checking your lines by microphone:</b> your browser's own speech recognition (from Apple or Google) hears what you say. Line Learner doesn't keep the audio or make voiceprints.</li>
     <li><b>Songs:</b> song names go to <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a> to find lyrics. Playing a song uses <a href="https://www.spotify.com/legal/privacy-policy/" target="_blank" rel="noopener">Spotify</a>, whose player can set its own cookies.</li>
     <li><b>Send feedback:</b> your message, anything you add (contact details, a screenshot) and, if ticked, device details are stored for Shannon to read in the app, and emailed to Shannon through <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener">Resend</a>. Only Shannon can read them.</li>
+    <li><b>GitHub sync</b> (optional, advanced): your scripts and progress go to a secret Gist in your own GitHub account, using the access key you paste in, which stays on this device. A secret Gist isn't listed anywhere, but anyone with its link can read it.</li>
     <li><b>The app itself</b> is hosted on <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub Pages</a>; sign-in and sync use <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Google Firebase</a>.</li>
   </ul>
   <p><b>How long it's kept:</b> what's on your device stays until you delete it or clear this site's data. Your account details and synced data stay until you delete them or ask Shannon to. Feedback stays until Shannon deletes it. Monthly voice cost totals are kept as simple per-month numbers. Something you unshare from a group is hidden from the group, and kept (so it can be restored if it was a mistake) until Shannon deletes it.</p>
@@ -244,7 +246,7 @@ const UPDATES = [
     '<b>Script preview</b> before saving, with warnings about anything that looks off.',
     '<b>Settings</b> split into everyday ones and an Advanced section.',
     '<b>Backups</b> say clearly what\'s not included, and your own recordings can be saved separately.',
-    '<b>Safer group sharing:</b> sharing asks you to confirm you have permission and for the show\'s last performance date; shared scripts show when the license has ended or they\'re inactive; unsharing can be undone.',
+    '<b>Safer group sharing:</b> sharing asks you to confirm you have permission and for the show\'s last performance date; shared scripts show when the license has ended or they\'re inactive; something unshared by mistake can be restored.',
     '<b>Accessibility:</b> better screen reader support, keyboard focus and headings throughout.',
     '<b>Privacy notice</b> rewritten in plain language, with privacy and copyright requests in Send feedback.',
     '<b>Home screen icon:</b> theatre masks instead of a gray letter (remove and re-add the app to see it).',
