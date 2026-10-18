@@ -521,7 +521,49 @@ const ai = loadJSON(LS_AI, {}); // { key, on } : the key stays on this device an
 const aiInflight = new Map();
 let aiWarned = false;
 
-const aiReady = () => !!(ai.key && ai.on);
+// Shannon's shared voices: a small server (server/voices-worker.js on Cloudflare) holds her OpenAI key, and
+// people in her groups use it by signing in, with no key of their own. Empty until the server is set up.
+const SHARED_VOICES_URL = '';
+const usingShared = () => !ai.key && !!ai.shared && !!SHARED_VOICES_URL && !!signedInUser();
+// The Google sign-in (from groups.js, loaded after this file; its "fb" isn't a property of window).
+const signedInUser = () => (typeof fb !== 'undefined' ? fb.user : null);
+const aiReady = () => !!(ai.on && (ai.key || usingShared()));
+const aiAvailable = () => !!(ai.key || usingShared()); // for reading pages, whether or not voices are on
+
+async function sharedFetch(path, body) {
+  const token = await fb.api.auth.currentUser.getIdToken();
+  const res = await fetch(SHARED_VOICES_URL.replace(/\/+$/, '') + path, {
+    method: body ? 'POST' : 'GET',
+    headers: { Authorization: 'Bearer ' + token, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    let msg = '';
+    try { msg = (await res.json()).error || ''; } catch { /* no details */ }
+    const err = new Error(msg || `The shared voices server answered with an error (${res.status}).`);
+    err.status = res.status;
+    throw err;
+  }
+  return res;
+}
+
+// This month's use of the shared voices, from the server (used and limit in dollars).
+const shared = { status: null, loading: false };
+async function loadSharedStatus() {
+  if (shared.loading || !usingShared()) return;
+  shared.loading = true;
+  try { shared.status = await (await sharedFetch('/status')).json(); } catch (e) { shared.status = { error: e.message }; }
+  shared.loading = false;
+  const el = $('#shared-status');
+  if (el) el.textContent = sharedStatusText();
+}
+function sharedStatusText() {
+  const st = shared.status;
+  if (!st) return 'Checking your share…';
+  if (st.error) return st.error;
+  if (st.owner || !st.limit) return `Used about $${st.used.toFixed(2)} this month.`;
+  return `Your share this month: about $${st.used.toFixed(2)} of $${st.limit}.`;
+}
 const capital = w => w[0].toUpperCase() + w.slice(1);
 
 // Same gender casting as the device voices, spreading the AI voices across characters.
@@ -554,7 +596,7 @@ async function aiAudio(voice, instructions, input) {
   if (aiInflight.has(key)) return aiInflight.get(key);
   checkAiBudget();
   const job = (async () => {
-    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+    const res = !ai.key ? await sharedFetch('/speech', { voice, input, instructions }) : await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + ai.key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: AI_MODEL, voice, input, instructions, response_format: 'mp3' }),
@@ -592,6 +634,7 @@ const aiSpent = () => aiUsage().chars * COST_PER_CHAR + aiUsage().pages * COST_P
 const aiCap = () => (ai.capUsd == null ? 5 : ai.capUsd); // dollars a month on this device; 0 means no limit
 
 function checkAiBudget() {
+  if (!ai.key) return; // shared voices: the server keeps each person's allowance
   if (aiCap() > 0 && aiSpent() >= aiCap()) {
     const err = new Error(`This month's OpenAI limit on this device (about $${aiCap()}) is reached. Lines already made still play; raise the limit under Voices for each character, or wait until next month.`);
     err.status = 'limit';
@@ -661,9 +704,32 @@ async function aiPrepareAll() {
   if (app.view === 'script') render();
 }
 
+// The shared-voices part of the panel, for people without their own key.
+function sharedPanelHtml() {
+  if (!SHARED_VOICES_URL) return '';
+  if (!signedInUser()) {
+    return `<div class="stack-sm"><b>Shannon's shared voices</b>
+      <p class="small">No key needed: sign in with Google and join one of Shannon's groups (ask her for an invite).</p>
+      <div><button class="btn" data-action="group">Sign in</button></div></div>`;
+  }
+  if (ai.shared) loadSharedStatus();
+  const prog = app.aiProgress;
+  return `<div class="stack-sm">
+    <label class="check-row"><input type="checkbox" id="ai-shared" ${ai.shared ? 'checked' : ''}><b>Use Shannon's shared voices</b></label>
+    ${ai.shared ? `<p class="muted small" id="shared-status">${esc(sharedStatusText())}</p>
+      <div class="row wrap">${prog
+        ? `<span id="ai-progress" class="muted small">Preparing voices: ${prog.done} of ${prog.total}</span><button class="btn ghost" data-action="ai-stop">Stop</button>`
+        : '<button class="btn" data-action="ai-prepare">Prepare all lines now</button>'}</div>
+      <p class="muted small">Lines are made once and saved on this device, so replays don't use your share.</p>` : '<p class="muted small">Human-sounding voices for people in Shannon\'s groups, no key needed.</p>'}
+  </div>`;
+}
+
 function aiPanelHtml() {
   if (!ai.key) {
+    const sharedHtml = sharedPanelHtml();
     return `<div class="ai-card stack-sm">
+      ${sharedHtml}
+      ${sharedHtml ? '<details class="own-key"><summary class="small">Or use your own OpenAI key</summary><div class="stack-sm">' : ''}
       <b>Natural AI voices</b>
       <p class="muted small">Human-sounding voices from OpenAI that act out stage directions like (angrily) or (whispering). Each line costs a little the first time it's read, then replays free, even offline.</p>
       <ol class="steps-list small">
@@ -674,6 +740,7 @@ function aiPanelHtml() {
       <label class="field small"><span>Voice lock PIN (recommended if anyone else uses this device)</span>
         <input id="ai-pin" type="password" inputmode="numeric" autocomplete="off" placeholder="4 or more digits" aria-label="Voice lock PIN"></label>
       <p class="muted small">The key is saved only on this device. With a PIN, AI voices, "how they sound" notes and Female/Male can only be changed (and the key removed) by someone who knows it, so audio you've paid for isn't re-made. Tip: set a monthly spending limit in your OpenAI account.</p>
+      ${sharedHtml ? '</div></details>' : ''}
     </div>`;
   }
   const prog = app.aiProgress;
@@ -1425,6 +1492,11 @@ const markedTextRule = skipCuts => skipCuts
 
 async function readScreenshots(images, prompt = SHOT_PROMPT) {
   checkAiBudget();
+  if (!ai.key) {
+    const { text = '' } = await (await sharedFetch('/read', { prompt, images })).json();
+    countAiUse({ pages: images.length });
+    return text.replace(/^```[a-z]*\n?|```\s*$/gi, '').trim();
+  }
   const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + ai.key, 'Content-Type': 'application/json' },
@@ -1515,7 +1587,7 @@ const lastSpeaker = text => (text.match(/^([^:\n()#]{1,40}):/gm) || []).at(-1)?.
 
 async function readTray() {
   if (tray.reading || !tray.pages.length) return;
-  if (!ai.key) { toast('Reading pages uses your OpenAI key. Add it under "Voices for each character" on any script, or paste the text instead.'); return; }
+  if (!aiAvailable()) { toast('Reading pages needs the AI: add your own OpenAI key or turn on shared voices under "Voices for each character" on any script, or paste the text instead.'); return; }
   Object.assign(tray, { reading: true, stop: false });
   keepAwake(true);
   const total = tray.pages.length, song = app.editing?.kind === 'song';
@@ -2476,6 +2548,12 @@ document.addEventListener('change', e => {
     s.updated = Date.now();
     saveScripts();
     sayHello(c);
+  } else if (el.id === 'ai-shared') {
+    Object.assign(ai, { shared: el.checked, on: el.checked });
+    aiWarned = false;
+    shared.status = null;
+    saveJSON(LS_AI, ai);
+    render();
   } else if (el.id === 'ai-on') {
     ai.on = el.checked;
     aiWarned = false;

@@ -214,7 +214,7 @@ function renderGroup() {
       <div class="row wrap"><input id="group-code" type="search" class="search" placeholder="Invite code" aria-label="Invite code" autocapitalize="characters"><button class="btn" data-action="group-join">Join</button></div>
     </div>`;
   if (!g) {
-    return `<section class="stack">${head}<p class="muted">Signed in as ${esc(fb.user.name)}. <button class="link-btn" data-action="group-signout">Sign out</button></p>${createJoin}</section>`;
+    return `<section class="stack">${head}<p class="muted">Signed in as ${esc(fb.user.name)}. <button class="link-btn" data-action="group-signout">Sign out</button></p>${createJoin}${accountIdHtml()}</section>`;
   }
   const members = Object.entries(g.memberNames || {}).filter(([id]) => (g.members || []).includes(id)).map(([, n]) => n);
   const list = grp.items.length ? `<ul class="lib-list">${grp.items.map(it => {
@@ -239,7 +239,14 @@ function renderGroup() {
     ${list}
     ${createJoin}
     <p class="muted small">Signed in as ${esc(fb.user.name)}. <button class="link-btn" data-action="group-signout">Sign out</button> · <button class="link-btn" data-action="group-leave">Leave ${esc(g.name)}</button></p>
+    ${accountIdHtml()}
   </section>`;
+}
+
+// Your account ID, needed once when setting up the shared voices server (its OWNER_UID).
+function accountIdHtml() {
+  return `<details class="small account-id"><summary class="muted">Account ID (for setting up shared voices)</summary>
+    <div class="row wrap"><code id="my-uid">${esc(fb.user.uid)}</code><button class="btn ghost" data-action="copy-uid">Copy</button></div></details>`;
 }
 
 function loadGroups() {
@@ -303,6 +310,10 @@ async function joinGroup(code) {
 
 Object.assign(actions, {
   group() { leave(); app.view = 'group'; render(); window.scrollTo(0, 0); },
+  'copy-uid'() {
+    const id = fb.user?.uid || '';
+    navigator.clipboard?.writeText(id).then(() => toast('Account ID copied.'), () => toast(id));
+  },
   'group-switch'(b) { selectGroup(b.dataset.gid); render(); },
   'group-signin'() { fb.signIn().catch(groupError); },
   'group-signout'() { fb.signOut().catch(groupError); },
