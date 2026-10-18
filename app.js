@@ -617,6 +617,7 @@ function aiBudgetHtml() {
       <button class="btn ghost" data-action="ai-cap"${aiLocked() ? ' disabled' : ''}>Set</button></span></div>
     ${cap > 0 ? `<div class="bar" aria-hidden="true"><div style="width:${pct}%"></div></div>` : ''}
     <p class="muted small">Used about ${money(spent)} in ${month}${cap > 0 ? ` of $${cap}` : ' (no limit set)'}. An estimate: for a hard limit, set a monthly budget in your OpenAI account (Settings &gt; Limits). 0 means no limit here.</p>
+    <p class="muted small">Enjoying the voices? <a href="https://venmo.com/u/shannonnazzal" target="_blank" rel="noopener">☕ Tip jar on Venmo</a> helps cover them.</p>
   </div>`;
 }
 

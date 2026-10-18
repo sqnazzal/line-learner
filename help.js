@@ -4,6 +4,7 @@
 // Loaded after app.js and uses its helpers.
 
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
+const TIP_URL = 'https://venmo.com/u/shannonnazzal';
 const DEVICE_TABS = { ios: 'iPhone & iPad', android: 'Android', computer: 'Computer' };
 const help = { tab: IS_IOS ? 'ios' : IS_ANDROID ? 'android' : 'computer' };
 
@@ -112,7 +113,9 @@ const COMMON = topic("Something's not working?", `<ul>
   <li><b>Reload the page.</b> Updates arrive automatically, but a reload makes sure you have the latest.</li>
   <li><b>Check your internet connection:</b> checking lines, AI voices, lyrics, sync and groups need it.</li>
   <li><b>Your scripts live in this browser.</b> Clearing this site's data (or browsing privately) can remove them, so turn on <b>Sync</b> or save a <b>Download backup</b> file now and then.</li>
-  <li>Still stuck? Take a screenshot of the message and send it to Shannon.</li></ul>`);
+  <li>Still stuck? Take a screenshot of the message and send it to Shannon.</li></ul>`)
+  + topic('Tip jar', `<p>Line Learner is free. The natural AI voices and page reading cost a little to run, so if it's helping you get off book, a tip toward the voices is very welcome (and never expected).</p>
+  <p><a class="btn primary" href="${TIP_URL}" target="_blank" rel="noopener">☕ Tip Shannon on Venmo</a></p>`);
 
 function renderHelp() {
   const tabs = Object.entries(DEVICE_TABS).map(([k, v]) =>

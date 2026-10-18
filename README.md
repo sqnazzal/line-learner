@@ -156,6 +156,10 @@ The home screen lists your scripts under category tabs: **Current**, **Audition*
 - **Spending limit:** under Voices for each character, set a monthly limit for this device (default $5). The app keeps a rough estimate of OpenAI use; when it reaches the limit, new AI audio and page reading pause until next month, while everything already made still plays. For a hard limit, set a monthly budget in your OpenAI account (Settings > Limits).
 - **Your own Spotify app:** Spotify limits each personal app to 5 people. Others with Premium can make a free Spotify app and paste its Client ID under **Use your own Spotify app** when connecting.
 
+## Tip jar
+
+A Venmo tip link (https://venmo.com/u/shannonnazzal) is in the footer, on the Help screen and on the AI voices panel, to help cover the voices.
+
 ## Help
 
 **Help & troubleshooting** (on the home screen and at the bottom of every page) has setup steps and fixes for each kind of device, with tabs for iPhone & iPad, Android and computers. It opens on the tab for the device you're using.
