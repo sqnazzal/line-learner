@@ -1257,7 +1257,7 @@ function updateMergeBox(lines) {
   const opts = sel => chars.map(([c, n]) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(titleCase(c))} (${n})</option>`).join('');
   const sugg = mergeSuggestions(chars);
   box.innerHTML = `<details class="card merge"${app.mergeOpen || sugg.length ? ' open' : ''}>
-    <summary>Merge characters${sugg.length ? ` <span class="muted small">· ${sugg.length} possible ${sugg.length === 1 ? 'duplicate' : 'duplicates'}</span>` : ''}</summary>
+    <summary>Fix or merge character names${sugg.length ? ` <span class="muted small">· ${sugg.length} possible ${sugg.length === 1 ? 'duplicate' : 'duplicates'}</span>` : ''}</summary>
     <div class="stack-sm">
       ${sugg.length ? `<p class="small">These look like the same person:</p><ul class="share-list">${sugg.map(s => `<li class="share-row">
           <span>${esc(titleCase(s.from))} (${s.nFrom}) <span class="muted">into</span> <b>${esc(titleCase(s.to))}</b> (${s.nTo})</span>
@@ -1833,7 +1833,6 @@ function renderScript() {
         <option value="">Choose a character…</option>
         ${chars.map(([c, n]) => `<option value="${esc(c)}" ${c === s.myChar ? 'selected' : ''}>${esc(titleCase(c))} (${n} ${n === 1 ? 'line' : 'lines'})</option>`).join('')}
       </select></label>
-      ${s.kind !== 'song' && !s.sample && chars.length > 1 ? '<div><button class="link-btn small" data-action="fix-names">Fix or merge character names</button></div>' : ''}
       ${rangeHtml}
       ${s.kind !== 'song' && s.myChar ? `<label class="check-row"><input type="checkbox" id="cues-only" ${app.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines.</b> Listen and Rehearse play only the line before each of yours, then yours, and skip the rest.</span></label>` : ''}
       ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${solid} of ${mine.length} lines solid</span></div>` : ''}
@@ -2407,13 +2406,6 @@ const actions = {
     merger.sig = '';
     textChanged();
     toast('Merge undone.');
-  },
-  'fix-names'() {
-    actions['edit-script']();
-    app.mergeOpen = true;
-    merger.sig = '';
-    updatePreview();
-    $('#merge-box')?.scrollIntoView({ block: 'start' });
   },
   'find-next'() { showMatch(1); },
   'find-prev'() { showMatch(-1); },
