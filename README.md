@@ -165,4 +165,4 @@ Not covered by that license: PDF.js in `vendor/pdfjs` keeps its own Apache 2.0 l
 
 Built by Shannon Nazzal · © 2026
 
-An actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Free for every actor. Please don't sell it, charge for it, or otherwise make money off it.
+An actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Free for every actor. Please don't sell it, charge for it, or otherwise make money off it ([license](LICENSE.md)).
