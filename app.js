@@ -953,7 +953,7 @@ function renderLibrary() {
   const has = scripts.length > 0;
   return `<section class="stack">
     <div class="hero">
-      <h1>Because your family is tired of running lines with you.</h1>
+      <h1 class="tagline">Because your family is tired of running lines with you.</h1>
       <p class="lede">Paste your script, pick your part, and let’s rehearse. Listen on repeat, work through tricky speeches, or run the whole scene out loud. Forget a line? Just say “line.” We can do this all night.</p>
       <div class="row wrap">
         <button class="btn primary" data-action="new">+ New script</button>

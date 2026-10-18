@@ -188,6 +188,9 @@ textarea { font-family: var(--font-script); line-height: 1.6; resize: vertical; 
 /* Library */
 .hero { display: flex; flex-direction: column; gap: 14px; padding: 12px 0 4px; }
 .lede { font-size: 1.1rem; color: var(--muted); max-width: 60ch; }
+/* The welcome line: bold, body-sized, and scaled down on narrow phones so it stays on one line. */
+.tagline { font-size: min(1.15rem, 3.4vw); font-weight: 700; white-space: nowrap; line-height: 1.3; }
+@media (max-width: 330px) { .tagline { white-space: normal; } }
 .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .script-card { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 8px; }
 .script-card:hover { border-color: var(--accent); }
