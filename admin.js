@@ -20,7 +20,12 @@ Object.assign(fb, {
   async sendFeedback(note) {
     await fb.load();
     const { F, db } = fb.api;
-    return F.addDoc(F.collection(db, 'feedback'), { ...note, at: Date.now(), ...(fb.user ? { uid: fb.user.uid, name: fb.user.name } : {}) });
+    const ref = await F.addDoc(F.collection(db, 'feedback'), { ...note, at: Date.now(), ...(fb.user ? { uid: fb.user.uid, name: fb.user.name } : {}) });
+    // Asks the voices server to email Shannon about it. Best effort: the note is saved either way.
+    if (SHARED_VOICES_URL) {
+      fetch(`${SHARED_VOICES_URL}/notify-feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ref.id }) }).catch(() => {});
+    }
+    return ref;
   },
   async adminFeedback() {
     const { F, db } = fb.api;

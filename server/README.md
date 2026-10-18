@@ -18,6 +18,11 @@
    ```
    Then in the Worker: **Settings > Bindings > Add > D1 database**, variable name `DB`, database `line-learner-usage`.
 5. **Connect the app.** The Worker's address goes in `SHARED_VOICES_URL` in `app.js` (currently `https://line-learner-voices.sqnazzal.workers.dev`).
+6. **Feedback emails (optional).** Sign up at [resend.com](https://resend.com) (free), then **API Keys > Create API key** with **Sending access**. In the Worker's **Settings > Variables and Secrets** add:
+   - `RESEND_API_KEY` (type **Secret**): the key
+   - `FEEDBACK_EMAIL`: the email address you signed up to Resend with (Resend's free test sender only mails that address)
+
+   Each note sent with **Send feedback** then arrives by email with the device details and any screenshot attached; reply to it to answer the sender if they left an email address.
 
 ## How it decides
 

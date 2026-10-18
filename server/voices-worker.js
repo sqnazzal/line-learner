@@ -13,6 +13,10 @@
 // Optional binding: a D1 database named DB, with this table (run once in the D1 console):
 //   CREATE TABLE usage (uid TEXT, month TEXT, usd REAL, PRIMARY KEY (uid, month));
 // Without DB there are no per-person allowances; the OpenAI project's budget still caps the total.
+//
+// Optional, for an email when someone sends feedback (uses Resend, resend.com):
+//   RESEND_API_KEY      Secret. An API key from resend.com (API Keys > Create, "Sending access").
+//   FEEDBACK_EMAIL      The address you signed up to Resend with (its free test sender only mails that address).
 
 const TTS_MODEL = 'gpt-4o-mini-tts';
 const VISION_MODEL = 'gpt-6-luna';
@@ -33,6 +37,12 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     try {
+      // Feedback alerts need no sign-in: the note is read from Firestore, so only real, new notes are emailed.
+      if (new URL(request.url).pathname.replace(/\/+$/, '').endsWith('/notify-feedback') && request.method === 'POST') {
+        const { id } = await request.json().catch(() => ({}));
+        return json(await emailFeedback(String(id || ''), env));
+      }
+
       const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
       if (!token) return json({ error: 'Sign in to use the shared voices.' }, 401);
       let user;
@@ -166,4 +176,48 @@ async function addUsage(env, uid, month, usd) {
   if (!env.DB || !usd) return;
   await env.DB.prepare('INSERT INTO usage (uid, month, usd) VALUES (?, ?, ?) ON CONFLICT (uid, month) DO UPDATE SET usd = usd + excluded.usd')
     .bind(uid, month, usd).run();
+}
+
+// ---------- Email Shannon when someone sends feedback (only with RESEND_API_KEY and FEEDBACK_EMAIL) ----------
+// The app sends just the new note's ID. The note is read from Firestore (the rules let anyone holding a
+// note's random ID read that one note), and only notes from the last 10 minutes are emailed, so the
+// email can't be faked or replayed later.
+const emailed = new Set();
+async function emailFeedback(id, env) {
+  if (!env.RESEND_API_KEY || !env.FEEDBACK_EMAIL) return { ok: false, reason: 'not set up' };
+  if (!/^[A-Za-z0-9]{10,40}$/.test(id) || emailed.has(id)) return { ok: false };
+  const res = await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/feedback/${id}`);
+  if (!res.ok) return { ok: false };
+  const f = (await res.json()).fields || {};
+  const str = k => f[k]?.stringValue || '';
+  const at = Number(f.at?.integerValue ?? f.at?.doubleValue ?? 0);
+  if (Date.now() - at > 10 * 60 * 1000) return { ok: false, reason: 'too old' };
+  emailed.add(id);
+
+  const kind = { bug: 'Bug report', idea: 'Idea', other: 'Feedback' }[str('kind')] || 'Feedback';
+  const who = str('name') || str('contact') || 'someone (not signed in)';
+  const contact = str('contact');
+  const text = [
+    `${kind} from ${who}${contact && contact !== who ? ` (${contact})` : ''}`,
+    '',
+    str('message'),
+    '',
+    str('details') ? `Device details:\n${str('details')}` : '',
+    '',
+    'See it (and delete it) in Line Learner > Group > Admin: https://sqnazzal.github.io/line-learner/',
+  ].join('\n');
+  const shot = str('screenshot').match(/^data:image\/(\w+);base64,(.+)$/);
+  const mail = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: 'Line Learner <onboarding@resend.dev>',
+      to: [env.FEEDBACK_EMAIL],
+      subject: `Line Learner: ${kind.toLowerCase()} from ${who}`,
+      text,
+      ...(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact) ? { reply_to: contact } : {}),
+      ...(shot ? { attachments: [{ filename: `screenshot.${shot[1] === 'jpeg' ? 'jpg' : shot[1]}`, content: shot[2] }] } : {}),
+    }),
+  });
+  return { ok: mail.ok };
 }

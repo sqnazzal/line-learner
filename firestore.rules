@@ -33,8 +33,10 @@ service cloud.firestore {
       allow list, write: if isAdmin();
     }
 
-    // Send feedback: anyone can send a note (signed in or not); only the admin can read or delete them.
+    // Send feedback: anyone can send a note (signed in or not); only the admin can list or delete them.
+    // One note can be read by its random ID, so the voices server can email it to the admin.
     match /feedback/{id} {
+      allow get: if true;
       allow create: if request.resource.data.keys().hasOnly(['kind', 'message', 'contact', 'details', 'screenshot', 'at', 'uid', 'name'])
         && request.resource.data.kind in ['bug', 'idea', 'other']
         && request.resource.data.message is string && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 5000
