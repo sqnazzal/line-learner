@@ -1,5 +1,9 @@
 Required Notice: Copyright 2026 Shannon Nazzal (https://github.com/sqnazzal/line-learner)
 
+Additional permission: Shannon Nazzal also permits anyone to use Line Learner as hosted at https://sqnazzal.github.io/line-learner/ to rehearse for any role or audition, paid or unpaid, including professional and commercial productions. This permission is only for using the app to rehearse. It does not permit selling, charging for, copying, modifying or redistributing the software.
+
+Third-party software keeps its own license: PDF.js (vendor/pdfjs) is under the Apache License 2.0 (vendor/pdfjs/LICENSE), and Firebase's web SDK, loaded from Google's servers, is under the Apache License 2.0. The plays and monologues in library/ are public domain texts.
+
 # PolyForm Strict License 1.0.0
 
 <https://polyformproject.org/licenses/strict/1.0.0>

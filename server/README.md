@@ -23,13 +23,13 @@
    - `FEEDBACK_EMAIL`: the email address you signed up to Resend with (Resend's free test sender only mails that address)
 
    Each note sent with **Send feedback** then arrives by email with the device details and any screenshot attached; reply to it to answer the sender if they left an email address.
-7. **Everyone in Admin > People (optional).** Lets the Worker list every Google sign-in, read-only:
+7. **Google key for the Worker (needed for feedback emails and for everyone in Admin > People).** Read-only access for the Worker to the sign-in list and to new feedback notes:
    1. Open [console.cloud.google.com/iam-admin/serviceaccounts?project=line-learner-45bd1](https://console.cloud.google.com/iam-admin/serviceaccounts?project=line-learner-45bd1) and tap **Create service account**. Name it `admin-people-list`, **Create and continue**.
-   2. Role: **Firebase Authentication Viewer** only. **Continue**, **Done**.
+   2. Roles: **Firebase Authentication Viewer** and **Cloud Datastore Viewer** (add another role for the second), nothing else. **Continue**, **Done**.
    3. Open the new account > **Keys > Add key > Create new key > JSON**. A file downloads.
    4. In the Worker: **Settings > Variables and Secrets > Add**, type **Secret**, name `GOOGLE_SERVICE_ACCOUNT`, and paste the whole file's contents. Then delete the downloaded file.
 
-   Without it, People only shows those who have opened the app signed in since the Admin screen was added.
+   Without it, no feedback emails are sent (notes still appear in Admin), and People only shows those who have opened the app signed in since the Admin screen was added. Feedback notes are private: since this change the Worker reads them with this key rather than publicly, and it sends at most 20 alert emails an hour.
 
 ## How it decides
 

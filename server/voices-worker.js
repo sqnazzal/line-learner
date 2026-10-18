@@ -18,9 +18,9 @@
 //   RESEND_API_KEY      Secret. An API key from resend.com (API Keys > Create, "Sending access").
 //   FEEDBACK_EMAIL      The address you signed up to Resend with (its free test sender only mails that address).
 //
-// Optional, so Admin > People lists everyone who has signed in with Google (not just those who opened the app since):
+// Needed for feedback emails, and so Admin > People lists everyone who has signed in with Google:
 //   GOOGLE_SERVICE_ACCOUNT  Secret. The whole JSON key of a Google service account with only the
-//                           "Firebase Authentication Viewer" role (see server/README.md).
+//                           "Firebase Authentication Viewer" and "Cloud Datastore Viewer" roles (see server/README.md).
 
 const TTS_MODEL = 'gpt-4o-mini-tts';
 const VISION_MODEL = 'gpt-6-luna';
@@ -234,18 +234,28 @@ async function addUsage(env, uid, month, usd) {
 // note's random ID read that one note), and only notes from the last 10 minutes are emailed, so the
 // email can't be faked or replayed later.
 const emailed = new Set();
+// Feedback notes are private (only the admin can read them in the app), so the Worker reads each one with its
+// own Google service account, never as the public. At most EMAILS_PER_HOUR alerts go out, so a flood of
+// notes can't flood the inbox (they still all appear in Admin).
+const EMAILS_PER_HOUR = 20;
+let emailWindow = { start: 0, count: 0 };
 async function emailFeedback(id, env) {
-  if (!env.RESEND_API_KEY || !env.FEEDBACK_EMAIL) return { ok: false, reason: 'not set up' };
+  if (!env.RESEND_API_KEY || !env.FEEDBACK_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT) return { ok: false, reason: 'not set up' };
   if (!/^[A-Za-z0-9]{10,40}$/.test(id) || emailed.has(id)) return { ok: false };
-  const res = await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/feedback/${id}`);
+  if (Date.now() - emailWindow.start > 3600_000) emailWindow = { start: Date.now(), count: 0 };
+  if (emailWindow.count >= EMAILS_PER_HOUR) return { ok: false, reason: 'busy' };
+  const token = await googleAccessToken(JSON.parse(env.GOOGLE_SERVICE_ACCOUNT));
+  const res = await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/feedback/${id}`,
+    { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return { ok: false };
   const f = (await res.json()).fields || {};
   const str = k => f[k]?.stringValue || '';
   const at = Number(f.at?.integerValue ?? f.at?.doubleValue ?? 0);
   if (Date.now() - at > 10 * 60 * 1000) return { ok: false, reason: 'too old' };
   emailed.add(id);
+  emailWindow.count++;
 
-  const kind = { bug: 'Bug report', idea: 'Idea', other: 'Feedback' }[str('kind')] || 'Feedback';
+  const kind = { bug: 'Bug report', idea: 'Idea', privacy: 'Privacy request', copyright: 'Copyright concern', other: 'Feedback' }[str('kind')] || 'Feedback';
   const who = str('name') || str('contact') || 'someone (not signed in)';
   const contact = str('contact');
   const text = [

@@ -204,7 +204,7 @@ function renderAdmin() {
   </section>`;
 }
 
-const FEEDBACK_TAGS = { bug: 'Bug', idea: 'Idea', other: 'Other' };
+const FEEDBACK_TAGS = { bug: 'Bug', idea: 'Idea', other: 'Other', privacy: 'Privacy', copyright: 'Copyright' };
 
 function feedbackHtml() {
   const list = adm.feedback;

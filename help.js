@@ -72,7 +72,7 @@ const HELP = {
   computer: [
     ['Getting started', `<ol>
       <li>Use <b>Google Chrome</b> or <b>Microsoft Edge</b> (Firefox can read lines aloud but can't check them).</li>
-      <li>Keyboard shortcuts while practicing: <kbd>Space</kbd> play/pause, <kbd>←</kbd> <kbd>→</kbd> lines, <kbd>H</kbd> hint, <kbd>L</kbd> hear the line, <kbd>Enter</kbd> done speaking.</li>
+      <li>Keyboard shortcuts while practicing: <kbd>Space</kbd> play/pause, <kbd>←</kbd> <kbd>→</kbd> lines, <kbd>H</kbd> hint, <kbd>L</kbd> hear the line, <kbd>Enter</kbd> done speaking. Turn them off under <b>Practice settings</b> &gt; <b>Advanced</b> if they get in the way of a screen reader or voice control.</li>
       <li>Bookmark the page, or in Chrome/Edge use the <b>Install</b> icon in the address bar for an app window.</li></ol>`],
     ['Microphone (checking your lines)', `<ul>
       <li>Click the icon at the left of the address bar &gt; <b>Microphone</b> &gt; <b>Allow</b>, then reload.</li>
@@ -119,7 +119,7 @@ const SYNC_HELP = topic('Sync, groups and backups', `<h2>Syncing your devices</h
     <li><b>Not in the backup:</b> your recordings. Use <b>Download recordings</b> next to it for those (the same Restore button brings them back).</li></ul>`);
 
 const ACCESS_HELP = topic('Accessibility', `<ul>
-    <li><b>Screen readers and keyboard:</b> every button works from the keyboard, and in the player, results like <i>"Not quite, 60 percent. Missed: glad, see"</i> are announced. Shortcuts: <kbd>Space</kbd> play/pause, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> move, <kbd>H</kbd> hint, <kbd>L</kbd> hear the line, <kbd>Enter</kbd> done speaking.</li>
+    <li><b>Screen readers and keyboard:</b> every button works from the keyboard, and in the player, results like <i>"Not quite, 60 percent. Missed: glad, see"</i> are announced. Shortcuts: <kbd>Space</kbd> play/pause, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> move, <kbd>H</kbd> hint, <kbd>L</kbd> hear the line, <kbd>Enter</kbd> done speaking. Turn them off under <b>Practice settings</b> &gt; <b>Advanced</b> if they get in the way of a screen reader or voice control.</li>
     <li><b>Can't or don't want to speak?</b> <b>Type your lines</b> checks typed lines with no microphone, and without mic support, Rehearse lets you mark each line yourself.</li>
     <li><b>Seeing the words:</b> <b>Practice settings</b> &gt; <b>Text size</b> goes up to Extra large, the colors button at the top switches Light and Dark, and your browser's zoom works everywhere.</li>
     <li><b>Hearing:</b> everything read aloud is also shown on screen.</li>
@@ -132,30 +132,36 @@ const REAL_HELP = topic('Rehearsing for real: phone on a stand, headphones, long
     <li><b>Just your part:</b> on a script, tick <b>Just my cues and lines</b> and Listen, Rehearse and Type play only the line before each of yours, then yours, skipping the rest of the show. <b>Listen, screen off</b> has the same choice when you make a track.</li>
     <li><b>Long scenes:</b> leave any time and the script page offers <b>Pick up where you left off</b>. Lines like <code># Act 2</code> or <code>Scene 3</code> in the script make sections you can pick with <b>Start at</b>, and the play icon on any of your lines starts Rehearse from there.</li></ul>`);
 
-// Kept in step with what the app actually stores and sends; update it when that changes.
+// Kept in step with what the app actually stores and sends (and the access firestore.rules gives); update it
+// when either changes.
+const PRIVACY_DATE = 'October 18, 2026';
 const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.privacyOpen ? ' open' : ''}><summary>Privacy: what's stored and where</summary><div class="help-body">
-  <p>Line Learner is a free app Shannon made for friends, family and fellow actors. There are no ads, no tracking, and nothing is ever sold.</p>
+  <p class="muted small">Last updated ${PRIVACY_DATE}.</p>
+  <p>Line Learner is a free app Shannon made for friends, family and fellow actors. It has no ads and no analytics or advertising trackers, and nothing is ever sold. The services it uses (below) may keep their own technical logs, such as your IP address, under their own policies.</p>
   <p><b>Stays on your device</b> (in this browser):</p>
   <ul>
     <li>Your scripts, songs, categories and practice progress</li>
-    <li>Your voice recordings (they never leave your device unless you download them)</li>
+    <li>Your voice recordings (they never leave your device unless you download them yourself)</li>
     <li>Saved screen-off tracks and AI voice audio</li>
     <li>Your own OpenAI key, if you add one, and your Spotify connection</li>
   </ul>
-  <p><b>If you sign in with Google</b> (optional), Shannon's Firebase project (run by Google) keeps:</p>
+  <p><b>If you sign in with Google</b> (optional, ages 13 and up), Shannon's Firebase project (run by Google) keeps:</p>
   <ul>
     <li>Your name, email and when you last used the app, so Shannon can see who's using it</li>
-    <li>Your synced scripts, songs, categories and progress. Only you can see them; Shannon, as the app's admin, can delete them</li>
+    <li>Your synced scripts, songs, categories and progress. Other people can't see them. Shannon, as the app's admin, has access to them and to your account details, and uses it only to delete data you ask to have removed or to fix a problem you report</li>
     <li>The groups you're in, and anything you <b>Share to group</b>, which everyone in that group can see</li>
   </ul>
   <p><b>Sent to other services, only when you use a feature that needs them:</b></p>
   <ul>
-    <li><b>AI voices and reading pages:</b> the lines being voiced, or the page photos, go to OpenAI. With Shannon's shared voices they pass through Shannon's small server, which keeps only a running monthly cost total for your account.</li>
-    <li><b>Checking your lines by microphone:</b> your browser's speech recognition (Apple or Google) hears what you say.</li>
-    <li><b>Songs:</b> song names go to LRCLIB to find lyrics, and Spotify to play them.</li>
-    <li><b>Send feedback:</b> your message, anything you add (contact details, a screenshot) and, if ticked, device details go to Shannon, by email and in the app.</li>
+    <li><b>AI voices and reading pages:</b> the lines being voiced, or the page photos, go to <a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noopener">OpenAI</a>. With Shannon's shared voices they pass through Shannon's small server on <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare</a>, which keeps only a monthly cost total for your account. AI voices are computer-generated, not real people.</li>
+    <li><b>Checking your lines by microphone:</b> your browser's own speech recognition (from Apple or Google) hears what you say. Line Learner doesn't keep the audio or make voiceprints.</li>
+    <li><b>Songs:</b> song names go to <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a> to find lyrics. Playing a song uses <a href="https://www.spotify.com/legal/privacy-policy/" target="_blank" rel="noopener">Spotify</a>, whose player can set its own cookies.</li>
+    <li><b>Send feedback:</b> your message, anything you add (contact details, a screenshot) and, if ticked, device details are stored for Shannon to read in the app, and emailed to Shannon through <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener">Resend</a>. Only Shannon can read them.</li>
+    <li><b>The app itself</b> is hosted on <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub Pages</a>; sign-in and sync use <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Google Firebase</a>.</li>
   </ul>
-  <p><b>Removing your data:</b> delete scripts in the app any time; clearing this site's data in your browser removes everything on this device. To have your synced scripts, profile and group memberships deleted, <button class="link-btn" data-action="feedback">send feedback</button> asking Shannon to delete your data.</p>
+  <p><b>How long it's kept:</b> what's on your device stays until you delete it or clear this site's data. Your account details and synced data stay until you delete them or ask Shannon to. Feedback stays until Shannon deletes it. Monthly voice cost totals are kept as simple per-month numbers. Something you unshare from a group is hidden from the group, and kept (so it can be restored if it was a mistake) until Shannon deletes it.</p>
+  <p><b>Deleting your data:</b> delete scripts in the app any time (with sync on, that removes them from your synced copy too); clearing this site's data in your browser removes everything on this device. To have your synced data, profile and group memberships deleted, <button class="link-btn" data-action="feedback" data-kind="privacy">send a privacy request</button> while signed in. Things you shared to a group stay there until you unshare them (or ask Shannon to remove them), and copies other people already added to their own scripts stay on their devices; no one can take those back.</p>
+  <p><b>Questions, or a copyright concern?</b> <button class="link-btn" data-action="feedback" data-kind="privacy">Privacy request</button> · <button class="link-btn" data-action="feedback" data-kind="copyright">Copyright concern</button></p>
 </div></details>`;
 
 const COMMON = topic("Something's not working?", `<ul>
@@ -202,6 +208,8 @@ const fbk = { kind: 'bug', from: '', shot: '', sent: false, busy: false };
 const FEEDBACK_KINDS = {
   bug: ['Report a bug', 'What happened, and what did you expect? What were you doing just before?'],
   idea: ['Idea', 'What would make rehearsing easier?'],
+  privacy: ['Privacy or delete my data', 'What would you like to know, see or have deleted? Sign in first if it is about your account, so we know it is you.'],
+  copyright: ['Copyright concern', 'Which script or song, where it appears (Browse, or a group), what you own or represent, and how to reach you. Please leave a contact below.'],
   other: ['Something else', "What's on your mind?"],
 };
 
@@ -234,7 +242,7 @@ function renderFeedback() {
     ${head}
     <p class="lede">Found a bug, have an idea, or a line it keeps getting wrong? Tell Shannon here. Especially while it's new, every note helps.</p>
     <div class="card stack-sm">
-      <div class="segmented" role="group" aria-label="What kind of feedback">${kinds}</div>
+      <div class="segmented wrap-seg" role="group" aria-label="What kind of feedback">${kinds}</div>
       <label class="field"><span>Message</span><textarea id="fb-msg" rows="6" maxlength="5000" placeholder="${esc(FEEDBACK_KINDS[fbk.kind][1])}"></textarea></label>
       <label class="field"><span>Your name or email, if you'd like a reply (optional)</span><input id="fb-contact" maxlength="200" value="${esc(signedInUser()?.email || '')}" autocomplete="email"></label>
       <label class="field"><span>Screenshot (optional)</span><input id="fb-shot" type="file" accept="image/*"></label>
@@ -259,7 +267,7 @@ document.addEventListener('change', async e => {
 });
 
 Object.assign(actions, {
-  feedback() { if (app.view !== 'feedback') fbk.from = app.view; leave(); Object.assign(fbk, { sent: false, shot: '', busy: false }); app.view = 'feedback'; render(); window.scrollTo(0, 0); },
+  feedback(b) { if (app.view !== 'feedback') fbk.from = app.view; leave(); Object.assign(fbk, { sent: false, shot: '', busy: false, ...(FEEDBACK_KINDS[b?.dataset?.kind] ? { kind: b.dataset.kind } : {}) }); app.view = 'feedback'; render(); window.scrollTo(0, 0); },
   'fb-kind'(b) {
     fbk.kind = b.dataset.kind;
     for (const x of document.querySelectorAll('[data-action="fb-kind"]')) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }

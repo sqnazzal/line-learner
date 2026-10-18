@@ -124,7 +124,7 @@ Sign in, then tap **Group**.
 
 ## Accessibility
 
-Built to WCAG 2.1 AA: works by keyboard and with screen readers (player results are announced, focus follows each screen), passes color contrast in Light and Dark, follows the device's reduce-motion setting, and zooms freely. **Type your lines** practices with no microphone, text size goes up to Extra large, and everything read aloud is also on screen. Checked with the axe accessibility scanner on every screen in both themes. Barriers can be reported through **Send feedback**.
+Designed toward WCAG 2.2 AA (not certified, and not a legal ADA determination): works by keyboard and with screen readers (player results are announced, focus follows each screen), passes color contrast in Light and Dark, follows the device's reduce-motion setting, and zooms freely. **Type your lines** practices with no microphone, text size goes up to Extra large, and everything read aloud is also on screen. Checked with the axe accessibility scanner on every screen in both themes; not yet tested end to end with VoiceOver or NVDA. Single-key shortcuts can be turned off (Practice settings > Advanced). Barriers can be reported through **Send feedback**.
 
 ## Privacy
 
@@ -177,10 +177,12 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 
 Line Learner is licensed under the [PolyForm Strict License 1.0.0](LICENSE.md): anyone can use it for personal, educational, charitable or other noncommercial purposes, but not change it, share copies of it, or make money from it. For anything else, ask Shannon.
 
+**Extra permission:** anyone may use the hosted app to rehearse for any role or audition, paid or unpaid (see the top of [LICENSE.md](LICENSE.md)); that doesn't extend to selling, copying, changing or redistributing the app.
+
 Not covered by that license: PDF.js in `vendor/pdfjs` keeps its own Apache 2.0 license, and the plays and monologues in `library/` are public domain texts from Project Gutenberg.
 
 ---
 
 Built by Shannon Nazzal · © 2026
 
-An actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Free for every actor. Please don't sell it, charge for it, or otherwise make money off it ([license](LICENSE.md)).
+An actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Free for every actor, for any role, paid or not. Please don't sell it, charge for it, or otherwise make money off the app itself ([license](LICENSE.md)).

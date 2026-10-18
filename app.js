@@ -64,6 +64,7 @@ const DEFAULT_SETTINGS = {
   listenHears: true,       // Listen mode: hear you say your line and move on when you finish
   textSize: 'normal',      // normal | large | huge (bigger words for a phone on a stand)
   typeCues: 'show',        // Type mode: show (silent) | speak (headphones)
+  shortcuts: true,         // single-key shortcuts in the player (Space, arrows, H, L, Enter); can be turned off
 };
 
 function loadJSON(key, fallback) {
@@ -775,7 +776,7 @@ function sharedPanelHtml() {
       <div class="row wrap">${prog
         ? `<span id="ai-progress" class="muted small">Preparing voices: ${prog.done} of ${prog.total}</span><button class="btn ghost" data-action="ai-stop">Stop</button>`
         : '<button class="btn" data-action="ai-prepare">Prepare all lines now</button>'}</div>
-      <p class="muted small">Lines are made once and saved on this device, so replays don't use your share.</p>` : '<p class="muted small">Human-sounding voices for people in Shannon\'s groups, no key needed.</p>'}
+      <p class="muted small">Lines are made once and saved on this device, so replays don't use your share.</p>` : '<p class="muted small">Human-sounding, computer-generated voices for people in Shannon\'s groups, no key needed.</p>'}
   </div>`;
 }
 
@@ -786,7 +787,7 @@ function aiPanelHtml() {
       ${sharedHtml}
       ${sharedHtml ? '<details class="own-key"><summary class="small">Or use your own OpenAI key</summary><div class="stack-sm">' : ''}
       <b>Natural AI voices</b>
-      <p class="muted small">Human-sounding voices from OpenAI that act out stage directions like (angrily) or (whispering). Each line costs a little the first time it's read, then replays free, even offline.</p>
+      <p class="muted small">Human-sounding, computer-generated voices from OpenAI that act out stage directions like (angrily) or (whispering). Each line costs a little the first time it's read, then replays free, even offline.</p>
       <ol class="steps-list small">
         <li>Sign in at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a> and add a few dollars of credit under Billing.</li>
         <li>Tap <b>Create new secret key</b>, copy it, and paste it here.</li>
@@ -1198,7 +1199,7 @@ function accountLineHtml() {
     const syncing = typeof gsync !== 'undefined' && gsync.conf.on;
     return `<p class="muted small account-line">Signed in as ${esc(user.name)}. ${syncing ? 'Your scripts, songs and progress sync to your other devices.' : 'Turn on <button class="link-btn" data-action="sync-view">Sync</button> to keep your scripts the same on your other devices.'}</p>`;
   }
-  return `<p class="muted small account-line">Signing in is optional. Everything works on this device without it. <button class="link-btn" data-action="group">Sign in with Google</button> to keep your scripts in sync across your devices and to share with a cast or group.</p>`;
+  return `<p class="muted small account-line">Signing in is optional. Everything works on this device without it. <button class="link-btn" data-action="group">Sign in with Google</button> to keep your scripts in sync across your devices and to share with a cast or group (ages 13 and up).</p>`;
 }
 
 // "Continue Hamlet as Horatio · Act 1, Scene 2 · Rehearse": straight back into your last run, same mode,
@@ -1262,7 +1263,8 @@ function renderEdit() {
       ${findBarHtml()}
       <label class="field"><span>Lyrics</span><textarea id="ed-raw" rows="14" spellcheck="false" placeholder="One line of the song per line">${esc(e.raw)}</textarea></label>
       <div id="ed-preview" class="muted stack-sm"></div>
-      <div class="row wrap">
+      <p class="muted small rights-note">Only add scripts and lyrics you have the right to use this way: a public-domain text, your own writing, or one your production's license or the publisher allows (including reading it with AI voices). It stays private to you unless you share it.</p>
+            <div class="row wrap">
         <span class="spacer"></span>
         <button class="btn ghost" data-action="cancel-edit">Cancel</button>
         <button class="btn primary" data-action="save-edit">Save</button>
@@ -1292,7 +1294,8 @@ JULIET: Ay me!</pre>
     ${findBarHtml(true)}
     <label class="field"><span>Script</span><textarea id="ed-raw" rows="16" spellcheck="false" placeholder="Paste your scene or monologue here">${esc(e.raw)}</textarea></label>
     <div id="ed-preview" class="muted stack-sm"></div>
-    <div class="row wrap">
+    <p class="muted small rights-note">Only add scripts and lyrics you have the right to use this way: a public-domain text, your own writing, or one your production's license or the publisher allows (including reading it with AI voices). It stays private to you unless you share it.</p>
+        <div class="row wrap">
       <span class="spacer"></span>
       <button class="btn ghost" data-action="cancel-edit">Cancel</button>
       <button class="btn primary" data-action="save-edit">Save</button>
@@ -1564,8 +1567,15 @@ function renderBrowse() {
     </div>
     ${lib.tab === 'monologues' ? `<div class="row wrap chips">${chip('gender', '', 'Everyone')}${chip('gender', 'f', 'Female')}${chip('gender', 'm', 'Male')}<span class="chip-gap"></span>${chip('tone', '', 'Any tone')}${chip('tone', 'Dramatic', 'Dramatic')}${chip('tone', 'Comedic', 'Comedic')}</div>` : ''}
     <div id="lib-results">${libResultsHtml(q)}</div>
-    <p class="muted small">These are public-domain texts. Plays by Chekhov, Ibsen, Molière and Rostand are older English translations, so the wording may differ from the edition your production or audition uses. Modern plays are under copyright: import your own copy with PDF or screenshots.</p>
+    <p class="muted small">These are public-domain texts. Plays by Chekhov, Ibsen, Molière and Rostand are older English translations, so the wording may differ from the edition your production or audition uses. Modern plays are under copyright: import your own copy, if your production's license or the publisher allows it. Something here that shouldn't be? <button class="link-btn" data-action="feedback" data-kind="copyright">Report a copyright concern</button>.</p>
   </section>`;
+}
+
+// Where a library text comes from (and who translated it), so it can be checked against your edition.
+function libSourceHtml(p) {
+  if (!p?.gutenberg) return '';
+  const by = p.translator ? `Translated by ${esc(p.translator)}` : p.translator === '' ? 'Older English translation (translator not named)' : '';
+  return `<span class="muted small">${by ? `${by} · ` : ''}Public domain, from <a href="https://www.gutenberg.org/ebooks/${p.gutenberg}" target="_blank" rel="noopener">Project Gutenberg #${p.gutenberg}</a></span>`;
 }
 
 function libResultsHtml(q) {
@@ -1576,7 +1586,8 @@ function libResultsHtml(q) {
     if (!plays.length) return '<p class="muted">No plays match that search.</p>';
     return `<ul class="lib-list">${plays.map(p => `<li class="card lib-card">
       <div class="lib-main"><b>${esc(p.title)}</b><span class="muted small">${esc(p.author)} · ${esc(p.genre)} · ${p.speeches.toLocaleString()} speeches</span>
-      <span class="small">${esc(p.cast.slice(0, 8).map(titleCase).join(', '))}</span></div>
+      <span class="small">${esc(p.cast.slice(0, 8).map(titleCase).join(', '))}</span>
+      ${libSourceHtml(p)}</div>
       <button class="btn primary" data-action="lib-add-play" data-slug="${esc(p.slug)}">Add</button></li>`).join('')}</ul>`;
   }
   const monos = lib.monologues
@@ -1590,6 +1601,7 @@ function libResultsHtml(q) {
     <div class="lib-main">
       <b>${esc(titleCase(m.character))}</b><span class="muted small">${esc(m.play)} · ${esc(m.author)}</span>
       <span class="small">“${esc(m.firstWords.replace(/[\s.,;:!?]+$/, ''))}…”</span>
+      ${libSourceHtml(lib.plays.find(p => p.title.toLowerCase() === m.play.toLowerCase()))}
       <span class="row wrap tags"><span class="tag">${m.gender === 'f' ? 'Female' : 'Male'}</span><span class="tag">${esc(m.tone)}</span><span class="tag">About ${minutesFor(m.words)} min</span></span>
       ${lib.open === m.i ? `<p class="lib-preview">${fmt(m.text)}</p>` : ''}
     </div>
@@ -2009,6 +2021,7 @@ function renderScript() {
     <details id="voices" class="card" ${app.voicesOpen ? 'open' : ''}>
       <summary>Voices for each character</summary>
       ${aiPanelHtml()}
+      <p class="muted small">Want a real voice instead? The record button on any line records it on this device (recordings are never uploaded or shared). Recording a friend or castmate? Ask them first.</p>
       ${voices.length || aiReady() ? chars.map(([c]) => {
         const { gender, voice: auto } = cast.get(c);
         const lockAttr = voiceEditsLocked() ? ' disabled title="Locked: unlock with the PIN above to change AI voices"' : '';
@@ -2090,7 +2103,7 @@ function renderPlayer() {
     </div>
     <div id="stage" class="stage"></div>
     <div id="controls" class="controls"></div>
-    <p class="muted small center keys"><kbd>Space</kbd> play/pause · <kbd>←</kbd> <kbd>→</kbd> move · <kbd>H</kbd> hint · <kbd>L</kbd> hear line · <kbd>Enter</kbd> done speaking</p>
+    <p class="muted small center keys"${settings.shortcuts ? '' : ' hidden'}><kbd>Space</kbd> play/pause · <kbd>←</kbd> <kbd>→</kbd> move · <kbd>H</kbd> hint · <kbd>L</kbd> hear line · <kbd>Enter</kbd> done speaking</p>
     ${settingsHtml()}
   </section>`;
 }
@@ -2249,6 +2262,7 @@ function settingsHtml() {
     usesMic && `<label><span>Wait after you stop talking</span>${rng('silenceMs', 800, 4000, 100)}</label>`,
     m !== 'buildup' && `<label class="check">${chk('readDirections')}<span>${spoken ? 'Read stage directions aloud' : 'Show stage directions'}</span></label>`,
     spoken && `<label class="check">${chk('useRecordings')}<span>Use recorded voices when available</span></label>`,
+    `<label class="check">${chk('shortcuts')}<span>Keyboard shortcuts (Space, arrows, H, L, Enter)</span></label>`,
   ].filter(Boolean);
   return `<details class="card settings">
     <summary>Practice settings</summary>
@@ -2870,6 +2884,7 @@ function applySetting(el) {
   settings[key] = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : el.value;
   saveSettings();
   if (key === 'textSize') applyTextSize();
+  if (key === 'shortcuts') $('.keys')?.toggleAttribute('hidden', !settings.shortcuts);
   if (el.type === 'range') el.nextElementSibling.textContent = settingLabel(key);
   if (key === 'hint' && !P.result) { P.reveal = settings.hint; refreshPlayer(); }
 }
@@ -2997,7 +3012,7 @@ document.addEventListener('change', e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (app.view !== 'player' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (app.view !== 'player' || !settings.shortcuts || e.ctrlKey || e.metaKey || e.altKey) return;
   const tag = e.target.tagName;
   if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
   if (tag === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return;

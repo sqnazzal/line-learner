@@ -323,7 +323,7 @@ function renderGroup() {
   }
   if (!fb.user) {
     return `<section class="stack">${head}
-      <p class="lede">Signing in is optional. Sign in with Google to share scripts and songs with your cast, friends or family, to sync your scripts across your devices, and to use Shannon's shared voices if you're in one of Shannon's groups. Each person keeps their own progress.</p>
+      <p class="lede">Signing in is optional. Sign in with Google to share scripts and songs with your cast, friends or family, to sync your scripts across your devices, and to use Shannon's shared voices if you're in one of Shannon's groups. Each person keeps their own progress. Sign-in is for ages 13 and up; younger actors can use everything else without signing in, with a parent. <button class="link-btn" data-action="privacy">Privacy</button></p>
       ${sessionStorage.getItem(SS_JOIN) ? '<p class="note">Sign in to join the group you were invited to.</p>' : ''}
       <div><button class="btn primary" data-action="group-signin">Sign in with Google</button></div>
     </section>`;
@@ -406,7 +406,7 @@ function sharePanelHtml(s) {
     return `<li class="share-row"><div class="lib-main"><b>${esc(g.name)}</b><span class="muted small">${note}</span></div><div class="row">${actionsHtml}</div></li>`;
   }).join('');
   return `<div class="card stack-sm share-panel"><b>Share “${esc(s.title)}” with</b><ul class="share-list">${rows}</ul>
-    <p class="muted small">Shared copies go to everyone in that group. Only you can update or unshare what you share. Unsharing removes it from the group's list; copies people already added stay with them. Nobody's copy changes until they choose <b>Update my copy</b>.</p></div>`;
+    <p class="muted small">Shared copies go to everyone in that group. Only share if your production's license (or the publisher) allows giving the cast digital copies. Only you can update or unshare what you share. Unsharing removes it from the group's list, but copies people already added stay with them and can't be taken back. Nobody's copy changes until they choose <b>Update my copy</b>.</p></div>`;
 }
 
 async function loadShareStatus(s) {
