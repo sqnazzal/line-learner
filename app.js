@@ -894,9 +894,10 @@ function renderEdit() {
       <h1>${e.id ? 'Edit song' : 'New song'}</h1>
       <label class="field"><span>Title</span><input id="ed-title" value="${esc(e.title)}" placeholder="e.g. Defying Gravity (Wicked)"></label>
       ${songPanelHtml(e)}
+      ${trayHtml()}
+      ${findBarHtml()}
       <label class="field"><span>Lyrics</span><textarea id="ed-raw" rows="14" spellcheck="false" placeholder="One line of the song per line">${esc(e.raw)}</textarea></label>
       <p id="ed-preview" class="muted"></p>
-      ${trayHtml()}
       <div class="row wrap">
         <span class="spacer"></span>
         <button class="btn ghost" data-action="cancel-edit">Cancel</button>
@@ -922,11 +923,12 @@ JULIET: Ay me!</pre>
         <li><b>PDF scripts:</b> import or drag in the PDF, then skim the text. Page numbers and repeated headers are removed, but cast lists, title pages or odd layouts may need a quick tidy.</li>
       </ul>
     </details>
+    <div class="row wrap"><label class="btn">Import PDF or .txt<input type="file" id="ed-file" accept=".pdf,.txt,application/pdf,text/plain" hidden></label></div>
+    ${trayHtml()}
+    ${findBarHtml()}
     <label class="field"><span>Script</span><textarea id="ed-raw" rows="16" spellcheck="false" placeholder="Paste your scene or monologue here">${esc(e.raw)}</textarea></label>
     <p id="ed-preview" class="muted"></p>
-    ${trayHtml()}
     <div class="row wrap">
-      <label class="btn">Import PDF or .txt<input type="file" id="ed-file" accept=".pdf,.txt,application/pdf,text/plain" hidden></label>
       <span class="spacer"></span>
       <button class="btn ghost" data-action="cancel-edit">Cancel</button>
       <button class="btn primary" data-action="save-edit">Save</button>
@@ -1264,10 +1266,27 @@ function trayHtml() {
     </div>
     <p class="muted small">Handwriting (blocking, notes, arrows) is ignored; only the printed script is read.</p>
     <label class="check-row small"><input type="checkbox" data-setting="skipCuts" ${settings.skipCuts ? 'checked' : ''}${tray.reading ? ' disabled' : ''}><span>Leave out lines crossed out by hand (cuts)</span></label>
-    ${tray.progress ? `<p class="small" role="status">${esc(tray.progress)}</p>` : ''}
+    ${trayStatusHtml()}
     ${n ? `<div class="thumbs">${shown.map((p, i) => `<figure class="thumb"><img src="${p.url}" alt="Page ${i + 1}" loading="lazy"><figcaption>${i + 1}</figcaption>
       ${tray.reading ? '' : `<button class="thumb-x" data-action="tray-remove" data-i="${i}" aria-label="Remove page ${i + 1}">×</button>`}</figure>`).join('')}
       ${n > shown.length ? `<span class="muted small">and ${n - shown.length} more</span>` : ''}</div>` : ''}
+  </div>`;
+}
+
+// Progress while preparing a scanned PDF's pages or reading pages: a bar, where it's up to, and a rough time left.
+function trayStatusHtml() {
+  const job = tray.job;
+  if (!job) return tray.progress ? `<p class="small" role="status">${esc(tray.progress)}</p>` : '';
+  const pct = Math.round(100 * job.done / Math.max(1, job.total));
+  let left = '';
+  if (job.done > 0 && job.done < job.total) {
+    const mins = (Date.now() - job.started) / job.done * (job.total - job.done) / 60000;
+    left = mins < 1 ? ' · under a minute left' : ` · about ${Math.round(mins)} min left`;
+  }
+  return `<div class="tray-status" role="status">
+    <div class="bar" aria-hidden="true"><div style="width:${pct}%"></div></div>
+    <p class="small"><b>${esc(job.label)}</b>${left}</p>
+    ${tray.progress ? `<p class="muted small">${esc(tray.progress)}</p>` : ''}
   </div>`;
 }
 
@@ -1286,10 +1305,12 @@ async function readTray() {
   keepAwake(true);
   const total = tray.pages.length, song = app.editing?.kind === 'song';
   let done = 0, readAny = false;
+  tray.job = { label: '', done: 0, total, started: Date.now() };
   try {
     while (tray.pages.length && !tray.stop) {
       const batch = tray.pages.slice(0, BATCH);
-      tray.progress = `Reading pages ${done + 1} to ${done + batch.length} of ${total}… Keep this screen open.`;
+      Object.assign(tray.job, { done, label: `Reading pages ${done + 1} to ${done + batch.length} of ${total}` });
+      tray.progress = 'Keep this screen open until it finishes.';
       refreshTray();
       const sofar = $('#ed-raw')?.value || pendingDraft()?.raw || '';
       const who = song ? '' : lastSpeaker(sofar);
@@ -1316,6 +1337,7 @@ async function readTray() {
     tray.progress = `Stopped at page ${done + 1} of ${total}: ${e.message || 'something went wrong.'} Pages already read are in the text box. Tap Read to try the rest again.`;
   } finally {
     tray.reading = false;
+    tray.job = null;
     keepAwake(false);
     refreshTray();
   }
@@ -1326,8 +1348,10 @@ async function pdfPagesToImages(file) {
   const pdfjs = await loadPdfJs();
   const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   const out = [];
+  tray.job = { label: '', done: 0, total: doc.numPages, started: Date.now() };
   for (let n = 1; n <= doc.numPages; n++) {
-    tray.progress = `Preparing page ${n} of ${doc.numPages}…`;
+    Object.assign(tray.job, { done: n - 1, label: `Preparing the scanned pages: ${n} of ${doc.numPages}` });
+    tray.progress = '';
     refreshTray();
     const page = await doc.getPage(n);
     const base = page.getViewport({ scale: 1 });
@@ -1340,7 +1364,78 @@ async function pdfPagesToImages(file) {
     out.push(new File([blob], `page-${n}.jpg`, { type: 'image/jpeg', lastModified: n }));
   }
   tray.progress = '';
+  tray.job = null;
   return out;
+}
+
+// ---------- Find and fix (in the editor) ----------
+const finder = { idx: -1, undo: null };
+
+function findBarHtml() {
+  return `<details class="card find" id="find-box"${app.findOpen ? ' open' : ''}>
+    <summary>Find and fix</summary>
+    <div class="stack-sm">
+      <div class="row wrap"><input id="find-q" type="search" class="search" placeholder="Find, e.g. a misread name" aria-label="Find" autocapitalize="off" spellcheck="false">
+        <span id="find-count" class="muted small" role="status"></span></div>
+      <div class="row wrap"><input id="find-r" type="search" class="search" placeholder="Replace with" aria-label="Replace with" autocapitalize="off" spellcheck="false"></div>
+      <div class="row wrap">
+        <button class="btn ghost" data-action="find-prev">Previous</button>
+        <button class="btn ghost" data-action="find-next">Next</button>
+        <button class="btn" data-action="find-replace">Replace</button>
+        <button class="btn" data-action="find-all">Replace all</button>
+        <label class="check-row small"><input type="checkbox" id="find-case"><span>Match case</span></label>
+        <button class="btn ghost" data-action="find-undo" id="find-undo" hidden>Undo replace all</button>
+      </div>
+    </div>
+  </details>`;
+}
+
+function findMatches() {
+  const q = $('#find-q')?.value || '', box = $('#ed-raw');
+  if (!q || !box) return [];
+  const exact = $('#find-case')?.checked;
+  const hay = exact ? box.value : box.value.toLowerCase(), needle = exact ? q : q.toLowerCase();
+  const out = [];
+  for (let at = hay.indexOf(needle); at !== -1; at = hay.indexOf(needle, at + needle.length)) out.push(at);
+  return out;
+}
+
+function updateFindCount() {
+  const el = $('#find-count');
+  if (!el) return;
+  const n = findMatches().length, q = $('#find-q').value;
+  el.textContent = !q ? '' : !n ? 'No matches' : finder.idx >= 0 ? `${finder.idx + 1} of ${n}` : `${n} ${n === 1 ? 'match' : 'matches'}`;
+}
+
+// Scrolls the text box so the selection is in view, by measuring the text before it in a hidden copy.
+function scrollBoxTo(box, at) {
+  const mirror = document.createElement('div');
+  const cs = getComputedStyle(box);
+  Object.assign(mirror.style, {
+    position: 'absolute', visibility: 'hidden', whiteSpace: 'pre-wrap', overflowWrap: 'break-word',
+    width: box.clientWidth + 'px', font: cs.font, lineHeight: cs.lineHeight, padding: cs.padding, letterSpacing: cs.letterSpacing,
+  });
+  mirror.textContent = box.value.slice(0, at) + '.';
+  document.body.appendChild(mirror);
+  box.scrollTop = Math.max(0, mirror.scrollHeight - box.clientHeight / 2);
+  mirror.remove();
+}
+
+function showMatch(step) {
+  const ms = findMatches(), box = $('#ed-raw');
+  if (!ms.length) { finder.idx = -1; updateFindCount(); return; }
+  finder.idx = finder.idx < 0 ? (step > 0 ? 0 : ms.length - 1) : (finder.idx + step + ms.length) % ms.length;
+  const at = ms[finder.idx];
+  box.focus({ preventScroll: true });
+  box.setSelectionRange(at, at + $('#find-q').value.length);
+  scrollBoxTo(box, at);
+  box.closest('label')?.scrollIntoView({ block: 'nearest' });
+  updateFindCount();
+}
+
+function textChanged() {
+  updatePreview();
+  saveDraft();
 }
 
 function statDot(st) {
@@ -1897,6 +1992,43 @@ const actions = {
       toast("Couldn't download that play. Check your connection and try again.");
     }
   },
+  'find-next'() { showMatch(1); },
+  'find-prev'() { showMatch(-1); },
+  'find-replace'() {
+    const box = $('#ed-raw'), q = $('#find-q').value, rep = $('#find-r').value;
+    if (!q) { toast('Type what to find first.'); return; }
+    const ms = findMatches();
+    const at = ms[finder.idx];
+    const selected = at != null && box.selectionStart === at && box.selectionEnd === at + q.length;
+    if (!selected) { showMatch(1); return; } // first press shows the match; the next replaces it
+    box.setRangeText(rep, at, at + q.length, 'end');
+    textChanged();
+    finder.idx -= 1; // the next match now sits where this one was
+    showMatch(1);
+  },
+  'find-all'() {
+    const box = $('#ed-raw'), q = $('#find-q').value, rep = $('#find-r').value;
+    const ms = findMatches();
+    if (!ms.length) { toast(q ? 'No matches.' : 'Type what to find first.'); return; }
+    finder.undo = box.value;
+    let out = box.value;
+    for (const at of [...ms].reverse()) out = out.slice(0, at) + rep + out.slice(at + q.length);
+    box.value = out;
+    textChanged();
+    finder.idx = -1;
+    updateFindCount();
+    $('#find-undo').hidden = false;
+    toast(`Replaced ${ms.length} ${ms.length === 1 ? 'match' : 'matches'}.`);
+  },
+  'find-undo'() {
+    if (finder.undo == null) return;
+    $('#ed-raw').value = finder.undo;
+    finder.undo = null;
+    textChanged();
+    updateFindCount();
+    $('#find-undo').hidden = true;
+    toast('Undone.');
+  },
   'tray-read'() { readTray(); },
   'tray-stop'() { tray.stop = true; tray.progress = 'Stopping after the pages being read now…'; refreshTray(); },
   'tray-clear'() {
@@ -2122,7 +2254,8 @@ document.addEventListener('input', e => {
     return;
   }
   if (e.target.id === 'ed-raw' || e.target.id === 'ed-title') saveDraft();
-  if (e.target.id === 'ed-raw') updatePreview();
+  if (e.target.id === 'ed-raw') { updatePreview(); updateFindCount(); }
+  if (e.target.id === 'find-q') { finder.idx = -1; updateFindCount(); }
   else if (e.target.dataset.setting && e.target.type === 'range') applySetting(e.target);
   else if (e.target.dataset.speedChar) {
     const s = current(), c = e.target.dataset.speedChar, v = +e.target.value;
@@ -2135,7 +2268,18 @@ document.addEventListener('input', e => {
   }
 });
 
-document.addEventListener('toggle', e => { if (e.target.id === 'voices') app.voicesOpen = e.target.open; }, true);
+document.addEventListener('toggle', e => {
+  if (e.target.id === 'voices') app.voicesOpen = e.target.open;
+  if (e.target.id === 'find-box') { app.findOpen = e.target.open; if (e.target.open) $('#find-q')?.focus(); }
+}, true);
+
+// Find and fix: Enter jumps to the next match; Match case recounts.
+document.addEventListener('keydown', e => {
+  if (e.target.id === 'find-q' && e.key === 'Enter') { e.preventDefault(); showMatch(e.shiftKey ? -1 : 1); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'find-case') { finder.idx = -1; updateFindCount(); }
+});
 
 document.addEventListener('keydown', e => {
   if (app.view !== 'player' || e.ctrlKey || e.metaKey || e.altKey) return;

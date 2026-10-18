@@ -315,6 +315,10 @@ em.dir { font-style: italic; }
 button, .btn { touch-action: manipulation; }
 
 /* Pages tray (photos and screenshots to read) */
+.tray-status { display: flex; flex-direction: column; gap: 6px; }
+.tray-status .bar { height: 10px; }
+.tray-status .bar > div { background: var(--accent); }
+.find summary { font-weight: 600; }
 .thumbs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .thumb { position: relative; margin: 0; width: 64px; }
 .thumb img { width: 64px; height: 86px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; }
