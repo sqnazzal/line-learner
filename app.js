@@ -55,7 +55,6 @@ const DEFAULT_SETTINGS = {
   skipCuts: false,         // reading pages: leave out printed lines crossed out by hand
   listenHears: true,       // Listen mode: hear you say your line and move on when you finish
   textSize: 'normal',      // normal | large | huge (bigger words for a phone on a stand)
-  cuesOnly: false,        // Listen and Rehearse: only your lines and the line before each
 };
 
 function loadJSON(key, fallback) {
@@ -947,7 +946,7 @@ function stopRecording() {
 }
 
 // ---------- Script helpers ----------
-const app = { view: 'library', scriptId: null, editing: null, rec: null, voicesOpen: false };
+const app = { view: 'library', scriptId: null, editing: null, rec: null, voicesOpen: false, cuesOnly: false }; // cuesOnly: Just my cues and lines, off each time a script opens
 let sampleScript = null; // "Try a sample scene": kept in memory only, never in your scripts
 const current = () => scripts.find(s => s.id === app.scriptId) || (sampleScript?.id === app.scriptId ? sampleScript : undefined);
 const lineKey = l => hash(l.speaker + '|' + spokenText(l.text));
@@ -998,8 +997,8 @@ function cueOrder(s, onlyWeak = false) {
   return order;
 }
 const weakOrder = s => cueOrder(s, true);
-// What Listen and Rehearse play: the whole scene, or just your cues and lines (a setting on the script page).
-const playOrder = s => (settings.cuesOnly && s.myChar ? cueOrder(s) : rangeOrder(s));
+// What Listen and Rehearse play: the whole scene, or just your cues and lines (a checkbox on the script page).
+const playOrder = s => (app.cuesOnly && s.myChar ? cueOrder(s) : rangeOrder(s));
 const weakCount = s => weakOrder(s).filter(i => isMine(s, s.lines[i])).length;
 
 // ---------- Icons ----------
@@ -1836,7 +1835,7 @@ function renderScript() {
       </select></label>
       ${s.kind !== 'song' && !s.sample && chars.length > 1 ? '<div><button class="link-btn small" data-action="fix-names">Fix or merge character names</button></div>' : ''}
       ${rangeHtml}
-      ${s.kind !== 'song' && s.myChar ? `<label class="check-row"><input type="checkbox" data-setting="cuesOnly" ${settings.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines.</b> Listen and Rehearse play only the line before each of yours, then yours, and skip the rest.</span></label>` : ''}
+      ${s.kind !== 'song' && s.myChar ? `<label class="check-row"><input type="checkbox" id="cues-only" ${app.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines.</b> Listen and Rehearse play only the line before each of yours, then yours, and skip the rest.</span></label>` : ''}
       ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${solid} of ${mine.length} lines solid</span></div>` : ''}
     </div>
     ${resumeHtml(s)}
@@ -2094,7 +2093,7 @@ function leave() {
 async function startPlayer(mode, order, from = 0, drill = false) {
   const s = current();
   if (mode !== 'listen' && !s.myChar) { toast('Who are you playing? Pick your character under "I\'m playing" first.'); return false; }
-  const cuesOnly = !order && settings.cuesOnly && !!s.myChar;
+  const cuesOnly = !order && app.cuesOnly && !!s.myChar;
   order ||= playOrder(s);
   if (!order.length) { toast('Empty stage: nothing to practice here yet. Tap Edit to add some lines.'); return false; }
   // Every mode settles microphone permission before anything plays, so it never pops up mid-scene.
@@ -2344,6 +2343,7 @@ function jump(delta) {
 function openScript(id) {
   leave();
   app.scriptId = id;
+  app.cuesOnly = false;
   app.view = 'script';
   render();
   window.scrollTo(0, 0);
@@ -2616,6 +2616,7 @@ function applySetting(el) {
 
 document.addEventListener('change', e => {
   const el = e.target, s = current();
+  if (el.id === 'cues-only') { app.cuesOnly = el.checked; return; }
   if (el.id === 'my-char') { s.myChar = el.value; s.updated = Date.now(); saveScripts(); render(); }
   else if (el.id === 'range-start') {
     s.rangeStart = +el.value;
