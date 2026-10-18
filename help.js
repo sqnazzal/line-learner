@@ -214,6 +214,7 @@ const renderAbout = () => `<section class="stack about-page">
     <p>Line Learner started as a way to make my own rehearsals easier and somehow turned into something I thought other actors might actually find useful.</p>
     <p>Oh, and "Line Learner" is a working title. Apparently, I had time to build an entire app but couldn't come up with a more creative name. Suggestions welcome! 😂</p>
     <p>It's free, it's a work in progress, and I'm learning as I go. I hope it makes your rehearsals a little easier, too!</p>
+    <p>Curious what's changed lately? <button class="link-btn" data-action="updates">See what's new</button></p>
     <div><h3>Find me elsewhere</h3>
     <ul class="about-links">
       <li><a href="https://www.instagram.com/shannonnazzal.music/" target="_blank" rel="noopener">Instagram @shannonnazzal.music</a>: acting, voiceover, music, and whatever else I'm getting myself into.</li>
