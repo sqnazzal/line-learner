@@ -247,7 +247,8 @@ async function emailFeedback(id, env) {
   const token = await googleAccessToken(JSON.parse(env.GOOGLE_SERVICE_ACCOUNT));
   const res = await fetch(`https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/feedback/${id}`,
     { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) return { ok: false };
+  // The reasons say which part of the setup needs fixing (they never include the note or any key).
+  if (!res.ok) return { ok: false, reason: `can't read the note (Google said ${res.status}; check the service account's Firestore role)` };
   const f = (await res.json()).fields || {};
   const str = k => f[k]?.stringValue || '';
   const at = Number(f.at?.integerValue ?? f.at?.doubleValue ?? 0);
@@ -280,5 +281,6 @@ async function emailFeedback(id, env) {
       ...(shot ? { attachments: [{ filename: `screenshot.${shot[1] === 'jpeg' ? 'jpg' : shot[1]}`, content: shot[2] }] } : {}),
     }),
   });
-  return { ok: mail.ok };
+  if (!mail.ok) return { ok: false, reason: `Resend said ${mail.status}: ${(await mail.text()).slice(0, 300)}` };
+  return { ok: true };
 }
