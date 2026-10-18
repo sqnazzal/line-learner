@@ -209,7 +209,10 @@ const renderAbout = () => `<section class="stack about-page">
     <p>Hi! I'm Shannon Nazzal, an actor, audiobook narrator, and apparently now an app developer. Who knew?</p>
     <p>Like most actors, I've spent plenty of time trying to convince family members to read lines with me, recording myself saying everyone else's parts, or talking to an empty room. I tried some of the line-learning apps out there, too, but even the paid ones didn't quite do what I wanted.</p>
     <p>So, instead of just learning my lines like a normal person, I decided to build my own app. 😂</p>
+    <p>Naturally, I overthought it, overengineered it, and kept adding features because "wouldn't it be cool if it could also…" apparently isn't a question I know how to stop asking.</p>
+    <p>The result? A free rehearsal partner that reads your cues, listens for your lines, helps you practice at your own pace, and doesn't complain when you want to run the same scene for the 47th time.</p>
     <p>Line Learner started as a way to make my own rehearsals easier and somehow turned into something I thought other actors might actually find useful.</p>
+    <p>Oh, and "Line Learner" is a working title. Apparently, I had time to build an entire app but couldn't come up with a more creative name. Suggestions welcome! 😂</p>
     <p>It's free, it's a work in progress, and I'm learning as I go. I hope it makes your rehearsals a little easier, too!</p>
     <div><h3>Find me elsewhere</h3>
     <ul class="about-links">
@@ -219,7 +222,8 @@ const renderAbout = () => `<section class="stack about-page">
   </div>
   <div class="card stack">
     <h2>Say hello or help out</h2>
-    <p>Ideas, bugs and kind words all help make it better.</p>
+    <p>Have an idea? Find something broken? Have a better name for this thing? Just want to tell me you love it (or that I should stick to acting)? I'd love to hear from you!</p>
+    <p>I built this for fun and plan to keep it free. If you find it useful and feel like buying me a coffee, there's a tip jar below. Absolutely no pressure!</p>
     <div class="row wrap"><button class="btn" data-action="feedback">Send feedback</button><a class="btn" href="${TIP_URL}" target="_blank" rel="noopener">☕ Tip jar on Venmo</a></div>
   </div>
 </section>`;
