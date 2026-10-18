@@ -206,11 +206,16 @@ const renderAbout = () => `<section class="stack about-page">
   <div class="row between wrap"><h1>About Line Learner</h1><button class="btn ghost" data-action="home">${icon('back')} Your scripts</button></div>
   <div class="card stack">
     <h2>About the creator</h2>
-    <p>Hi, I'm Shannon Nazzal, an actor and audiobook narrator. Learning lines always meant finding someone free to read the other parts, so I built the rehearsal partner I wanted: one that reads your cues, listens for your lines, and is ready whenever you are. It's free for every actor.</p>
+    <p>Hi! I'm Shannon Nazzal, an actor, audiobook narrator, and apparently now an app developer. Who knew?</p>
+    <p>Like most actors, I've spent plenty of time trying to convince family members to read lines with me, recording myself saying everyone else's parts, or talking to an empty room. I tried some of the line-learning apps out there, too, but even the paid ones didn't quite do what I wanted.</p>
+    <p>So, instead of just learning my lines like a normal person, I decided to build my own app. 😂</p>
+    <p>Line Learner started as a way to make my own rehearsals easier and somehow turned into something I thought other actors might actually find useful.</p>
+    <p>It's free, it's a work in progress, and I'm learning as I go. I hope it makes your rehearsals a little easier, too!</p>
+    <div><h3>Find me elsewhere</h3>
     <ul class="about-links">
-      <li><a href="https://www.instagram.com/shannonnazzal.music/" target="_blank" rel="noopener">Instagram @shannonnazzal.music</a>: follow my acting, voiceover &amp; music</li>
-      <li><a href="https://www.backstage.com/tal/shannon-nazzal" target="_blank" rel="noopener">Backstage profile</a>: for casting and bookings</li>
-    </ul>
+      <li><a href="https://www.instagram.com/shannonnazzal.music/" target="_blank" rel="noopener">Instagram @shannonnazzal.music</a>: acting, voiceover, music, and whatever else I'm getting myself into.</li>
+      <li><a href="https://www.backstage.com/tal/shannon-nazzal" target="_blank" rel="noopener">Backstage profile</a>: my acting credits and projects.</li>
+    </ul></div>
   </div>
   <div class="card stack">
     <h2>Say hello or help out</h2>

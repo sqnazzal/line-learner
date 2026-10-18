@@ -486,3 +486,6 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 .segmented.wrap-seg { flex-wrap: wrap; border-radius: 18px; }
 .tag.ended { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
 .share-disclaimer { text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
+
+.about-links { margin: .4rem 0 0; padding-left: 1.2rem; }
+.about-links li + li { margin-top: .4rem; }
