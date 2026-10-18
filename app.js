@@ -1163,6 +1163,7 @@ function renderEdit() {
   return `<section class="stack">
     <h1>${e.id ? 'Edit script' : 'New script'}</h1>
     <label class="field"><span>Title</span><input id="ed-title" value="${esc(e.title)}" placeholder="e.g. Romeo and Juliet, balcony scene"></label>
+    ${e.id ? '<div id="merge-box"></div>' : ''}
     <details class="help card">
       <summary>How should I format it?</summary>
       <p>Put each speech on its own line, starting with the character's name:</p>
@@ -1183,7 +1184,7 @@ JULIET: Ay me!</pre>
     ${findBarHtml()}
     <label class="field"><span>Script</span><textarea id="ed-raw" rows="16" spellcheck="false" placeholder="Paste your scene or monologue here">${esc(e.raw)}</textarea></label>
     <p id="ed-preview" class="muted"></p>
-    <div id="merge-box"></div>
+    ${e.id ? '' : '<div id="merge-box"></div>'}
     <div class="row wrap">
       <span class="spacer"></span>
       <button class="btn ghost" data-action="cancel-edit">Cancel</button>
@@ -1256,7 +1257,7 @@ function updateMergeBox(lines) {
   if (chars.length < 2) { box.innerHTML = merger.undo != null ? undoMergeHtml() : ''; return; }
   const opts = sel => chars.map(([c, n]) => `<option value="${esc(c)}"${c === sel ? ' selected' : ''}>${esc(titleCase(c))} (${n})</option>`).join('');
   const sugg = mergeSuggestions(chars);
-  box.innerHTML = `<details class="card merge"${app.mergeOpen || sugg.length ? ' open' : ''}>
+  box.innerHTML = `<details class="card merge"${(app.mergeOpen ?? !!app.editing?.id) || sugg.length ? ' open' : ''}>
     <summary>Fix or merge character names${sugg.length ? ` <span class="muted small">· ${sugg.length} possible ${sugg.length === 1 ? 'duplicate' : 'duplicates'}</span>` : ''}</summary>
     <div class="stack-sm">
       ${sugg.length ? `<p class="small">These look like the same person:</p><ul class="share-list">${sugg.map(s => `<li class="share-row">

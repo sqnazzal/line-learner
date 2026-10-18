@@ -45,7 +45,7 @@ Madam! Your mother calls.
 **Tidying up** after importing:
 
 - **Find and fix** (above the text box): step through matches, **Replace** one or **Replace all** (with **Undo**).
-- **Fix or merge character names** (in **Edit**, under the character list): suggests duplicates like "MRS" and "MRS. PECK" and moves one character's lines to another.
+- **Fix or merge character names** (at the top of **Edit**): suggests duplicates like "MRS" and "MRS. PECK" and moves one character's lines to another.
 - Unsaved work is never lost: the home screen offers **Continue editing**.
 
 **Categories:** scripts sit under tabs on the home screen: **Current**, **Audition**, **Fun**, **Other**, **Past**, plus your own (**New category…**). Move one with the category menu on its card or page.

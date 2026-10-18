@@ -40,7 +40,7 @@ const HELP = {
       <li><b>PDF:</b> New script &gt; <b>Import PDF or .txt</b>.</li>
       <li><b>Paper script:</b> in the <b>Notes</b> app, tap the camera icon &gt; <b>Scan Documents</b>, save, then <b>Share</b> &gt; <b>Save to Files</b> as a PDF. Import that PDF and tap <b>Read pages</b>.</li>
       <li><b>A few pages or screenshots:</b> use <b>Take photo</b> (again for each page) or <b>Choose photos</b>, then <b>Read pages</b>. Uses your OpenAI key.</li>
-      <li>Afterwards, check the character list and use <b>Find and fix</b> or <b>Fix or merge character names</b> (in Edit) to tidy names.</li></ul>`],
+      <li>Afterwards, check the character list and use <b>Find and fix</b> or <b>Fix or merge character names</b> (at the top of Edit) to tidy names.</li></ul>`],
     ['Sync and groups', `<ul>
       <li><b>Sync</b>: tap <b>Sign in</b> at the top and sign in with Google on each of your devices. Your scripts, songs and progress then stay the same everywhere, automatically.</li>
       <li><b>Download backup</b> (on the Sync and backup screen) saves everything to a file you can keep or restore on a new device.</li>
@@ -72,7 +72,7 @@ const HELP = {
       <li><b>PDF:</b> New script &gt; <b>Import PDF or .txt</b>.</li>
       <li><b>Paper script:</b> in the <b>Google Drive</b> app, tap <b>+</b> &gt; <b>Scan</b> to make a PDF, then import it and tap <b>Read pages</b>.</li>
       <li><b>A few pages or screenshots:</b> use <b>Take photo</b> or <b>Choose photos</b>, then <b>Read pages</b>. Uses your OpenAI key.</li>
-      <li>Afterwards, use <b>Find and fix</b> or <b>Fix or merge character names</b> (in Edit) to tidy names.</li></ul>`],
+      <li>Afterwards, use <b>Find and fix</b> or <b>Fix or merge character names</b> (at the top of Edit) to tidy names.</li></ul>`],
     ['Sync and groups', `<ul>
       <li><b>Sync</b>: sign in with Google (top of the screen) on each of your devices and your scripts stay the same everywhere, automatically.</li>
       <li><b>Download backup</b> (on the Sync and backup screen) saves everything to a file you can keep or restore on a new device.</li>
@@ -101,7 +101,7 @@ const HELP = {
     ['Importing a script', `<ul>
       <li><b>PDF or .txt:</b> New script &gt; <b>Import PDF or .txt</b>, or drag the file onto the text box.</li>
       <li><b>Scanned PDF or screenshots:</b> they go into the pages list; tap <b>Read pages</b> (uses your OpenAI key).</li>
-      <li>Afterwards, use <b>Find and fix</b> or <b>Fix or merge character names</b> (in Edit) to tidy names.</li></ul>`],
+      <li>Afterwards, use <b>Find and fix</b> or <b>Fix or merge character names</b> (at the top of Edit) to tidy names.</li></ul>`],
     ['Sync and groups', `<ul>
       <li><b>Sync</b>: sign in with Google (top of the screen) on your computer and phone and your scripts stay the same on both, automatically.</li>
       <li><b>Download backup</b> (on the Sync and backup screen) saves everything to a file you can keep or restore on a new device.</li>
