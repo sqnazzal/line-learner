@@ -17,6 +17,10 @@
 // Optional, for an email when someone sends feedback (uses Resend, resend.com):
 //   RESEND_API_KEY      Secret. An API key from resend.com (API Keys > Create, "Sending access").
 //   FEEDBACK_EMAIL      The address you signed up to Resend with (its free test sender only mails that address).
+//
+// Optional, so Admin > People lists everyone who has signed in with Google (not just those who opened the app since):
+//   GOOGLE_SERVICE_ACCOUNT  Secret. The whole JSON key of a Google service account with only the
+//                           "Firebase Authentication Viewer" role (see server/README.md).
 
 const TTS_MODEL = 'gpt-4o-mini-tts';
 const VISION_MODEL = 'gpt-6-luna';
@@ -62,6 +66,7 @@ export default {
       // Admin (the owner only): everyone's use this month, and resetting someone's allowance.
       if (path.includes('/admin/')) {
         if (!isOwner) return json({ error: 'Only the admin can do that.' }, 403);
+        if (path.endsWith('/admin/users')) return json(await signInAccounts(env));
         if (!env.DB) return json({ rows: [] });
         if (path.endsWith('/admin/usage')) {
           const { results = [] } = await env.DB.prepare('SELECT uid, usd FROM usage WHERE month = ?').bind(month).all();
@@ -117,6 +122,52 @@ export default {
     }
   },
 };
+
+// ---------- Every Google sign-in account (for the admin's People list) ----------
+// Uses a Google service account that can only view sign-in accounts (role "Firebase Authentication Viewer").
+async function signInAccounts(env) {
+  if (!env.GOOGLE_SERVICE_ACCOUNT) return { users: null, reason: 'not set up' };
+  const sa = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT);
+  const token = await googleAccessToken(sa);
+  const users = [];
+  let page = '';
+  do {
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/accounts:batchGet?maxResults=1000${page ? `&nextPageToken=${encodeURIComponent(page)}` : ''}`,
+      { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return { users: null, reason: `Google answered ${res.status}` };
+    const data = await res.json();
+    for (const u of data.users || []) {
+      users.push({ uid: u.localId, email: u.email || '', name: u.displayName || '', created: Number(u.createdAt) || 0, lastSignIn: Number(u.lastLoginAt) || 0 });
+    }
+    page = data.nextPageToken || '';
+  } while (page);
+  return { users };
+}
+
+let saToken = { token: '', until: 0 };
+async function googleAccessToken(sa) {
+  if (saToken.token && Date.now() < saToken.until) return saToken.token;
+  const now = Math.floor(Date.now() / 1000);
+  const b64url = obj => btoa(JSON.stringify(obj)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const unsigned = `${b64url({ alg: 'RS256', typ: 'JWT' })}.${b64url({
+    iss: sa.client_email, scope: 'https://www.googleapis.com/auth/cloud-platform',
+    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
+  })}`;
+  const pem = sa.private_key.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+  const key = await crypto.subtle.importKey('pkcs8', Uint8Array.from(atob(pem), c => c.charCodeAt(0)),
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned)));
+  const jwt = `${unsigned}.${btoa(String.fromCharCode(...sig)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}&assertion=${jwt}`,
+  });
+  if (!res.ok) throw new Error(`token ${res.status}`);
+  const data = await res.json();
+  saToken = { token: data.access_token, until: Date.now() + (data.expires_in - 120) * 1000 };
+  return saToken.token;
+}
 
 // ---------- Checking the Firebase sign-in token (RS256, signed by Google) ----------
 let jwksCache = { keys: null, until: 0 };

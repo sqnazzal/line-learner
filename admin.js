@@ -94,6 +94,9 @@ async function loadAdmin() {
     adm.feedback = await fb.adminFeedback().catch(() => null); // null until the rules with 'feedback' are published
     adm.usage = {};
     try { for (const row of (await voicesAdmin('/admin/usage'))?.rows || []) adm.usage[row.uid] = row.usd; } catch { /* server not updated yet */ }
+    // Every Google sign-in, from the voices server (null until it's set up for that).
+    adm.accounts = null;
+    try { adm.accounts = (await voicesAdmin('/admin/users'))?.users || null; } catch { /* server not updated yet */ }
   } catch (e) {
     adm.error = String(e?.code || '').includes('permission')
       ? 'Firebase refused: publish the latest firestore.rules (with your account ID as admin).'
@@ -103,7 +106,19 @@ async function loadAdmin() {
   if (app.view === 'admin') render();
 }
 
-const nameOf = uid => adm.data?.profiles.find(p => p.id === uid)?.name || 'Unknown person';
+// Profiles (written when someone opens the app signed in) plus every Google sign-in the server knows of,
+// most recently active first.
+function allPeople() {
+  const byId = new Map(adm.data.profiles.map(p => [p.id, { ...p }]));
+  for (const a of adm.accounts || []) {
+    const p = byId.get(a.uid);
+    if (p) p.lastSignIn = a.lastSignIn;
+    else byId.set(a.uid, { id: a.uid, name: a.name, email: a.email, lastSignIn: a.lastSignIn });
+  }
+  return [...byId.values()].sort((a, b) => Math.max(b.lastSeen || 0, b.lastSignIn || 0) - Math.max(a.lastSeen || 0, a.lastSignIn || 0));
+}
+
+const nameOf = uid => adm.data?.profiles.find(p => p.id === uid)?.name || adm.accounts?.find(a => a.uid === uid)?.name || 'Unknown person';
 const when = t => (t ? ago(t) : 'never');
 
 function renderAdmin() {
@@ -111,13 +126,13 @@ function renderAdmin() {
   if (!isAdmin()) return `<section class="stack">${head}<p class="muted">This screen is only for the app's admin.</p></section>`;
   if (!adm.data && !adm.error) { loadAdmin(); return `<section class="stack">${head}<p class="muted">Loading…</p></section>`; }
   if (adm.error) return `<section class="stack">${head}<p class="note">${esc(adm.error)}</p><div><button class="btn" data-action="admin-reload">Try again</button></div></section>`;
-  const { profiles, groups, blocked } = adm.data;
+  const { groups, blocked } = adm.data, profiles = allPeople();
   const groupsOf = uid => groups.filter(g => (g.members || []).includes(uid));
-  const people = profiles.slice().sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0)).map(p => {
+  const people = profiles.map(p => {
     const gs = groupsOf(p.id), isBlocked = blocked.has(p.id), me = p.id === fb.user.uid;
     return `<li class="card admin-row">
       <div class="lib-main"><b>${esc(p.name || 'Unknown')}${me ? ' (you)' : ''}${isBlocked ? ' <span class="tag">Blocked</span>' : ''}</b>
-        <span class="muted small">${esc(p.email || '')} · last seen ${when(p.lastSeen)}</span>
+        <span class="muted small">${esc(p.email || '')} · ${p.lastSeen ? `last seen ${when(p.lastSeen)}` : `signed in ${when(p.lastSignIn)}, not seen in the app since the Admin screen was added`}</span>
         <span class="small">${gs.length ? `In: ${esc(gs.map(g => g.name).join(', '))}` : 'Not in any group'}${adm.usage[p.id] != null ? ` · shared voices this month: about $${adm.usage[p.id].toFixed(2)}` : ''}</span></div>
       ${me ? '' : `<div class="row wrap">
         ${gs.length ? `<button class="btn ghost" data-action="admin-kick-all" data-uid="${esc(p.id)}">Remove from all groups</button>` : ''}
@@ -148,6 +163,7 @@ function renderAdmin() {
     <p class="muted">You're the app's admin. Changes here affect other people right away. <button class="link-btn" data-action="admin-reload">Refresh</button></p>
     ${feedbackHtml()}
     <h2>People (${profiles.length})</h2>
+    ${adm.accounts ? '' : '<p class="muted small">Showing people who have opened the app since the Admin screen was added. To list everyone who has ever signed in, set up GOOGLE_SERVICE_ACCOUNT on the voices server (server/README.md, step 7).</p>'}
     <ul class="lib-list">${people || '<li class="muted">No one has signed in yet.</li>'}</ul>
     <p class="muted small"><b>Block</b> stops someone using groups, sharing and the shared voices (their own scripts on their own device are unaffected). To delete someone's Google sign-in completely, use <a href="${FIREBASE_USERS_URL}" target="_blank" rel="noopener">Firebase > Authentication > Users</a> after removing and blocking them here.</p>
     <h2>Groups (${groups.length})</h2>

@@ -23,6 +23,13 @@
    - `FEEDBACK_EMAIL`: the email address you signed up to Resend with (Resend's free test sender only mails that address)
 
    Each note sent with **Send feedback** then arrives by email with the device details and any screenshot attached; reply to it to answer the sender if they left an email address.
+7. **Everyone in Admin > People (optional).** Lets the Worker list every Google sign-in, read-only:
+   1. Open [console.cloud.google.com/iam-admin/serviceaccounts?project=line-learner-45bd1](https://console.cloud.google.com/iam-admin/serviceaccounts?project=line-learner-45bd1) and tap **Create service account**. Name it `admin-people-list`, **Create and continue**.
+   2. Role: **Firebase Authentication Viewer** only. **Continue**, **Done**.
+   3. Open the new account > **Keys > Add key > Create new key > JSON**. A file downloads.
+   4. In the Worker: **Settings > Variables and Secrets > Add**, type **Secret**, name `GOOGLE_SERVICE_ACCOUNT`, and paste the whole file's contents. Then delete the downloaded file.
+
+   Without it, People only shows those who have opened the app signed in since the Admin screen was added.
 
 ## How it decides
 
