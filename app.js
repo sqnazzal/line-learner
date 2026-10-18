@@ -1070,6 +1070,16 @@ function setCategory(s, value) {
   render();
 }
 
+// One short line on what signing in does, since it's optional and that isn't obvious from the buttons.
+function accountLineHtml() {
+  const user = signedInUser();
+  if (user) {
+    const syncing = typeof gsync !== 'undefined' && gsync.conf.on;
+    return `<p class="muted small account-line">Signed in as ${esc(user.name)}. ${syncing ? 'Your scripts, songs and progress sync to your other devices.' : 'Turn on <button class="link-btn" data-action="sync-view">Sync</button> to keep your scripts the same on your other devices.'}</p>`;
+  }
+  return `<p class="muted small account-line">Signing in is optional. Everything works on this device without it. <button class="link-btn" data-action="group">Sign in with Google</button> to keep your scripts in sync across your devices and to share with a cast or group.</p>`;
+}
+
 function renderLibrary() {
   const has = scripts.length > 0;
   return `<section class="stack">
@@ -1081,8 +1091,8 @@ function renderLibrary() {
         <button class="btn" data-action="new-song">+ New song</button>
         <button class="btn" data-action="browse">Browse free scripts &amp; monologues</button>
         <button class="btn ghost" data-action="sample">Try a sample scene</button>
-        <button class="btn ghost" data-action="help">Help &amp; troubleshooting</button>
       </div>
+      ${accountLineHtml()}
     </div>
     ${supportNote()}
     ${(() => {
@@ -2831,6 +2841,7 @@ function renderSync() {
   if (syncConf.token) {
     return `<section class="stack">
       <h1>Sync and backup</h1>
+    <p class="lede">Optional. Your scripts are always saved on this device. Sync keeps your scripts, songs, categories and progress the same on your phone and computer. Voices, recordings and saved tracks stay on each device.</p>
       ${googleSyncPanel()}
       <div class="card stack-sm">
         <b>GitHub sync</b>
@@ -2857,6 +2868,7 @@ function renderSync() {
   }
   return `<section class="stack">
     <h1>Sync and backup</h1>
+    <p class="lede">Optional. Your scripts are always saved on this device. Sync keeps your scripts, songs, categories and progress the same on your phone and computer. Voices, recordings and saved tracks stay on each device.</p>
     ${googleSyncPanel()}
     ${sync.error ? `<p class="note">${esc(sync.error)}</p>` : ''}
     <details class="card stack-sm">

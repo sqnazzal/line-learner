@@ -309,7 +309,7 @@ function renderGroup() {
   }
   if (!fb.user) {
     return `<section class="stack">${head}
-      <p class="lede">Share scripts and songs with your cast, friends or family. Everyone signs in with Google; each person keeps their own progress.</p>
+      <p class="lede">Signing in is optional. Sign in with Google to share scripts and songs with your cast, friends or family, to sync your scripts across your devices, and to use Shannon's shared voices if you're in one of Shannon's groups. Each person keeps their own progress.</p>
       ${sessionStorage.getItem(SS_JOIN) ? '<p class="note">Sign in to join the group you were invited to.</p>' : ''}
       <div><button class="btn primary" data-action="group-signin">Sign in with Google</button></div>
     </section>`;

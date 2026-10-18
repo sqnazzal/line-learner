@@ -15,7 +15,7 @@ Open it at **<https://sqnazzal.github.io/line-learner/>**. Nothing to install.
 - **Android:** use **Chrome**. For an app icon: **⋮ > Add to Home screen**.
 - **Computer:** use **Chrome** or **Edge** (Firefox can read lines but can't check them by microphone).
 - The first time you practice, allow the **microphone**. Checking your lines needs an internet connection.
-- Stuck at any point? **Help & troubleshooting** (home screen and bottom of every page) has steps for each kind of device.
+- Stuck at any point? **Help & troubleshooting** (bottom of every page) has steps for each kind of device.
 
 ## Adding a script
 
@@ -153,4 +153,6 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 
 ---
 
-Built by Shannon Nazzal © 2026, an actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Not for commercial use.
+Built by Shannon Nazzal · © 2026
+
+An actor who took “anything but memorizing my lines” a little too far. May occasionally miss a cue or question your perfectly good delivery. No callbacks guaranteed. Actual rehearsal still required. If something breaks, consider it improv. Not for commercial use.
