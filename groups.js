@@ -120,7 +120,14 @@ function groupError(e) {
 // ---------- State ----------
 const grp = { groups: [], items: [], current: null, unsubGroups: null, unsubItems: null, error: '' };
 
+// The top-bar button: "Sign in" until you're signed in, then "Group".
+function showGroupButton() {
+  const b = $('#group-btn');
+  if (b) b.textContent = fb.user ? 'Group' : 'Sign in';
+}
+
 function onUserChanged() {
+  showGroupButton();
   grp.unsubGroups?.(); grp.unsubItems?.();
   Object.assign(grp, { groups: [], items: [], unsubGroups: null, unsubItems: null });
   if (fb.user) {

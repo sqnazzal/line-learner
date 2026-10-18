@@ -863,7 +863,6 @@ function renderLibrary() {
       <div class="row wrap">
         <button class="btn primary" data-action="new">+ New script</button>
         <button class="btn" data-action="new-song">+ New song</button>
-        <button class="btn" data-action="group">Group</button>
         <button class="btn" data-action="browse">Browse free scripts &amp; monologues</button>
         <button class="btn ghost" data-action="sample">Try a sample scene</button>
       </div>
