@@ -451,7 +451,7 @@ function sharePanelHtml(s) {
     <label class="check-row small"><input type="checkbox" id="share-ok" ${share.ok ? 'checked' : ''}><span>I confirm the production's license (or the publisher) allows giving the cast digital copies of this, through that date.</span></label>
     <p class="muted small" id="share-hint"${share.ok && share.ends ? ' hidden' : ''}>Can't confirm that? Keep it private: it's still yours to rehearse with on your own devices. <b>Share</b> and <b>Update</b> turn on once both are filled in.</p>
     <b class="small">With</b><ul class="share-list">${rows}</ul>
-    <p class="muted small">Shared copies go to everyone in that group. <b>Only share if your production's license (or the publisher) allows giving the cast digital copies. Whoever shares is responsible for that: Line Learner and Shannon don't check licenses or permissions.</b> Only you can update or unshare what you share. Unsharing removes it from the group's list, but copies people already added stay with them and can't be taken back. Nobody's copy changes until they choose <b>Update my copy</b>.</p></div>`;
+    <p class="muted small share-disclaimer">Shared copies go to everyone in that group. <b>Only share if your production's license (or the publisher) allows giving the cast digital copies. Whoever shares is responsible for that: Line Learner and Shannon don't check licenses or permissions.</b> Only you can update or unshare what you share. Unsharing removes it from the group's list, but copies people already added stay with them and can't be taken back. Nobody's copy changes until they choose <b>Update my copy</b>.</p></div>`;
 }
 
 async function loadShareStatus(s) {

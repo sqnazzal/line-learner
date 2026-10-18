@@ -485,3 +485,4 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 .help-body h2:first-child { margin-top: 0; }
 .segmented.wrap-seg { flex-wrap: wrap; border-radius: 18px; }
 .tag.ended { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.share-disclaimer { text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
