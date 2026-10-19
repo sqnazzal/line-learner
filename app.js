@@ -236,6 +236,7 @@ const RUN_TOGETHER = {
 function words(s) {
   return spokenText(s).toLowerCase()
     .replace(/['‘’`]/g, '')
+    .replace(/(?:\p{L}\.){2,}/gu, m => m.replace(/\./g, '')) // initials: S.O.B. is one word, like "SOB"
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .split(' ').filter(Boolean)
     .map(w => (/^\d+$/.test(w) && +w <= 20 ? NUMS[+w] : w))
@@ -268,12 +269,13 @@ function near(a, b) {
   return edits + (a.length - i) + (b.length - j) <= 1;
 }
 
-// Recognition sometimes splits an old or unusual word ("wherefore" heard as "where for"); glue those back.
+// Recognition sometimes splits an old or unusual word ("wherefore" heard as "where for") or spells out
+// initials ("S O B"); glue those back, up to three pieces.
 function joinSplitWords(said, expected) {
   const out = [];
   for (let j = 0; j < said.length; j++) {
-    const joined = said[j] + said[j + 1];
-    if (j + 1 < said.length && !expected.has(said[j]) && [...expected].some(w => near(w, joined))) { out.push(joined); j++; }
+    const k = expected.has(said[j]) ? 0 : [3, 2].find(n => j + n <= said.length && [...expected].some(w => near(w, said.slice(j, j + n).join(''))));
+    if (k) { out.push(said.slice(j, j + k).join('')); j += k - 1; }
     else out.push(said[j]);
   }
   return out;
@@ -916,8 +918,10 @@ function listen(token, expected) {
       }
       setTranscript(said());
       if (!interim.trim() && COMMAND_RE.test(words(finalText).join(' '))) return finish('prompt');
-      if (compare(expected, said()).score === 100) return finish('complete');
-      arm(settings.silenceMs);
+      const score = compare(expected, said()).score;
+      if (score === 100) return finish('complete');
+      // Not far enough into the line to pass yet: allow a real pause (a beat, a breath) before deciding you've stopped.
+      arm(score >= settings.passScore ? settings.silenceMs : Math.max(settings.silenceMs * 2, 4000));
     };
     rec.onerror = e => {
       if (e.error === 'no-speech' || e.error === 'aborted') return;
@@ -926,6 +930,8 @@ function listen(token, expected) {
     // Browsers end recognition after a stretch of silence; keep going until we decide we're done.
     rec.onend = () => {
       if (settled) return;
+      // iPhone ends a session at each pause, sometimes before marking the last words final: keep them.
+      if (interim.trim()) { finalText += ' ' + interim; interim = ''; }
       try { rec.start(); } catch { finish('error:restart'); }
     };
     off = token.onCancel(() => finish('cancel'));
