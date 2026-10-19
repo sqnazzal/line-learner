@@ -16,7 +16,7 @@ const LS_REMIND = 'lineLearner.reminders';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PLAN_MAX = 120;
 const remind = { conf: loadJSON(LS_REMIND, { on: false, subId: '', sig: '' }), busy: false, syncing: false, again: false, checked: false, error: '' };
-const planUi = { open: null, editing: false, showAll: false, draft: null };
+const planUi = { open: null, editing: false, showAll: false, draft: null, adding: null };
 const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const saveRemind = () => saveJSON(LS_REMIND, remind.conf);
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -251,6 +251,24 @@ function remindHtml(s) {
   return `<div class="stack-sm plan-remind"><b>Reminders</b>${body}${remind.error ? `<p class="note small">${esc(remind.error)}</p>` : ''}</div>`;
 }
 
+function addFormHtml(s) {
+  const a = planUi.adding;
+  const kinds = [
+    ...planScenes(s).map((sc, k) => [`learn:${k}`, `Learn ${scenesLabel([sc[2]])}`]),
+    ['drill', 'Drill weak lines'], ['run', 'Full run-through'], ['final', 'Run just your cues and lines'],
+  ];
+  return `<div class="note stack-sm plan-add">
+    <b>Add a session</b>
+    <label class="field inline"><span>What</span><select id="plan-add-kind">${kinds.map(([v, t]) => `<option value="${v}" ${v === a.kind ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+    <label class="field inline"><span>When</span><input type="datetime-local" id="plan-add-at" value="${localInput(a.at)}"></label>
+    <label class="field inline"><span>How long</span><select id="plan-add-min">${[15, 20, 30, 45, 60, 90].map(m => `<option value="${m}" ${m === +a.min ? 'selected' : ''}>${m} minutes</option>`).join('')}</select></label>
+    <div class="row wrap"><button class="btn primary" data-action="plan-add-save">Add it</button><button class="btn ghost" data-action="plan-add-cancel">Cancel</button></div>
+  </div>`;
+}
+
+// A plan counts as active until opening night has passed.
+window.planActive = s => !!(s?.plan && !s.sample && new Date(s.plan.opening + 'T23:59') >= new Date());
+
 function planCardHtml(s) {
   if (s.sample || s.kind === 'song') return '';
   if (s.plan) fixSceneNames(s);
@@ -272,10 +290,11 @@ function planCardHtml(s) {
       ${shown.length ? `<ol class="plan-list">${shown.map(x => sessionRowHtml(s, x)).join('')}</ol>` : ''}
       <div class="row wrap">
         ${all.length > shown.length || planUi.showAll ? `<button class="btn ghost" data-action="plan-all">${planUi.showAll ? 'Show upcoming only' : `Show all ${all.length} sessions`}</button>` : ''}
-        <button class="btn ghost" data-action="plan-add">+ Add a session</button>
+        ${planUi.adding ? '' : '<button class="btn ghost" data-action="plan-add">+ Add a session</button>'}
         <button class="btn ghost" data-action="plan-edit">Change dates or days</button>
         <button class="btn ghost" data-action="plan-delete">Delete plan</button>
       </div>
+      ${planUi.adding?.sid === s.id ? addFormHtml(s) : ''}
       ${remindHtml(s)}`;
   }
   return `<details id="plan" class="card"${(planUi.open ?? !!p) ? ' open' : ''}>
@@ -349,15 +368,27 @@ Object.assign(actions, {
     s.plan.sessions = s.plan.sessions.filter(x => x.id !== b.dataset.id);
     planChanged(s);
   },
+  // Opens the Add a session form, set to the next day without a session, at the usual time.
   'plan-add'() {
     const s = current(), p = s.plan;
     let d = new Date(Date.now() + DAY_MS);
     while (p.sessions.some(x => sameDay(x.at, d)) && d < new Date(p.opening + 'T00:00')) d = new Date(d.getTime() + DAY_MS);
-    p.sessions.push({ id: uid().slice(-8), at: atTime(d, p.time), min: p.min, kind: 'run' });
-    p.sessions.sort((a, b) => a.at - b.at);
-    planUi.showAll = true;
+    planUi.adding = { sid: s.id, kind: 'run', at: atTime(d, p.time), min: p.min };
+    render();
+    $('#plan-add-kind')?.focus();
+  },
+  'plan-add-cancel'() { planUi.adding = null; render(); },
+  'plan-add-save'() {
+    const s = current(), a = planUi.adding;
+    if (!a || !s.plan || !a.at) return;
+    const [kind, scene] = a.kind.split(':');
+    const x = { id: uid().slice(-8), at: a.at, min: a.min, kind };
+    if (kind === 'learn') x.scenes = [planScenes(s)[+scene]?.[2] ?? ''];
+    s.plan.sessions.push(x);
+    s.plan.sessions.sort((p, q) => p.at - q.at);
+    planUi.adding = null;
     planChanged(s);
-    toast(`Added a full run-through ${whenText(atTime(d, p.time))}. Change its time in the list.`);
+    toast(`Added: ${sessionLabel(x)}, ${whenText(x.at)}.`);
   },
   'plan-start'(b) {
     const s = planOf(b.dataset.sid), x = findSession(s, b.dataset.id);
@@ -429,6 +460,10 @@ document.addEventListener('change', e => {
     const k = +e.target.dataset.planDay;
     d.days = e.target.checked ? [...new Set([...d.days, k])].sort() : d.days.filter(x => x !== k);
   }
+  const a = planUi.adding?.sid === s.id ? planUi.adding : null;
+  if (a && e.target.id === 'plan-add-kind') a.kind = e.target.value;
+  if (a && e.target.id === 'plan-add-at') a.at = new Date(e.target.value).getTime() || a.at;
+  if (a && e.target.id === 'plan-add-min') a.min = +e.target.value;
   if (e.target.id === 'plan-lead' && s.plan) { s.plan.lead = +e.target.value; planChanged(s); }
   if (e.target.dataset.planMove && s.plan) {
     const x = findSession(s, e.target.dataset.planMove), at = new Date(e.target.value).getTime();

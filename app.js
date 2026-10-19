@@ -2007,6 +2007,7 @@ function renderScript() {
   const [start, end] = rangeBounds(s);
   const voices = voiceList();
   const cast = castVoices(s);
+  const planOnTop = !!window.planActive?.(s); // an active rehearsal plan is the first card (plan.js)
 
   const rangeHtml = sections.length ? `<div class="row wrap">
       <label class="field inline"><span>Start at</span><select id="range-start">
@@ -2044,6 +2045,7 @@ function renderScript() {
     </div>
     ${s.groupItem && typeof sharedStatusNote === 'function' ? sharedStatusNote(s) : ''}
     ${s.sample ? '<p class="muted">A sample scene to try things out. It isn\'t saved to your scripts, so play with it freely.</p>' : typeof sharePanelHtml === 'function' ? sharePanelHtml(s) : ''}
+    ${planOnTop ? planCardHtml(s) : ''}
     ${supportNote()}
     <div class="card stack-sm">
       ${s.sample ? '' : `<label class="field inline"><span>Category</span><select data-cat-id="${s.id}" aria-label="Category">${categoryOptions(catOf(s))}</select></label>`}
@@ -2064,7 +2066,7 @@ function renderScript() {
       <button class="mode" data-action="type" ${s.myChar ? '' : 'disabled'}>${icon('keyboard')}<b>Type your lines</b><span>For the train or anywhere you can't talk. Read your cues, type your lines, and get the same word-by-word check.</span></button>
       <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line' : 'lines'} you're working on` : mine.some(l => isSolid(s, l)) ? 'Nothing shaky right now' : 'Nothing to drill yet: rehearse first') : 'Pick your character first'}</span></button>
     </div>
-    ${typeof planCardHtml === 'function' ? planCardHtml(s) : ''}
+    ${typeof planCardHtml === 'function' && !planOnTop ? planCardHtml(s) : ''}
     <details id="voices" class="card" ${app.voicesOpen ? 'open' : ''}>
       <summary>Voices for each character</summary>
       ${aiPanelHtml()}

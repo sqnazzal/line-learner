@@ -138,7 +138,7 @@ const REAL_HELP = topic('Rehearsing for real: phone on a stand, headphones, long
 const PLAN_HELP = topic('Rehearsal plan and reminders', `<ul>
     <li><b>Make a plan:</b> open a script, pick who you're playing, then open <b>Rehearsal plan</b>. Enter opening night, the days you can rehearse, a usual time and how long a session can be, and tap <b>Make my plan</b>.</li>
     <li><b>How it's spread out:</b> about two sessions a week when opening is far off, three a week from five weeks out, and every free day in the last two weeks. First you learn each scene you're in, one per session (with drills of your shaky lines mixed in), then full run-throughs, and last a light run of just your cues and lines.</li>
-    <li><b>Change anything:</b> change a session's date and time right in the list, tick it done, delete it, or <b>+ Add a session</b>. <b>Change dates or days</b> makes a new plan and keeps the sessions you've done. Missed some? <b>Re-plan from today</b> spreads what's left over the days you have.</li>
+    <li><b>Change anything:</b> change a session's date and time right in the list, tick it done, delete it, or <b>+ Add a session</b> (learn a scene, drill weak lines, a full run-through or a cues-only run, at any time and length). <b>Change dates or days</b> makes a new plan and keeps the sessions you've done. Missed some? <b>Re-plan from today</b> spreads what's left over the days you have.</li>
     <li><b>Ticking off:</b> <b>Start</b> on a session opens the right practice (that scene, your weak lines or the whole show). Finish it, or finish any run of that script on a session's day, and it's ticked off by itself.</li>
     <li><b>Home screen:</b> your next rehearsal shows at the top, with a <b>Start</b> button.</li>
     <li><b>On every device:</b> the plan syncs with the script when you're signed in with Google.</li>
@@ -253,6 +253,7 @@ VIEWS.about = renderAbout;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-18', [
+    '<b>Plan first:</b> while a rehearsal plan is active, it\'s the top card on the script page. <b>+ Add a session</b> now lets you pick what it\'s for (any scene, a drill, a full run or a cues-only run), when, and how long.',
     '<b>Plans know their acts:</b> with separate act and scene headings, sessions are named like "Act 2, Scene 1", and a Learn session covers only its own scene (it used to run on into every act\'s scene of the same name).',
     '<b>Rehearsal in progress:</b> once you start a planned session, the home screen shows how far you got, with <b>Pick up</b> and <b>Start over</b>.',
     '<b>Room to breathe:</b> Rehearse waits longer (about 4 seconds) through a pause in the middle of your line, and on iPhone no longer drops words said just before a pause.',
