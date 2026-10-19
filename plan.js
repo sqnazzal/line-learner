@@ -134,7 +134,7 @@ function sessionProgress(s, x) {
   if (!started) return null;
   return r && r.at >= started && x.kind !== 'drill' ? r : { started };
 }
-const progressNote = p => (p.total ? `Line ${p.pos} of ${p.total}` : 'Started, not finished yet');
+const progressNote = p => (p.total ? `${Math.round(100 * p.pos / p.total)}% through: up to line ${p.pos} of ${p.total}` : 'Started, not finished yet');
 // The home screen's Continue card steps aside when it would only repeat the rehearsal in progress.
 window.planInProgress = id => { const n = nextSession(); return !!(n && n.s.id === id && sessionProgress(n.s, n.x)); };
 
