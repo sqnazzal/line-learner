@@ -321,6 +321,9 @@ const fmtDate = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { mont
 function shareState(it) {
   if (!it) return { live: true };
   if (it.inactive) return { live: false, label: 'Inactive', why: 'it was marked inactive by the person who shared it' };
+  // Songs can only be passed around when their lyrics are public domain (the sharer confirms it).
+  if (it.kind === 'song' && it.permission !== 'public-domain') return { live: false, label: 'Not public domain', why: 'songs can only be shared when the lyrics are public domain' };
+  if (it.kind === 'song') return { live: true, label: 'Public domain' };
   if (it.licenseEnds && it.licenseEnds < todayStr()) return { live: false, label: `License ended ${fmtDate(it.licenseEnds)}`, why: `the show's license ended ${fmtDate(it.licenseEnds)}` };
   return { live: true, label: it.licenseEnds ? `Through ${fmtDate(it.licenseEnds)}` : '' };
 }
@@ -459,7 +462,7 @@ function renderGroup() {
         <b>${it.kind === 'song' ? '<span class="tag">Song</span> ' : ''}${esc(it.title)}${st.label ? ` <span class="tag${st.live ? '' : ' ended'}">${esc(st.label)}</span>` : ''}</b>
         <span class="muted small">Shared by ${esc(canRemove ? 'you' : it.addedByName || 'someone')}${it.updated ? ' · ' + ago(it.updated) : ''}</span>
         ${!st.live && !mine ? '<span class="small">No longer available to add.</span>' : ''}
-        ${canRemove && !it.licenseEnds ? '<span class="small">No last performance date yet: open it and tap <b>Share to group</b> &gt; <b>Update</b> to add one.</span>' : ''}</div>
+        ${canRemove && !it.licenseEnds && it.kind !== 'song' ? '<span class="small">No last performance date yet: open it and tap <b>Share to group</b> &gt; <b>Update</b> to add one.</span>' : ''}</div>
       <div class="lib-actions">${state}${canRemove ? `<button class="btn ghost" data-action="group-inactive" data-id="${esc(it.id)}" data-on="${it.inactive ? '' : '1'}">${it.inactive ? 'Make active' : 'Mark inactive'}</button>
         <button class="btn ghost" data-action="group-remove" data-id="${esc(it.id)}">Unshare</button>` : ''}</div></li>`;
   }).join('')}</ul>` : '<p class="muted">Nothing shared yet. Open any script or song and tap <b>Share to group</b>.</p>';
@@ -504,11 +507,12 @@ function shareButtonHtml(s) {
 
 function sharePanelHtml(s) {
   if (!fb.user || share.open !== s.id) return '';
+  const song = s.kind === 'song';
   const rows = grp.groups.map(g => {
     const st = share.status[g.id];
     // Only the person who shared an item can update or unshare it (the security rules enforce this too).
     const mine = st && st !== 'loading' && st.addedBy === fb.user.uid;
-    const ready = share.ok && share.ends ? '' : ' disabled';
+    const ready = share.ok && (song || share.ends) ? '' : ' disabled';
     const actionsHtml = st === 'loading' ? '<span class="muted small">Checking…</span>'
       : !st ? `<button class="btn primary" data-action="group-share-to" data-gid="${esc(g.id)}"${ready}>Share</button>`
       : mine ? `<button class="btn" data-action="group-share-to" data-gid="${esc(g.id)}"${ready}>Update</button>
@@ -519,11 +523,15 @@ function sharePanelHtml(s) {
       : st === null ? 'Not shared' : '';
     return `<li class="share-row"><div class="lib-main"><b>${esc(g.name)}</b><span class="muted small">${note}</span></div><div class="row">${actionsHtml}</div></li>`;
   }).join('');
-  return `<div class="card stack-sm share-panel"><b>Share “${esc(s.title)}”</b>
-    <label class="field inline"><span>${s.kind === 'song' ? 'Last performance date (or when your permission ends)' : "The show's last performance date"}</span>
+  const confirmHtml = song
+    ? `<label class="check-row small"><input type="checkbox" id="share-ok" ${share.ok ? 'checked' : ''}><span>I confirm these lyrics are in the public domain (for example, published in the U.S. before 1931, or a traditional song whose words aren't under copyright).</span></label>
+    <p class="muted small" id="share-hint"${share.ok ? ' hidden' : ''}>Songs can only be shared when the lyrics are public domain. Not sure, or it's a newer song? Keep it private: it's still yours to learn on your own devices.</p>`
+    : `<label class="field inline"><span>The show's last performance date</span>
       <input type="date" id="share-ends" value="${esc(share.ends)}" min="${todayStr()}"></label>
     <label class="check-row small"><input type="checkbox" id="share-ok" ${share.ok ? 'checked' : ''}><span>I confirm the production's license (or the publisher) allows giving the cast digital copies of this, through that date.</span></label>
-    <p class="muted small" id="share-hint"${share.ok && share.ends ? ' hidden' : ''}>Can't confirm that? Keep it private: it's still yours to rehearse with on your own devices. <b>Share</b> and <b>Update</b> turn on once both are filled in.</p>
+    <p class="muted small" id="share-hint"${share.ok && share.ends ? ' hidden' : ''}>Can't confirm that? Keep it private: it's still yours to rehearse with on your own devices. <b>Share</b> and <b>Update</b> turn on once both are filled in.</p>`;
+  return `<div class="card stack-sm share-panel"><b>Share “${esc(s.title)}”</b>
+    ${confirmHtml}
     <b class="small">With</b><ul class="share-list">${rows}</ul>
     <p class="muted small share-disclaimer">Shared copies go to everyone in that group. <b>Only share if your production's license (or the publisher) allows giving the cast digital copies. Whoever shares is responsible for that: Line Learner and Shannon don't check licenses or permissions.</b> Only you can update or unshare what you share. Unsharing removes it from the group's list, but copies people already added stay with them and can't be taken back. Nobody's copy changes until they choose <b>Update my copy</b>.</p></div>`;
 }
@@ -542,7 +550,7 @@ async function loadShareStatus(s) {
 
 // The permission box and date switch Share / Update on without redrawing (so typing a date isn't interrupted).
 function updateShareReady() {
-  const ready = share.ok && !!share.ends;
+  const ready = share.ok && (current()?.kind === 'song' || !!share.ends);
   for (const b of document.querySelectorAll('[data-action="group-share-to"]')) b.disabled = !ready;
   $('#share-hint')?.toggleAttribute('hidden', ready);
 }
@@ -603,8 +611,10 @@ Object.assign(actions, {
     try {
       const prev = share.status[gid];
       if (prev && prev.addedBy !== fb.user.uid) { toast(`Only ${prev.addedByName || 'the person who shared it'} can change this.`); return; }
-      if (!share.ok || !share.ends) { toast("Add the show's last performance date and tick the permission box first."); return; }
-      const item = { ...itemFromScript(s), licenseEnds: share.ends, permission: true };
+      const song = s.kind === 'song';
+      if (song && !share.ok) { toast('Songs can only be shared when the lyrics are public domain. Tick the box to confirm they are.'); return; }
+      if (!song && (!share.ok || !share.ends)) { toast("Add the show's last performance date and tick the permission box first."); return; }
+      const item = song ? { ...itemFromScript(s), permission: 'public-domain' } : { ...itemFromScript(s), licenseEnds: share.ends, permission: true };
       if (item.raw.length > 450000) { toast('This is too long to share (the limit is about 450,000 characters). Share it in parts instead.'); return; }
       await fb.shareItem(gid, item);
       share.status[gid] = item;

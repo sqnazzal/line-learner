@@ -112,7 +112,7 @@ const SYNC_HELP = topic('Sync, groups and backups', `<h2>Syncing your devices</h
     <li><b>Advanced:</b> people who already use GitHub can sync through it instead (Sync &gt; <b>Advanced: sync with GitHub instead</b>). Most people don't need this.</li></ul>
   <h2>Groups</h2>
   <ul>
-    <li><b>Sign in</b> (top of the screen) to create a group or join one from an invite, then <b>Share to group</b> from a script so your cast can add it. Only share what your production's license (or the publisher) allows: sharing asks for the show's last performance date and a tick confirming permission (can't confirm? keep it private). Whoever shares is responsible; Line Learner and Shannon don't check licenses. After that date, or once the sharer taps <b>Mark inactive</b>, no one new can add it, and people who have it see a note.</li>
+    <li><b>Sign in</b> (top of the screen) to create a group or join one from an invite, then <b>Share to group</b> from a script so your cast can add it. Only share what your production's license (or the publisher) allows: sharing asks for the show's last performance date and a tick confirming permission (can't confirm? keep it private). Whoever shares is responsible; Line Learner and Shannon don't check licenses. After that date, or once the sharer taps <b>Mark inactive</b>, no one new can add it, and people who have it see a note. <b>Songs</b> can only be shared when their lyrics are public domain (the sharer confirms it); newer songs stay private to you.</li>
     <li><b>Private:</b> other people can't see your synced scripts; people in your groups only see what you choose to share. The app's admin (Shannon) can remove accounts and their synced data if needed.</li>
     <li><b>Sign-in window doesn't open?</b> Allow pop-ups for this site. On iPhone: <b>Settings</b> &gt; <b>Apps</b> &gt; <b>Safari</b> &gt; turn off <b>Block Pop-ups</b>, then try again.</li></ul>
   <h2>Backups</h2>
@@ -253,6 +253,7 @@ VIEWS.about = renderAbout;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-18', [
+    '<b>Sharing songs:</b> a song can only be shared to a group when its lyrics are public domain, which the sharer confirms. Other songs, including lyrics found online, stay private to you.',
     '<b>Scene openers get a cue:</b> in Drill weak lines and Just my cues and lines, a line of yours that opens a scene is cued by the act or scene heading, called out first.',
     '<b>Plan first:</b> while a rehearsal plan is active, it\'s the top card on the script page. <b>+ Add a session</b> now lets you pick what it\'s for (any scene, a drill, a full run or a cues-only run), when, and how long.',
     '<b>Plans know their acts:</b> with separate act and scene headings, sessions are named like "Act 2, Scene 1", and a Learn session covers only its own scene (it used to run on into every act\'s scene of the same name).',

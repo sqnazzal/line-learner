@@ -109,13 +109,17 @@ service cloud.firestore {
             && (!('prevRaw' in d) || (d.prevRaw is string && d.prevRaw.size() <= 450000));
         }
         allow read: if memberOf(gid) || isAdmin();
+        // Songs only when the sharer confirms the lyrics are public domain.
         allow create: if memberOf(gid) && request.resource.data.addedBy == request.auth.uid
-          && validItem(request.resource.data) && !('removed' in request.resource.data);
+          && validItem(request.resource.data) && !('removed' in request.resource.data)
+          && (request.resource.data.kind != 'song' || request.resource.data.get('permission', false) == 'public-domain');
         allow update: if isAdmin() || (memberOf(gid)
           && resource.data.addedBy == request.auth.uid
           && request.resource.data.addedBy == request.auth.uid
           && validItem(request.resource.data)
-          && (request.resource.data.raw == resource.data.raw || request.resource.data.get('prevRaw', null) == resource.data.raw));
+          && (request.resource.data.raw == resource.data.raw || request.resource.data.get('prevRaw', null) == resource.data.raw)
+          && (request.resource.data.kind != 'song' || request.resource.data.raw == resource.data.raw
+            || request.resource.data.get('permission', false) == 'public-domain');
         allow delete: if isAdmin();
       }
     }

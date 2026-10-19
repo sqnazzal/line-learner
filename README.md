@@ -126,6 +126,7 @@ Sign in, then tap **Group**.
 - On any script or song, **Share to group** shows all your groups with **Share**, **Update** and **Unshare** for each. Others tap **Add to my scripts**, and later **Update my copy** (keeping their progress and character).
 - Only the person who shared something can update or unshare it. Groups can't be deleted, and members can only remove themselves.
 - **Permission to share is the sharer's responsibility.** Sharing asks for the show's last performance date and a tick confirming the production's license (or the publisher) allows digital copies for the cast; without both it stays private. Line Learner and Shannon don't check licenses. After that date the item shows **License ended**, or the sharer can **Mark inactive**: either way no one new can add it, and people who have a copy see a note.
+- **Songs can only be shared when their lyrics are public domain** (for example, published in the U.S. before 1931, or a traditional song): sharing a song asks the sharer to confirm that instead of a performance date, and the security rules require it. Songs shared before this rule show **Not public domain** and can't be added until the sharer confirms it with **Update**. Lyrics found online stay private to the person who added them.
 - Each person's progress, recordings, voices and personal scripts stay private.
 
 ## Accessibility
