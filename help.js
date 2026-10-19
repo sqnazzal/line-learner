@@ -253,6 +253,7 @@ VIEWS.about = renderAbout;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-18', [
+    '<b>Plans know their acts:</b> with separate act and scene headings, sessions are named like "Act 2, Scene 1", and a Learn session covers only its own scene (it used to run on into every act\'s scene of the same name).',
     '<b>Rehearsal in progress:</b> once you start a planned session, the home screen shows how far you got, with <b>Pick up</b> and <b>Start over</b>.',
     '<b>Room to breathe:</b> Rehearse waits longer (about 4 seconds) through a pause in the middle of your line, and on iPhone no longer drops words said just before a pause.',
     '<b>Initials count:</b> lines with initials like S.O.B. pass whether the mic hears "SOB" or "S O B".',

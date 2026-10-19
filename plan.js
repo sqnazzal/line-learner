@@ -22,15 +22,39 @@ const saveRemind = () => saveJSON(LS_REMIND, remind.conf);
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // ---------- Making the plan ----------
-// The scenes you're in, in order: [heading index, index after the scene, heading text]. A script without
-// headings is one "scene".
+// The scenes you're in, in order: [heading index, index after the scene, name, heading text]. A script without
+// headings is one "scene". With separate act and scene headings, a scene's name includes its act
+// ("Act 2, Scene 1"), so each act's Scene 1 is told apart.
 function planScenes(s) {
   const heads = s.lines.map((l, i) => (l.type === 'section' ? i : -1)).filter(i => i >= 0);
-  if (!heads.length) return [[0, s.lines.length, '']];
-  const all = heads.map((h, k) => [h, heads[k + 1] ?? s.lines.length, s.lines[h].text]);
-  if (heads[0] > 0) all.unshift([0, heads[0], '']); // lines before the first heading
+  if (!heads.length) return [[0, s.lines.length, '', '']];
+  let act = '';
+  const seen = {};
+  const all = heads.map((h, k) => {
+    const text = s.lines[h].text;
+    if (/^\s*act\b/i.test(text)) act = text;
+    let name = act && !/\bact\b/i.test(text) ? `${act}, ${text}` : text;
+    seen[name] = (seen[name] || 0) + 1;
+    if (seen[name] > 1) name += ` (${seen[name]})`;
+    return [h, heads[k + 1] ?? s.lines.length, name, text];
+  });
+  if (heads[0] > 0) all.unshift([0, heads[0], '', '']); // lines before the first heading
   const mine = all.filter(([a, z]) => s.lines.slice(a, z).some(l => isMine(s, l)));
   return mine.length ? mine : all;
+}
+
+// Plans made before scenes were named with their act stored just "Scene 1": the first such session gets the
+// first Scene 1, the next one the second, and so on.
+function fixSceneNames(s) {
+  const all = planScenes(s), names = new Set(all.map(sc => sc[2])), used = {};
+  for (const x of s.plan?.sessions || []) {
+    if (x.kind !== 'learn' || !x.scenes || x.scenes.every(t => names.has(t))) continue;
+    x.scenes = x.scenes.map(t => {
+      if (names.has(t)) return t;
+      const hits = all.filter(sc => sc[3] === t), k = used[t] = (used[t] ?? -1) + 1;
+      return (hits[k] || hits[0])?.[2] ?? t;
+    });
+  }
 }
 
 const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
@@ -124,6 +148,12 @@ function nextSession() {
 }
 
 // ---------- Home screen: the next rehearsal ----------
+// The part of the script a session rehearses: its scenes for a Learn session, otherwise the whole script.
+function sessionRange(s, x) {
+  const scenes = x.kind === 'learn' ? planScenes(s).filter(sc => x.scenes?.includes(sc[2])) : [];
+  return scenes.length ? [scenes[0][0], scenes[scenes.length - 1][1]] : [0, s.lines.length];
+}
+
 // How far into a session you got once you've started it: where Rehearse stopped (on this device) if it kept a place.
 // A Rehearse run of the script in the last two days counts toward its next session too, even if not started from the plan.
 function sessionProgress(s, x) {
@@ -132,7 +162,8 @@ function sessionProgress(s, x) {
   const first = s.plan.sessions.find(y => !y.done) === x;
   const started = x.started || (first && r && r.at > Date.now() - 2 * DAY_MS ? r.at : 0);
   if (!started) return null;
-  return r && r.at >= started && x.kind !== 'drill' ? r : { started };
+  const [a, z] = sessionRange(s, x);
+  return r && r.at >= started && x.kind !== 'drill' && r.line >= a && r.line < z ? r : { started };
 }
 const progressNote = p => (p.total ? `${Math.round(100 * p.pos / p.total)}% through: up to line ${p.pos} of ${p.total}` : 'Started, not finished yet');
 // The home screen's Continue card steps aside when it would only repeat the rehearsal in progress.
@@ -146,6 +177,7 @@ function sessionButtons(s, x, p, startLabel) {
 
 function nextRehearsalHtml() {
   const n = nextSession();
+  if (n) fixSceneNames(n.s);
   if (!n) return '';
   const p = sessionProgress(n.s, n.x);
   return `<div class="card stack-sm">
@@ -221,6 +253,7 @@ function remindHtml(s) {
 
 function planCardHtml(s) {
   if (s.sample || s.kind === 'song') return '';
+  if (s.plan) fixSceneNames(s);
   const p = s.plan;
   let inner;
   if (!s.myChar) inner = '<p class="muted">Pick who you\'re playing (under "I\'m playing" above) to make a rehearsal plan.</p>';
@@ -329,13 +362,12 @@ Object.assign(actions, {
   'plan-start'(b) {
     const s = planOf(b.dataset.sid), x = findSession(s, b.dataset.id);
     if (!s || !x) return;
+    fixSceneNames(s);
     if (app.view !== 'script' || app.scriptId !== s.id) openScript(s.id);
     planUi.active = { sid: s.id, id: x.id };
     const resume = b.dataset.resume && sessionProgress(s, x);
     if (!x.started) { x.started = Date.now(); s.updated = Date.now(); }
-    const scenes = planScenes(s).filter(sc => x.scenes?.includes(sc[2]));
-    if (x.kind === 'learn' && scenes.length) [s.rangeStart, s.rangeEnd] = [scenes[0][0], scenes[scenes.length - 1][1]];
-    else [s.rangeStart, s.rangeEnd] = [0, s.lines.length];
+    [s.rangeStart, s.rangeEnd] = sessionRange(s, x);
     saveScripts();
     app.cuesOnly = x.kind === 'final';
     if (x.kind === 'drill' && weakCount(s)) actions.weak();
