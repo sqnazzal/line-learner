@@ -180,6 +180,7 @@ async function googleSync() {
     saveGsync();
     if (tooBig.length) gsync.error = `"${tooBig[0].title}" is too big to sync. Keep it safe with Download backup.`;
     syncRecordings();
+    window.syncReminders?.(); // rehearsal reminders (plan.js)
     if (app.view === 'script' && !current()) app.view = 'library';
     if (['library', 'script', 'sync'].includes(app.view) && !app.rec) render();
   } catch (e) {

@@ -1265,6 +1265,7 @@ function renderLibrary() {
       </div>
       ${accountLineHtml()}
     </div>
+    ${typeof nextRehearsalHtml === 'function' ? nextRehearsalHtml() : ''}
     ${continueHtml()}
     ${supportNote()}
     ${(() => {
@@ -2057,6 +2058,7 @@ function renderScript() {
       <button class="mode" data-action="type" ${s.myChar ? '' : 'disabled'}>${icon('keyboard')}<b>Type your lines</b><span>For the train or anywhere you can't talk. Read your cues, type your lines, and get the same word-by-word check.</span></button>
       <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line' : 'lines'} you're working on` : mine.some(l => isSolid(s, l)) ? 'Nothing shaky right now' : 'Nothing to drill yet: rehearse first') : 'Pick your character first'}</span></button>
     </div>
+    ${typeof planCardHtml === 'function' ? planCardHtml(s) : ''}
     <details id="voices" class="card" ${app.voicesOpen ? 'open' : ''}>
       <summary>Voices for each character</summary>
       ${aiPanelHtml()}
@@ -2338,6 +2340,7 @@ function finishRun() {
   P.status = 'done';
   saveResume();
   keepAwake(false);
+  window.planRunDone?.(current()); // ticks off a rehearsal plan session (plan.js)
   refreshPlayer();
 }
 
@@ -3476,7 +3479,7 @@ function focusKey(el) {
   if (!el || el === document.body || !$('#app').contains(el)) return null;
   if (el.id) return '#' + CSS.escape(el.id);
   if (!el.dataset.action) return null;
-  return `[data-action="${CSS.escape(el.dataset.action)}"]` + ['i', 'tab', 'cat', 'kind', 'choice', 'gid', 'char']
+  return `[data-action="${CSS.escape(el.dataset.action)}"]` + ['i', 'id', 'tab', 'cat', 'kind', 'choice', 'gid', 'char']
     .filter(k => el.dataset[k] != null).map(k => `[data-${k}="${CSS.escape(el.dataset[k])}"]`).join('');
 }
 function restoreFocus(key) {

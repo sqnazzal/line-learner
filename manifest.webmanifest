@@ -1,0 +1,10 @@
+{
+  "name": "Line Learner",
+  "short_name": "Line Learner",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#c03d33",
+  "icons": [{ "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }]
+}

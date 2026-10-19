@@ -21,6 +21,11 @@
 // Needed for feedback emails, and so Admin > People lists everyone who has signed in with Google:
 //   GOOGLE_SERVICE_ACCOUNT  Secret. The whole JSON key of a Google service account with only the
 //                           "Firebase Authentication Viewer" and "Cloud Datastore Viewer" roles (see server/README.md).
+//
+// For rehearsal reminders (push notifications), also needs GOOGLE_SERVICE_ACCOUNT, plus:
+//   VAPID_PUBLIC_KEY    The reminders key (the same as PUSH_KEY in plan.js).
+//   VAPID_PRIVATE_KEY   Secret. Its private half.
+//   A Cron Trigger (Settings > Trigger events > Cron): */5 * * * *
 
 const TTS_MODEL = 'gpt-4o-mini-tts';
 const VISION_MODEL = 'gpt-6-luna';
@@ -51,6 +56,10 @@ export default {
       if (!token) return json({ error: 'Sign in to use the shared voices.' }, 401);
       let user;
       try { user = await verifyFirebaseToken(token, env.FIREBASE_PROJECT_ID); } catch { return json({ error: 'Your sign-in has expired. Sign in again.' }, 401); }
+      // Rehearsal reminders are for everyone signed in, not only Shannon's groups: a test one, sent right away.
+      if (new URL(request.url).pathname.replace(/\/+$/, '').endsWith('/test-reminder') && request.method === 'POST') {
+        return json(await testReminder(user.sub, env));
+      }
       const isOwner = user.sub === env.OWNER_UID;
       if (!isOwner && !(await inOwnersGroup(user.sub, token, env))) {
         return json({ error: "The shared voices are for people in Shannon's groups. Ask Shannon for an invite." }, 403);
@@ -120,6 +129,11 @@ export default {
     } catch (e) {
       return json({ error: 'The voices server had a problem. Try again in a moment.' }, 500);
     }
+  },
+
+  // The Cron Trigger (every 5 minutes) sends the rehearsal reminders that are due.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(sendReminders(event.scheduledTime, env));
   },
 };
 
@@ -282,4 +296,113 @@ async function emailFeedback(id, env) {
   });
   if (!mail.ok) return { ok: false, reason: `Resend said ${mail.status}: ${(await mail.text()).slice(0, 300)}` };
   return { ok: true };
+}
+
+// ---------- Rehearsal reminders (push notifications) ----------
+// The app keeps each upcoming reminder in Firestore (reminders/{uid}_{id}: when, title and text) and each
+// device's push address in users/{uid}/meta/push. Every 5 minutes this reads the ones due in the next 5
+// minutes (with GOOGLE_SERVICE_ACCOUNT) and sends each through the device's push service (Apple, Google,
+// Mozilla or Microsoft), encrypted so only that device can read it (RFC 8291) and signed with the VAPID key.
+// A push address that has expired just fails; the app saves a fresh one each time it opens.
+const REMIND_EVERY = 5 * 60 * 1000;
+const PUSH_HOSTS = /^https:\/\/([a-z0-9-]+\.)*(push\.apple\.com|fcm\.googleapis\.com|push\.services\.mozilla\.com|notify\.windows\.com)\//;
+const firestoreBase = env => `https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+const pushReady = env => !!(env.GOOGLE_SERVICE_ACCOUNT && env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);
+
+async function sendReminders(when, env) {
+  if (!pushReady(env)) return { sent: 0, reason: 'not set up' };
+  const token = await googleAccessToken(JSON.parse(env.GOOGLE_SERVICE_ACCOUNT));
+  const at = (op, ms) => ({ fieldFilter: { field: { fieldPath: 'at' }, op, value: { integerValue: String(ms) } } });
+  const res = await fetch(`${firestoreBase(env)}:runQuery`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: {
+      from: [{ collectionId: 'reminders' }],
+      where: { compositeFilter: { op: 'AND', filters: [at('GREATER_THAN_OR_EQUAL', when), at('LESS_THAN', when + REMIND_EVERY)] } },
+      limit: 500,
+    } }),
+  });
+  if (!res.ok) return { sent: 0, reason: `Google said ${res.status}` };
+  const subsOf = new Map();
+  let sent = 0;
+  for (const { document: d } of await res.json()) {
+    const f = d?.fields || {}, uid = f.uid?.stringValue;
+    if (!uid) continue;
+    if (!subsOf.has(uid)) subsOf.set(uid, await pushSubs(uid, token, env));
+    const msg = { title: f.title?.stringValue || 'Time to rehearse', body: f.body?.stringValue || '', url: f.url?.stringValue || '', tag: d.name.split('/').pop() };
+    for (const sub of subsOf.get(uid)) if (await sendPush(sub, msg, env).catch(() => false)) sent++;
+  }
+  return { sent };
+}
+
+// "Send a test reminder" in the app: one notification to each of this person's devices, right away.
+const lastTest = new Map();
+async function testReminder(uid, env) {
+  if (!pushReady(env)) return { ok: false, reason: 'Reminders aren\'t set up on the server yet.' };
+  if (Date.now() - (lastTest.get(uid) || 0) < 20000) return { ok: false, reason: 'Just sent one. Give it a moment.' };
+  lastTest.set(uid, Date.now());
+  const subs = await pushSubs(uid, await googleAccessToken(JSON.parse(env.GOOGLE_SERVICE_ACCOUNT)), env);
+  let sent = 0;
+  for (const sub of subs) if (await sendPush(sub, { title: 'Line Learner reminders are on', body: 'This is how your rehearsal reminders will look.', tag: 'test' }, env).catch(() => false)) sent++;
+  return { ok: sent > 0, sent, devices: subs.length };
+}
+
+async function pushSubs(uid, token, env) {
+  const res = await fetch(`${firestoreBase(env)}/users/${encodeURIComponent(uid)}/meta/push`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return [];
+  const subs = (await res.json()).fields?.subs?.mapValue?.fields || {};
+  return Object.values(subs).map(v => v.mapValue?.fields || {})
+    .map(f => ({ endpoint: f.endpoint?.stringValue || '', p256dh: f.p256dh?.stringValue || '', auth: f.auth?.stringValue || '' }))
+    .filter(s => PUSH_HOSTS.test(s.endpoint) && s.p256dh && s.auth);
+}
+
+async function sendPush(sub, msg, env) {
+  const body = await encryptPush(new TextEncoder().encode(JSON.stringify(msg)), b64urlBytes(sub.p256dh), b64urlBytes(sub.auth));
+  const res = await fetch(sub.endpoint, {
+    method: 'POST',
+    headers: { Authorization: await vapidAuth(sub.endpoint, env), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '3600', Urgency: 'high' },
+    body,
+  });
+  return res.ok;
+}
+
+const bytesB64url = u8 => btoa(String.fromCharCode(...u8)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+const joinBytes = (...parts) => {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) { out.set(p, at); at += p.length; }
+  return out;
+};
+
+// The VAPID header: proves to the push service that the reminder comes from this app's server.
+async function vapidAuth(endpoint, env) {
+  const now = Math.floor(Date.now() / 1000), enc = obj => bytesB64url(new TextEncoder().encode(JSON.stringify(obj)));
+  const unsigned = `${enc({ typ: 'JWT', alg: 'ES256' })}.${enc({ aud: new URL(endpoint).origin, exp: now + 12 * 3600, sub: 'https://sqnazzal.github.io/line-learner/' })}`;
+  const pub = b64urlBytes(env.VAPID_PUBLIC_KEY);
+  const key = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', d: env.VAPID_PRIVATE_KEY, x: bytesB64url(pub.slice(1, 33)), y: bytesB64url(pub.slice(33, 65)) },
+    { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(unsigned)));
+  return `vapid t=${unsigned}.${bytesB64url(sig)}, k=${env.VAPID_PUBLIC_KEY}`;
+}
+
+// Web Push message encryption (aes128gcm, RFC 8291). `fixed` (keys and salt) is only for checking against the RFC's example.
+async function encryptPush(plain, uaPublic, authSecret, fixed = {}) {
+  const te = new TextEncoder();
+  const asKeys = fixed.keys || await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPublic = new Uint8Array(await crypto.subtle.exportKey('raw', asKeys.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', uaPublic, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const ecdh = await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, asKeys.privateKey, 256);
+  const hkdf = async (salt, ikm, info, bytes) => new Uint8Array(await crypto.subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt, info },
+    await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']), bytes * 8));
+  const ikm = await hkdf(authSecret, ecdh, joinBytes(te.encode('WebPush: info\0'), uaPublic, asPublic), 32);
+  const salt = fixed.salt || crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, te.encode('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await hkdf(salt, ikm, te.encode('Content-Encoding: nonce\0'), 12);
+  const key = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, joinBytes(plain, new Uint8Array([2]))));
+  const header = new Uint8Array(21); // salt, record size 4096, key length 65
+  header.set(salt);
+  new DataView(header.buffer).setUint32(16, 4096);
+  header[20] = 65;
+  return joinBytes(header, asPublic, sealed);
 }

@@ -135,6 +135,17 @@ const REAL_HELP = topic('Rehearsing for real: phone on a stand, headphones, long
     <li><b>Just your part:</b> on a script, tick <b>Just my cues and lines</b> and Listen, Rehearse and Type play only the line before each of yours, then yours, skipping the rest of the show. <b>Listen, screen off</b> has the same choice when you make a track.</li>
     <li><b>Long scenes:</b> leave any time and the script page offers <b>Pick up where you left off</b>. Lines like <code># Act 2</code> or <code>Scene 3</code> in the script make sections you can pick with <b>Start at</b>, and the play icon on any of your lines starts Rehearse from there.</li></ul>`);
 
+const PLAN_HELP = topic('Rehearsal plan and reminders', `<ul>
+    <li><b>Make a plan:</b> open a script, pick who you're playing, then open <b>Rehearsal plan</b>. Enter opening night, the days you can rehearse, a usual time and how long a session can be, and tap <b>Make my plan</b>.</li>
+    <li><b>How it's spread out:</b> about two sessions a week when opening is far off, three a week from five weeks out, and every free day in the last two weeks. First you learn each scene you're in, one per session (with drills of your shaky lines mixed in), then full run-throughs, and last a light run of just your cues and lines.</li>
+    <li><b>Change anything:</b> change a session's date and time right in the list, tick it done, delete it, or <b>+ Add a session</b>. <b>Change dates or days</b> makes a new plan and keeps the sessions you've done. Missed some? <b>Re-plan from today</b> spreads what's left over the days you have.</li>
+    <li><b>Ticking off:</b> <b>Start</b> on a session opens the right practice (that scene, your weak lines or the whole show). Finish it, or finish any run of that script on a session's day, and it's ticked off by itself.</li>
+    <li><b>Home screen:</b> your next rehearsal shows at the top, with a <b>Start</b> button.</li>
+    <li><b>On every device:</b> the plan syncs with the script when you're signed in with Google.</li>
+    <li><b>Reminders:</b> sign in with Google, then <b>Turn on reminders</b> in the plan and allow notifications. Do it on each device you want them on. Choose when: as the session starts, 15 minutes or an hour before. <b>Send a test</b> checks it works.</li>
+    <li><b>iPhone and iPad:</b> reminders need iOS 16.4 or later, and Line Learner opened from its Home Screen icon (Safari's Share button &gt; <b>Add to Home Screen</b>). If you already have the icon, use that one: removing an icon deletes what it saved on the phone.</li>
+    <li><b>No reminder came?</b> Check notifications are allowed for Line Learner (iPhone: Settings &gt; Notifications; on a computer, the browser's site settings), and that Focus or Do Not Disturb isn't holding them. Reminders can arrive up to 5 minutes early.</li></ul>`);
+
 // Kept in step with what the app actually stores and sends (and the access firestore.rules gives); update it
 // when either changes.
 const PRIVACY_DATE = 'October 18, 2026';
@@ -153,6 +164,7 @@ const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.p
     <li>Your name, email and when you last used the app, so Shannon can see who's using it</li>
     <li>Your synced scripts, songs, categories and progress, and your recordings if you back them up. Other people can't see them. Shannon, as the app's admin, has access to them and to your account details, and uses it only to delete data you ask to have removed or to fix a problem you report</li>
     <li>The groups you're in, and anything you <b>Share to group</b>, which everyone in that group can see</li>
+    <li>If you turn on <b>rehearsal reminders</b>: a push address for each device you turn them on for (made by Apple, Google, Mozilla or Microsoft, whose push service delivers the notification), and your next rehearsals (time, script title and what you're working on) so Shannon's small server on Cloudflare can send each reminder. Turning reminders off on every device removes them</li>
   </ul>
   <p><b>Sent to other services, only when you use a feature that needs them:</b></p>
   <ul>
@@ -185,6 +197,7 @@ function renderHelp() {
     <div class="segmented" role="group" aria-label="Your device">${tabs}</div>
     ${HELP[help.tab].map(([t, b], i) => topic(t, b, i === 0)).join('')}
     ${REAL_HELP}
+    ${PLAN_HELP}
     ${SYNC_HELP}
     ${COMMON}
     ${ACCESS_HELP}
@@ -240,6 +253,8 @@ VIEWS.about = renderAbout;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-18', [
+    '<b>Rehearsal plan:</b> give a script your opening night and the days you\'re free, and it spreads rehearsals out until then (learn each scene, drill, then full run-throughs). Move or tick off any session, and your next one shows on the home screen.',
+    '<b>Rehearsal reminders:</b> signed in with Google, get a notification before each session on your phone or computer.',
     '<b>Past shows stay put:</b> moving a script to Past removes it from the Continue shortcut on the home screen.',
     '<b>Type your lines:</b> practice quietly (on a train, say) by typing your lines. Cues show on screen, or can be read aloud.',
     '<b>Sound-alikes count:</b> different spellings that sound the same (Dotty / Dottie) and run-together words (damn it / dammit, want to / wanna) now pass.',

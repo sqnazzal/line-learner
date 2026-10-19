@@ -31,6 +31,15 @@
 
    Without it, no feedback emails are sent (notes still appear in Admin), and People only shows those who have opened the app signed in since the Admin screen was added. Feedback notes are private: since this change the Worker reads them with this key rather than publicly, and it sends at most 20 alert emails an hour.
 
+8. **Rehearsal reminders (push notifications).** Needs the Google key from step 7.
+   1. In the Worker: **Settings > Variables and Secrets > Add**:
+      - `VAPID_PUBLIC_KEY` (type **Text**): the same key as `PUSH_KEY` in `plan.js`
+      - `VAPID_PRIVATE_KEY` (type **Secret**): its private half (kept only here, never in the repository; if it's ever lost, make a new pair, put the public half in `PUSH_KEY`, and everyone turns reminders on again)
+   2. **Settings > Trigger events > Add > Cron Triggers**, schedule `*/5 * * * *` (every 5 minutes).
+   3. Publish `firestore.rules` (it has the `reminders` section).
+
+   Every 5 minutes the Worker reads the reminders due in the next 5 minutes and sends each to that person's devices through their push service (Apple, Google, Mozilla or Microsoft), encrypted for the device. **Send a test** in the app checks the whole path.
+
 ## How it decides
 
 - Checks the Google sign-in token is genuine (signed by Google, for this Firebase project, not expired).

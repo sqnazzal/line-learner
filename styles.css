@@ -493,3 +493,18 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 .update-list li + li { margin-top: .5rem; }
 .ai-rights { margin: .75rem 0; }
 .stack-sm > .ai-rights, .stack > .ai-rights { margin: 0; }
+
+/* Rehearsal plan */
+.plan-days { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.plan-days legend { font-weight: 600; padding: 0; margin-bottom: 6px; }
+.plan-list { list-style: none; margin: 0; padding: 0; }
+.plan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 0; border-top: 1px solid var(--border); }
+.plan-row:last-child { border-bottom: 1px solid var(--border); }
+.plan-row .plan-what { flex: 1 1 100%; }
+.plan-row .tools { display: flex; gap: 2px; }
+.plan-row.done .plan-what b { text-decoration: line-through; color: var(--muted); }
+.plan-row.missed .plan-what b { color: var(--muted); }
+.plan-when { flex: 1 1 0; min-width: 0; font: inherit; font-size: .9em; padding: 4px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); max-width: 100%; }
+.icon-btn.on { color: var(--good); }
+.plan-remind { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+.plan-remind svg { width: 16px; height: 16px; vertical-align: -3px; color: var(--good); }

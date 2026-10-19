@@ -74,6 +74,8 @@ Each of your lines is **Not practiced**, **Working on it**, or **Solid**. Solid 
 - **Scene breaks:** each scene heading is read out by an announcer ("Act 2", "Scene 1") with a pause, so a new scene is clear even with the screen off.
 - **Long scenes:** leave mid-scene and the script page offers **Pick up where you left off**.
 - **Continue:** the home screen offers **Continue** for your last run (same script, mode, section and cues-only setting), from where you stopped in a long scene. Scripts moved to Past drop off it.
+- **Rehearsal plan:** on a script, enter opening night, the days you're free, a usual time and a session length, and it spreads rehearsals out until then: learn each scene you're in, drills of shaky lines, then full run-throughs (more often as opening gets close) and a last cues-only run. Move, add, delete or tick off any session; finishing a run on a session's day ticks it off, and the next one shows on the home screen. Missed some? **Re-plan from today**. The plan syncs with the script.
+- **Rehearsal reminders** (Google sign-in): **Turn on reminders** in the plan, on each device, for a notification when a session starts, or 15 minutes or an hour before. On iPhone and iPad it needs iOS 16.4+ and the app opened from its Home Screen icon.
 - **Edited or updated scripts keep your progress:** progress is kept per line (who says it and the words), so lines that didn't change keep theirs and changed lines start fresh. **Start at** and **Pick up where you left off** follow the same lines too.
 - **Headphones:** wired or Bluetooth work; on many phones their play/pause and skip buttons work the player.
 - **Practice settings** (under the player): text size (up to **Extra large** for a phone on a stand), reading speed, how much of your line shows as a hint, how strict the check is, how long it waits after you stop talking, and more.
@@ -147,7 +149,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | Service | What for | Where to manage it |
 | --- | --- | --- |
 | **Google Firebase** (project `line-learner-45bd1`) | Google sign-in, groups, shared items, Google sync | console.firebase.google.com: **Security > Authentication** (Google enabled; `sqnazzal.github.io` under Authorized domains), **Databases and storage > Firestore > Rules** |
-| **Cloudflare Worker** (`line-learner-voices`) | Shared voices: holds the OpenAI key for group members | See `server/README.md` |
+| **Cloudflare Worker** (`line-learner-voices`) | Shared voices (holds the OpenAI key for group members), feedback emails, rehearsal reminders | See `server/README.md` |
 | **OpenAI** | AI voices and reading pages | platform.openai.com: keep a **monthly budget** on the shared project (Settings > Limits) |
 | **Spotify developer app** | Connecting Spotify (Client ID in `songs.js`) | developer.spotify.com/dashboard: **User Management** (up to 5 people; owner needs Premium). The app also only offers it to members of the **Nazzal only** group (`SPOTIFY_GROUP` in `songs.js`) |
 | **GitHub** | Hosting, and the optional GitHub sync | This repository; Pages builds from `main` |
@@ -167,10 +169,12 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | `track.js` | Listen, screen off (building and saving audio tracks) |
 | `songs.js` | Songs: lyrics, Spotify, Sing along |
 | `groups.js` | Google sign-in, groups, sharing, Google sync |
+| `plan.js` | Rehearsal plans and reminders |
+| `sw.js`, `manifest.webmanifest` | The service worker (only shows reminders, caches nothing) and the app manifest |
 | `admin.js` | The admin screen (Shannon only) |
 | `help.js` | Help & troubleshooting, Privacy, About, What's new and Send feedback |
 | `firestore.rules` | Firebase security rules |
-| `server/` | The shared voices Cloudflare Worker and its setup guide |
+| `server/` | The Cloudflare Worker (shared voices, feedback emails, reminders) and its setup guide |
 | `library/`, `tools/` | The free script library and the tools that build it |
 | `vendor/pdfjs` | Mozilla's PDF.js 3.11.174 (Apache 2.0), for reading PDFs |
 | `sample-script.txt` | An example scene |
