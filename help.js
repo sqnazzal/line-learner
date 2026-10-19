@@ -258,7 +258,7 @@ const UPDATES = [
     '<b>Scene openers get a cue:</b> in Drill weak lines and Just my cues and lines, a line of yours that opens a scene is cued by the act or scene heading, called out first.',
     '<b>Plan first:</b> while a rehearsal plan is active, it\'s the top card on the script page. <b>+ Add a session</b> now lets you pick what it\'s for (any scene, a drill, a full run or a cues-only run), when, and how long.',
     '<b>Plans know their acts:</b> with separate act and scene headings, sessions are named like "Act 2, Scene 1", and a Learn session covers only its own scene (it used to run on into every act\'s scene of the same name).',
-    '<b>Rehearsal in progress:</b> once you start a planned session, the home screen shows how far you got, with <b>Pick up</b> and <b>Start over</b>.',
+    '<b>Rehearsal in progress:</b> once you start a planned session, the home screen shows how far you got, with <b>Pick up</b> and <b>Start over</b>, on all your devices.',
     '<b>Room to breathe:</b> Rehearse waits longer (about 4 seconds) through a pause in the middle of your line, and on iPhone no longer drops words said just before a pause.',
     '<b>Initials count:</b> lines with initials like S.O.B. pass whether the mic hears "SOB" or "S O B".',
     '<b>Rehearsal plan:</b> give a script your opening night and the days you\'re free, and it spreads rehearsals out until then (learn each scene, drill, then full run-throughs). Move or tick off any session, and your next one shows on the home screen.',

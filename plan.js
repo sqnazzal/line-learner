@@ -158,7 +158,9 @@ function sessionRange(s, x) {
 // A Rehearse run of the script in the last two days counts toward its next session too, even if not started from the plan.
 function sessionProgress(s, x) {
   if (x.done) return null;
-  const r = resumeAt[s.id]?.mode === 'rehearse' ? resumeAt[s.id] : null;
+  // Where you stopped: this device's saved place, or the one synced with the plan from another device, whichever is newer.
+  const here = resumeAt[s.id]?.mode === 'rehearse' ? resumeAt[s.id] : null;
+  const r = [here, x.progress].filter(Boolean).sort((p, q) => q.at - p.at)[0] || null;
   const first = s.plan.sessions.find(y => !y.done) === x;
   const started = x.started || (first && r && r.at > Date.now() - 2 * DAY_MS ? r.at : 0);
   if (!started) return null;
@@ -314,6 +316,21 @@ function planChanged(s) {
 }
 const findSession = (s, id) => s?.plan?.sessions.find(x => x.id === id);
 
+// Leaving a run (or the app) keeps the session's place with the plan, so your other devices show it too.
+window.planSaveProgress = s => {
+  const r = resumeAt[s?.id];
+  if (!s?.plan || r?.mode !== 'rehearse') return;
+  const a = planUi.active;
+  const x = (a?.sid === s.id && findSession(s, a.id)) || s.plan.sessions.find(y => !y.done && sessionProgress(s, y));
+  if (!x || x.done || x.progress?.at === r.at) return;
+  const [from, to] = sessionRange(s, x);
+  if (r.line < from || r.line >= to) return;
+  x.progress = { line: r.line, pos: r.pos, total: r.total, at: r.at };
+  s.updated = Date.now();
+  saveScripts();
+};
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && app.view === 'player') window.planSaveProgress(current()); });
+
 // Finishing a run ticks off the session you started from the plan, or else today's session for this script.
 window.planRunDone = s => {
   if (!s?.plan) return;
@@ -400,6 +417,7 @@ Object.assign(actions, {
     planUi.active = { sid: s.id, id: x.id };
     const resume = b.dataset.resume && sessionProgress(s, x);
     if (!x.started) { x.started = Date.now(); s.updated = Date.now(); }
+    if (!resume) delete x.progress; // Start over
     [s.rangeStart, s.rangeEnd] = sessionRange(s, x);
     saveScripts();
     app.cuesOnly = x.kind === 'final';
@@ -603,4 +621,5 @@ navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.openScri
     openFromReminder(id);
   }
   if (remind.conf.on && pushSupported()) navigator.serviceWorker.register('sw.js').catch(() => {});
+  for (const s of planScripts()) window.planSaveProgress(s); // a place saved on this device before progress synced
 })();

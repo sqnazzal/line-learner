@@ -2389,7 +2389,7 @@ function pauseRun(note = '') {
 }
 
 function leave() {
-  if (app.view === 'player') saveResume();
+  if (app.view === 'player') { saveResume(); window.planSaveProgress?.(current()); }
   stopRun();
   stopRecording();
   previewToken.cancel();
