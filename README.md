@@ -187,7 +187,7 @@ Line Learner is licensed under the [PolyForm Strict License 1.0.0](LICENSE.md): 
 
 **Extra permission:** anyone may use the hosted app to rehearse for any role or audition, paid or unpaid (see the top of [LICENSE.md](LICENSE.md)); that doesn't extend to selling, copying, changing or redistributing the app.
 
-Not covered by that license: PDF.js in `vendor/pdfjs` keeps its own Apache 2.0 license, and the plays and monologues in `library/` are public domain texts from Project Gutenberg.
+Not covered by that license: PDF.js in `vendor/pdfjs` keeps its own Apache 2.0 license, and the plays and monologues in `library/` are public domain texts from Project Gutenberg, reformatted for Line Learner (speaker names and scene headings, with the Project Gutenberg header, footer and license removed). Each is credited with a link to its Project Gutenberg page.
 
 ---
 

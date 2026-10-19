@@ -1620,7 +1620,7 @@ function renderBrowse() {
 function libSourceHtml(p) {
   if (!p?.gutenberg) return '';
   const by = p.translator ? `Translated by ${esc(p.translator)}` : p.translator === '' ? 'Older English translation (translator not named)' : '';
-  return `<span class="muted small">${by ? `${by} · ` : ''}Public domain, from <a href="https://www.gutenberg.org/ebooks/${p.gutenberg}" target="_blank" rel="noopener">Project Gutenberg #${p.gutenberg}</a></span>`;
+  return `<span class="muted small">${by ? `${by} · ` : ''}Public domain text from <a href="https://www.gutenberg.org/ebooks/${p.gutenberg}" target="_blank" rel="noopener">Project Gutenberg #${p.gutenberg}</a>, reformatted for Line Learner</span>`;
 }
 
 function libResultsHtml(q) {
