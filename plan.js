@@ -124,12 +124,34 @@ function nextSession() {
 }
 
 // ---------- Home screen: the next rehearsal ----------
+// How far into a session you got once you've started it: where Rehearse stopped (on this device) if it kept a place.
+// A Rehearse run of the script in the last two days counts toward its next session too, even if not started from the plan.
+function sessionProgress(s, x) {
+  if (x.done) return null;
+  const r = resumeAt[s.id]?.mode === 'rehearse' ? resumeAt[s.id] : null;
+  const first = s.plan.sessions.find(y => !y.done) === x;
+  const started = x.started || (first && r && r.at > Date.now() - 2 * DAY_MS ? r.at : 0);
+  if (!started) return null;
+  return r && r.at >= started && x.kind !== 'drill' ? r : { started };
+}
+const progressNote = p => (p.total ? `Line ${p.pos} of ${p.total}` : 'Started, not finished yet');
+// The home screen's Continue card steps aside when it would only repeat the rehearsal in progress.
+window.planInProgress = id => { const n = nextSession(); return !!(n && n.s.id === id && sessionProgress(n.s, n.x)); };
+
+function sessionButtons(s, x, p, startLabel) {
+  return p
+    ? `<div class="row wrap"><button class="btn primary" data-action="plan-start" data-sid="${s.id}" data-id="${x.id}" data-resume="1">${icon('play')} Pick up</button><button class="btn ghost" data-action="plan-start" data-sid="${s.id}" data-id="${x.id}">Start over</button></div>`
+    : `<div><button class="btn primary" data-action="plan-start" data-sid="${s.id}" data-id="${x.id}">${icon('play')} ${startLabel}</button></div>`;
+}
+
 function nextRehearsalHtml() {
   const n = nextSession();
   if (!n) return '';
-  return `<div class="card resume-card">
-    <span><b>Next rehearsal: ${esc(n.s.title)}</b> <span class="muted">${esc(whenText(n.x.at))} · ${esc(sessionLabel(n.x))} · ${n.x.min} min</span></span>
-    <button class="btn primary" data-action="plan-start" data-sid="${n.s.id}" data-id="${n.x.id}">${icon('play')} Start</button>
+  const p = sessionProgress(n.s, n.x);
+  return `<div class="card stack-sm">
+    <span><b>${p ? 'Rehearsal in progress' : 'Next rehearsal'}: ${esc(n.s.title)}</b> <span class="muted">${esc(whenText(n.x.at))} · ${esc(sessionLabel(n.x))} · ${n.x.min} min</span></span>
+    ${p ? `<div class="meter">${bar(p.total ? p.pos / p.total : 0)}<span class="muted small">${progressNote(p)}</span></div>` : ''}
+    ${sessionButtons(n.s, n.x, p, 'Start')}
   </div>`;
 }
 
@@ -208,11 +230,11 @@ function planCardHtml(s) {
     const ahead = all.filter(x => !x.done && !missed(x)), gone = all.filter(missed);
     const left = Math.round((new Date(p.opening + 'T00:00') - new Date().setHours(0, 0, 0, 0)) / DAY_MS);
     const shown = planUi.showAll ? all : ahead.slice(0, 6);
-    const next = ahead[0];
+    const next = ahead[0], nextP = next && sessionProgress(s, next);
     inner = `<p>Opening night: <b>${esc(new Date(p.opening + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))}</b>${left > 0 ? ` <span class="muted">(in ${left} ${left === 1 ? 'day' : 'days'})</span>` : left === 0 ? ' <span class="muted">(today: break a leg!)</span>' : ''} · ${done} of ${all.length} done</p>
       ${all.length ? `<div class="meter">${bar(done / all.length)}</div>` : ''}
-      ${next ? `<div class="note stack-sm"><span><b>Next: ${esc(whenText(next.at))}</b> · ${esc(sessionLabel(next))}, ${next.min} min</span><span class="small">${SESSION_HOW[next.kind] || ''}</span>
-        <div><button class="btn primary" data-action="plan-start" data-sid="${s.id}" data-id="${next.id}">${icon('play')} Start now</button></div></div>` : left > 0 ? '<p class="muted small">No sessions left. Add one, or make a new plan.</p>' : ''}
+      ${next ? `<div class="note stack-sm"><span><b>${nextP ? 'In progress' : 'Next'}: ${esc(whenText(next.at))}</b> · ${esc(sessionLabel(next))}, ${next.min} min</span><span class="small">${nextP ? progressNote(nextP) + '.' : SESSION_HOW[next.kind] || ''}</span>
+        ${sessionButtons(s, next, nextP, 'Start now')}</div>` : left > 0 ? '<p class="muted small">No sessions left. Add one, or make a new plan.</p>' : ''}
       ${gone.length && left > 0 ? `<p class="note small row between wrap"><span>${gone.length} ${gone.length === 1 ? 'session was' : 'sessions were'} missed. Spread what's left over the days you have?</span><button class="btn" data-action="plan-replan">Re-plan from today</button></p>` : ''}
       ${shown.length ? `<ol class="plan-list">${shown.map(x => sessionRowHtml(s, x)).join('')}</ol>` : ''}
       <div class="row wrap">
@@ -242,7 +264,8 @@ const findSession = (s, id) => s?.plan?.sessions.find(x => x.id === id);
 window.planRunDone = s => {
   if (!s?.plan) return;
   const a = planUi.active;
-  const x = (a?.sid === s.id && findSession(s, a.id)) || s.plan.sessions.find(y => !y.done && sameDay(y.at, Date.now()));
+  const x = (a?.sid === s.id && findSession(s, a.id)) || s.plan.sessions.find(y => !y.done && y.started)
+    || s.plan.sessions.find(y => !y.done && sameDay(y.at, Date.now()));
   planUi.active = null;
   if (!x || x.done) return;
   x.done = Date.now();
@@ -308,12 +331,15 @@ Object.assign(actions, {
     if (!s || !x) return;
     if (app.view !== 'script' || app.scriptId !== s.id) openScript(s.id);
     planUi.active = { sid: s.id, id: x.id };
+    const resume = b.dataset.resume && sessionProgress(s, x);
+    if (!x.started) { x.started = Date.now(); s.updated = Date.now(); }
     const scenes = planScenes(s).filter(sc => x.scenes?.includes(sc[2]));
     if (x.kind === 'learn' && scenes.length) [s.rangeStart, s.rangeEnd] = [scenes[0][0], scenes[scenes.length - 1][1]];
     else [s.rangeStart, s.rangeEnd] = [0, s.lines.length];
     saveScripts();
     app.cuesOnly = x.kind === 'final';
     if (x.kind === 'drill' && weakCount(s)) actions.weak();
+    else if (resume?.total) { const order = playOrder(s); startPlayer('rehearse', order, Math.max(0, order.indexOf(resume.line))); }
     else startPlayer('rehearse');
   },
 

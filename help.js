@@ -253,6 +253,7 @@ VIEWS.about = renderAbout;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-18', [
+    '<b>Rehearsal in progress:</b> once you start a planned session, the home screen shows how far you got, with <b>Pick up</b> and <b>Start over</b>.',
     '<b>Room to breathe:</b> Rehearse waits longer (about 4 seconds) through a pause in the middle of your line, and on iPhone no longer drops words said just before a pause.',
     '<b>Initials count:</b> lines with initials like S.O.B. pass whether the mic hears "SOB" or "S O B".',
     '<b>Rehearsal plan:</b> give a script your opening night and the days you\'re free, and it spreads rehearsals out until then (learn each scene, drill, then full run-throughs). Move or tick off any session, and your next one shows on the home screen.',
