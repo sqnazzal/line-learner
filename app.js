@@ -1264,6 +1264,26 @@ function continueHtml() {
   </div>`;
 }
 
+// A different hello each time you come back (never the same one twice running), with your first name when
+// you're signed in. {n} is where the name goes.
+const WELCOMES = [
+  'Welcome back{n}. Places, please!', "Look who's back{n}. Break a leg!", 'Welcome back{n}. The stage is yours.',
+  'Back for more{n}? Curtain up!', 'Welcome back{n}. Your lines missed you.', "Encore{n}! Let's run it again.",
+  'Welcome back{n}. Your family thanks you.', 'The show must go on{n}. Welcome back!', 'Welcome back{n}. Five minutes to places.',
+  "Welcome back{n}. Let's make the director proud.", 'Lights up{n}! Welcome back.', 'Welcome back{n}. Off book is in sight.',
+];
+const welcomePick = (() => {
+  const last = loadJSON('lineLearner.welcome', -1);
+  let i = Math.floor(Math.random() * (WELCOMES.length - 1));
+  if (last >= 0 && i >= last) i++;
+  saveJSON('lineLearner.welcome', i);
+  return i;
+})();
+const welcomeLine = () => {
+  const first = ((typeof fb !== 'undefined' && fb.user?.name) || '').trim().split(/\s+/)[0];
+  return WELCOMES[welcomePick].replace('{n}', first ? `, ${first}` : '');
+};
+
 function renderLibrary() {
   const has = scripts.length > 0;
   // Once you have scripts, the welcome shrinks to one row of buttons, so your rehearsals and scripts come first.
@@ -1276,8 +1296,9 @@ function renderLibrary() {
     </div>
     ${accountLineHtml()}` : '';
   return `<section class="stack">
+    ${has ? `<div class="welcome"><p class="welcome-hi">${esc(welcomeLine())}</p><h1 class="tagline">Because your family is tired of running lines with you.</h1></div>` : ''}
     ${hero}
-    ${has ? '<h1 class="sr-only">Line Learner</h1>' : `<div class="hero">
+    ${has ? '' : `<div class="hero">
       <h1 class="tagline">Because your family is tired of running lines with you.</h1>
       <p class="lede">Paste your script, pick your part, and let’s rehearse. Listen on repeat, work through tricky speeches, or run the whole scene out loud. Forget a line? Just say “line.” We can do this all night.</p>
       <div class="row wrap">
@@ -2390,7 +2411,8 @@ function pauseRun(note = '') {
 }
 
 function leave() {
-  if (app.view === 'player') { saveResume(); window.planSaveProgress?.(current()); }
+  if (app.view === 'player') { saveResume(); window.planSaveProgress?.(current()); window.logPractice?.(P); }
+  if (app.view === 'sing') window.logPractice?.(window.singRun);
   stopRun();
   stopRecording();
   previewToken.cancel();
@@ -2408,7 +2430,7 @@ async function startPlayer(mode, order, from = 0, drill = false) {
   if (mode === 'rehearse' || (mode === 'listen' && settings.listenHears)) await ensureMic(mode);
   leave();
   P = newPlayer(mode, order);
-  Object.assign(P, { drill, cuesOnly });
+  Object.assign(P, { drill, cuesOnly, began: Date.now() });
   if (!drill && !s.sample) saveJSON(LS_LAST, lastRun = { id: s.id, mode, cuesOnly, at: Date.now() });
   app.view = 'player';
   render();

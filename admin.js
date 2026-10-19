@@ -14,7 +14,16 @@ Object.assign(fb, {
   // Everyone's own profile (name, email, last seen), written when they sign in.
   saveProfile() {
     const { F, db } = fb.api;
-    return F.setDoc(F.doc(db, 'profiles', fb.user.uid), { name: fb.user.name, email: fb.user.email, lastSeen: Date.now() }, { merge: true });
+    return F.setDoc(F.doc(db, 'profiles', fb.user.uid), { name: fb.user.name, email: fb.user.email, lastSeen: Date.now() }, { merge: true })
+      .then(() => fb.logUse({ open: 1 }));
+  },
+  // Today's use, kept on your own profile for Admin > Reports: counts only (app opens, practice runs by
+  // mode, minutes practiced), never what was practiced.
+  logUse(counts) {
+    if (!fb.user || !fb.api) return null;
+    const { F, db } = fb.api, up = {};
+    for (const [k, n] of Object.entries(counts)) if (n) up[`days.${dayKey(isoDay(new Date()))}.${k}`] = F.increment(n);
+    return Object.keys(up).length ? F.updateDoc(F.doc(db, 'profiles', fb.user.uid), up).catch(() => {}) : null;
   },
   // Send feedback (anyone, signed in or not). Only the admin can read the inbox.
   async sendFeedback(note) {
@@ -124,7 +133,7 @@ async function loadAdmin() {
       : "Couldn't load. Check your connection and try again.";
   }
   adm.loading = false;
-  if (app.view === 'admin') render();
+  if (app.view === 'admin' || app.view === 'report') render();
 }
 
 // Profiles (written when someone opens the app signed in) plus every Google sign-in the server knows of,
@@ -158,7 +167,7 @@ const nameOf = uid => adm.data?.profiles.find(p => p.id === uid)?.name || adm.ac
 const when = t => (t ? ago(t) : 'never');
 
 function renderAdmin() {
-  const head = `<div class="row between wrap"><h1>Admin</h1><button class="btn ghost" data-action="group">${icon('back')} Group</button></div>`;
+  const head = `<div class="row between wrap"><h1>Admin</h1><div class="row wrap"><button class="btn" data-action="report">Reports</button><button class="btn ghost" data-action="group">${icon('back')} Group</button></div></div>`;
   if (!isAdmin()) return `<section class="stack">${head}<p class="muted">This screen is only for the app's admin.</p></section>`;
   if (!adm.data && !adm.error) { loadAdmin(); return `<section class="stack">${head}<p class="muted">Loading…</p></section>`; }
   if (adm.error) return `<section class="stack">${head}<p class="note">${esc(adm.error)}</p><div><button class="btn" data-action="admin-reload">Try again</button></div></section>`;
@@ -306,4 +315,213 @@ Object.assign(actions, {
   },
 });
 
+// ---------- Counting use (for Reports) ----------
+const isoDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const dayKey = iso => `d${iso.replace(/-/g, '')}`;
+
+// Counts a practice run once, plus the minutes since it began (or since it was last counted). Called when
+// leaving the player or Sing, and when the app goes into the background.
+window.logPractice = run => {
+  if (!fb.user || !run?.began) return;
+  const now = Date.now(), min = Math.min(180, (now - (run.logAt || run.began)) / 60000);
+  fb.logUse({ [run.drill ? 'drill' : run.mode]: run.logged ? 0 : 1, min: min >= 0.1 ? Math.round(min * 10) / 10 : 0 });
+  Object.assign(run, { logged: true, logAt: now });
+};
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden') return;
+  if (app.view === 'player') window.logPractice(P);
+  if (app.view === 'sing') window.logPractice(window.singRun);
+});
+
+// ---------- Reports: app use and money spent ----------
+// Use comes from the counts above, on each signed-in person's profile (so people who never sign in aren't
+// counted). Money comes from the voices server: its estimate (per person by month; per day and kind once the
+// spend table exists) and, with OPENAI_ADMIN_KEY, what OpenAI actually billed.
+const REPORT_RANGES = { 7: 'Last 7 days', 30: 'Last 30 days', 90: 'Last 90 days', 365: 'Last 12 months' };
+const PRACTICE_KINDS = { rehearse: 'Rehearse', listen: 'Listen', drill: 'Drill weak lines', type: 'Type', buildup: 'Build up a speech', sing: 'Sing' };
+const SPEND_KINDS = { voice: 'AI voices', pages: 'Reading pages from photos' };
+const rpt = { days: loadJSON('lineLearner.reportDays', 30), money: null, moneyFor: 0, loading: false };
+document.addEventListener('change', e => {
+  if (e.target.id === 'report-range') { rpt.days = Number(e.target.value); saveJSON('lineLearner.reportDays', rpt.days); render(); }
+});
+
+async function loadReportMoney() {
+  if (rpt.loading) return;
+  rpt.loading = true;
+  const days = Number(rpt.days);
+  try { rpt.money = (await voicesAdmin(`/admin/report?days=${days}`)) || { error: 'no voices server' }; } catch (e) { rpt.money = { error: e.message || 'unreachable' }; }
+  rpt.moneyFor = days;
+  rpt.loading = false;
+  if (app.view === 'report') render();
+}
+
+const fmtMin = m => (m >= 60 ? `${Math.floor(m / 60)} h ${Math.round(m % 60)} min` : `${Math.round(m)} min`);
+const usd = n => `$${(n || 0).toFixed(2)}`;
+const monthName = ym => new Date(`${ym}-15T12:00`).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+const dayName = iso => new Date(`${iso}T12:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+// Everything the report shows, for the chosen range.
+function reportData() {
+  const n = Number(rpt.days), t = new Date();
+  const days = [...Array(n)].map((_, i) => isoDay(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (n - 1 - i))));
+  const byDay = new Map(days.map(d => [d, { day: d, who: new Set(), open: 0, runs: 0, min: 0, est: 0, billed: 0 }]));
+  const people = new Map(), modes = {}, kinds = {}, items = {};
+  const person = (id, p = {}) => {
+    if (!people.has(id)) people.set(id, { id, name: p.name || nameOf(id), email: p.email || '', days: 0, open: 0, runs: 0, min: 0, est: 0, last: '' });
+    return people.get(id);
+  };
+  const all = allPeople();
+  for (const p of all) {
+    const u = person(p.id, p);
+    for (const d of days) {
+      const c = p.days?.[dayKey(d)];
+      if (!c) continue;
+      const row = byDay.get(d), runs = Object.keys(PRACTICE_KINDS).reduce((sum, k) => sum + (c[k] || 0), 0);
+      for (const k in PRACTICE_KINDS) if (c[k]) modes[k] = (modes[k] || 0) + c[k];
+      row.who.add(p.id); row.open += c.open || 0; row.runs += runs; row.min += c.min || 0;
+      u.days++; u.open += c.open || 0; u.runs += runs; u.min += c.min || 0; u.last = d;
+    }
+  }
+  const m = rpt.moneyFor === n ? rpt.money || {} : {};
+  if (m.days) {
+    for (const r of m.days) {
+      const row = byDay.get(r.day);
+      if (!row) continue;
+      row.est += r.usd;
+      kinds[r.kind] = (kinds[r.kind] || 0) + r.usd;
+      person(r.uid).est += r.usd;
+    }
+  } else if (m.months) {
+    // Only monthly totals: the whole of each month that overlaps the range.
+    for (const r of m.months) if (r.month >= days[0].slice(0, 7)) person(r.uid).est += r.usd;
+  }
+  for (const r of m.openai?.rows || []) {
+    const row = byDay.get(r.day);
+    if (!row) continue;
+    row.billed += r.usd;
+    items[r.item || 'Other'] = (items[r.item || 'Other'] || 0) + r.usd;
+  }
+  const list = [...people.values()];
+  const sum = k => list.reduce((s, u) => s + u[k], 0);
+  const since = new Date(`${days[0]}T00:00`).getTime();
+  return {
+    rows: [...byDay.values()], people: list.sort((a, b) => b.runs - a.runs || b.days - a.days || b.est - a.est), modes, kinds, items, m,
+    total: {
+      people: all.length, active: list.filter(u => u.days).length,
+      newcomers: adm.accounts ? adm.accounts.filter(a => a.created >= since).length : null,
+      open: sum('open'), runs: sum('runs'), min: sum('min'), est: sum('est'),
+      billed: m.openai?.rows ? Object.values(items).reduce((s, v) => s + v, 0) : null,
+    },
+  };
+}
+
+// Days, or months for the 12-month range, so the bars stay readable.
+function reportBuckets(rows) {
+  if (rows.length <= 90) return rows.map(r => ({ ...r, people: r.who.size, label: dayName(r.day) }));
+  const by = new Map();
+  for (const r of rows) {
+    const k = r.day.slice(0, 7), b = by.get(k) || { label: monthName(k), who: new Set(), open: 0, runs: 0, min: 0, est: 0, billed: 0 };
+    for (const f of ['open', 'runs', 'min', 'est', 'billed']) b[f] += r[f];
+    r.who.forEach(id => b.who.add(id));
+    by.set(k, b);
+  }
+  return [...by.values()].map(b => ({ ...b, people: b.who.size }));
+}
+
+function barsHtml(title, rows, val, fmt) {
+  const vals = rows.map(val), max = Math.max(0, ...vals), total = vals.reduce((s, v) => s + v, 0);
+  return `<figure class="report-chart">
+    <figcaption><b>${esc(title)}</b></figcaption>
+    <div class="bars" role="img" aria-label="${esc(`${title}, ${rows[0].label} to ${rows.at(-1).label}: highest ${fmt(max)}`)}">
+      ${rows.map((r, i) => `<span class="bar" style="--h:${max ? Math.max(vals[i] ? 3 : 0, Math.round(100 * vals[i] / max)) : 0}%" title="${esc(`${r.label}: ${fmt(vals[i])}`)}"></span>`).join('')}
+    </div>
+    <div class="bars-axis muted small"><span>${esc(rows[0].label)}</span><span>Top ${esc(fmt(max))}${total !== max ? ` · total ${esc(fmt(total))}` : ''}</span><span>${esc(rows.at(-1).label)}</span></div>
+  </figure>`;
+}
+
+function shareRowsHtml(obj, names, fmt) {
+  const list = Object.entries(obj).sort((a, b) => b[1] - a[1]), total = list.reduce((s, [, v]) => s + v, 0);
+  if (!list.length) return '<p class="muted small">Nothing yet in this range.</p>';
+  return `<ul class="report-share">${list.map(([k, v]) => `<li><span>${esc(names[k] || k)}</span><span class="share-bar" aria-hidden="true"><span style="width:${total ? Math.round(100 * v / total) : 0}%"></span></span><span class="small">${esc(fmt(v))}${total ? ` (${Math.round(100 * v / total)}%)` : ''}</span></li>`).join('')}</ul>`;
+}
+
+function renderReport() {
+  const head = `<div class="row between wrap"><h1>Reports</h1><button class="btn ghost" data-action="admin">${icon('back')} Admin</button></div>`;
+  if (!isAdmin()) return `<section class="stack">${head}<p class="muted">This screen is only for the app's admin.</p></section>`;
+  if (!adm.data && !adm.error) { loadAdmin(); return `<section class="stack">${head}<p class="muted">Loading…</p></section>`; }
+  if (adm.error) return `<section class="stack">${head}<p class="note">${esc(adm.error)}</p><div><button class="btn" data-action="report-reload">Try again</button></div></section>`;
+  const moneyWait = rpt.moneyFor !== Number(rpt.days);
+  if (moneyWait) loadReportMoney();
+  const r = reportData(), b = reportBuckets(r.rows), t = r.total, m = r.m;
+  const tile = (label, value, note = '') => `<div class="card report-tile"><span class="muted small">${label}</span><b>${value}</b>${note ? `<span class="muted small">${note}</span>` : ''}</div>`;
+  const notes = [];
+  if (!moneyWait && m.error) notes.push(`Couldn't get spending from the voices server (${esc(m.error)}).`);
+  if (!moneyWait && !m.error && !m.days) notes.push('Spending shows whole-month totals per person. For spending by day and by kind, add the spend table to the voices server (server/README.md, step 9).');
+  if (!moneyWait && !m.error && m.openai?.error === 'not set up') notes.push("To see what OpenAI actually billed, not only the app's estimate, add an OpenAI Admin key to the voices server (server/README.md, step 9).");
+  else if (!moneyWait && m.openai?.error) notes.push(`OpenAI's bill couldn't be read (${esc(m.openai.error)}). Check the OPENAI_ADMIN_KEY secret.`);
+  const peopleRows = r.people.filter(u => u.days || u.est).map(u => `<tr><th scope="row">${esc(u.name || 'Unknown')}</th><td>${u.days}</td><td>${u.open}</td><td>${u.runs}</td><td>${esc(fmtMin(u.min))}</td><td>${usd(u.est)}</td><td>${u.last ? esc(dayName(u.last)) : ''}</td></tr>`).join('');
+  return `<section class="stack report">
+    ${head}
+    <div class="row between wrap">
+      <label class="field inline"><span>Show</span><select id="report-range">${Object.entries(REPORT_RANGES).map(([k, v]) => `<option value="${k}"${Number(rpt.days) === Number(k) ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <div class="row wrap"><button class="btn ghost" data-action="report-csv" data-what="days">Download by day (CSV)</button><button class="btn ghost" data-action="report-csv" data-what="people">Download by person (CSV)</button></div>
+    </div>
+    <h2>App use</h2>
+    <div class="report-tiles">
+      ${tile('Active people', t.active, `of ${t.people} signed up`)}
+      ${t.newcomers != null ? tile('New sign-ins', t.newcomers) : ''}
+      ${tile('App opens', t.open)}
+      ${tile('Practice runs', t.runs)}
+      ${tile('Time practicing', esc(fmtMin(t.min)))}
+    </div>
+    <div class="report-charts">
+      ${barsHtml(b.length < r.rows.length ? 'People active each month' : 'People active each day', b, x => x.people, String)}
+      ${barsHtml('Practice runs', b, x => x.runs, String)}
+      ${barsHtml('Time practicing', b, x => x.min, fmtMin)}
+    </div>
+    <h3>How people practice</h3>
+    ${shareRowsHtml(r.modes, PRACTICE_KINDS, v => `${v} ${v === 1 ? 'run' : 'runs'}`)}
+    <h2>Money spent</h2>
+    ${moneyWait ? '<p class="muted">Loading spending…</p>' : `<div class="report-tiles">
+      ${tile('Shared voices', usd(t.est), m.days ? "the app's estimate" : "the app's estimate, whole months")}
+      ${t.billed != null ? tile('OpenAI billed', usd(t.billed), 'from OpenAI') : ''}
+    </div>
+    <div class="report-charts">
+      ${m.days ? barsHtml('Shared voices (estimate)', b, x => x.est, usd) : ''}
+      ${t.billed != null ? barsHtml('OpenAI billed', b, x => x.billed, usd) : ''}
+    </div>
+    ${m.days ? `<h3>Spending by kind</h3>${shareRowsHtml(r.kinds, SPEND_KINDS, usd)}` : ''}
+    ${t.billed != null ? `<h3>OpenAI bill by item</h3>${shareRowsHtml(r.items, {}, usd)}` : ''}`}
+    ${notes.map(n => `<p class="note small">${n}</p>`).join('')}
+    <h2>By person</h2>
+    ${peopleRows ? `<div class="table-scroll" tabindex="0" role="region" aria-label="Use and spending by person"><table class="report-table">
+      <thead><tr><th scope="col">Person</th><th scope="col">Days active</th><th scope="col">Opens</th><th scope="col">Runs</th><th scope="col">Practice</th><th scope="col">Spend</th><th scope="col">Last active</th></tr></thead>
+      <tbody>${peopleRows}</tbody></table></div>` : '<p class="muted small">No one has been active in this range yet.</p>'}
+    <p class="muted small">Use is counted only for people who are signed in, starting October 19, 2026: app opens, practice runs by mode, and minutes, never what anyone practiced. Spending is the voices server's estimate for the shared voices (about $15 per million characters, a fifth of a cent per page). People's own OpenAI keys aren't included.</p>
+  </section>`;
+}
+
+function reportCsv(what) {
+  const r = reportData();
+  const rows = what === 'people'
+    ? [['person', 'email', 'days active', 'app opens', 'practice runs', 'minutes practicing', 'estimated spend usd', 'last active'],
+      ...r.people.map(u => [u.name, u.email, u.days, u.open, u.runs, Math.round(u.min), u.est.toFixed(4), u.last])]
+    : [['date', 'people active', 'app opens', 'practice runs', 'minutes practicing', 'estimated spend usd', 'openai billed usd'],
+      ...r.rows.map(x => [x.day, x.who.size, x.open, x.runs, Math.round(x.min), x.est.toFixed(4), x.billed.toFixed(4)])];
+  const cell = v => (/[",\n]/.test(String(v ?? '')) ? `"${String(v).replace(/"/g, '""')}"` : String(v ?? ''));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rows.map(row => row.map(cell).join(',')).join('\n')], { type: 'text/csv' }));
+  a.download = `line-learner-${what === 'people' ? 'people' : 'daily'}-${isoDay(new Date())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+
+Object.assign(actions, {
+  report() { leave(); app.view = 'report'; render(); window.scrollTo(0, 0); },
+  'report-reload'() { adm.data = null; rpt.moneyFor = 0; render(); },
+  'report-csv'(b) { reportCsv(b.dataset.what); },
+});
+
 VIEWS.admin = renderAdmin;
+VIEWS.report = renderReport;

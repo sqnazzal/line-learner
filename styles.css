@@ -518,3 +518,27 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 .setup-line > span { font-weight: 600; }
 .more-modes > summary, .plan-more > summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 4px 0; }
 .more-modes[open] > summary, .plan-more[open] > summary { margin-bottom: 10px; }
+
+/* Home for returning users: a rotating hello above the tagline */
+.welcome { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; }
+.welcome-hi { margin: 0; color: var(--accent); font-weight: 600; }
+.welcome .tagline { margin: 0; font-size: 1.35rem; }
+@media (min-width: 700px) { .welcome .tagline { font-size: 1.6rem; } }
+
+/* Admin > Reports */
+.report-tiles { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.report-tile { display: flex; flex-direction: column; gap: 2px; padding: 12px; }
+.report-tile b { font-size: 1.5rem; }
+.report-charts { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.report-chart { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 110px; padding: 4px; border-bottom: 1px solid var(--border); }
+.bar { flex: 1 1 0; min-width: 2px; height: var(--h); background: var(--accent); border-radius: 3px 3px 0 0; opacity: .85; }
+.bars-axis { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.report-share { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.report-share li { display: grid; grid-template-columns: minmax(7rem, 12rem) 1fr auto; gap: 10px; align-items: center; }
+.report-share .share-bar { height: 8px; border-radius: 4px; background: var(--accent-soft); overflow: hidden; }
+.report-share .share-bar span { display: block; height: 100%; background: var(--accent); }
+.table-scroll { overflow-x: auto; }
+.report-table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+.report-table th, .report-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.report-table td { font-variant-numeric: tabular-nums; }

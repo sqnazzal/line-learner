@@ -148,7 +148,7 @@ const PLAN_HELP = topic('Rehearsal plan and reminders', `<ul>
 
 // Kept in step with what the app actually stores and sends (and the access firestore.rules gives); update it
 // when either changes.
-const PRIVACY_DATE = 'October 18, 2026';
+const PRIVACY_DATE = 'October 19, 2026';
 const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.privacyOpen ? ' open' : ''}><summary>Privacy: what's stored and where</summary><div class="help-body">
   <p class="muted small">Last updated ${PRIVACY_DATE}.</p>
   <p>Line Learner is a free app Shannon made for friends, family and fellow actors. It has no ads and no analytics or advertising trackers, and nothing is ever sold. The services it uses (below) may keep their own technical logs, such as your IP address, under their own policies.</p>
@@ -161,14 +161,14 @@ const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.p
   </ul>
   <p><b>If you sign in with Google</b> (optional, ages 13 and up), Shannon's Firebase project (run by Google) keeps:</p>
   <ul>
-    <li>Your name, email and when you last used the app, so Shannon can see who's using it</li>
+    <li>Your name, email and when you last used the app, so Shannon can see who's using it, plus daily counts of how you use it (app opens, practice runs by mode, and minutes practicing; never what you practiced), for Shannon's usage reports</li>
     <li>Your synced scripts, songs, categories and progress, and your recordings if you back them up. Other people can't see them. Shannon, as the app's admin, has access to them and to your account details, and uses it only to delete data you ask to have removed or to fix a problem you report</li>
     <li>The groups you're in, and anything you <b>Share to group</b>, which everyone in that group can see</li>
     <li>If you turn on <b>rehearsal reminders</b>: a push address for each device you turn them on for (made by Apple, Google, Mozilla or Microsoft, whose push service delivers the notification), and your next rehearsals (time, script title and what you're working on) so Shannon's small server on Cloudflare can send each reminder. Turning reminders off on every device removes them</li>
   </ul>
   <p><b>Sent to other services, only when you use a feature that needs them:</b></p>
   <ul>
-    <li><b>AI voices and reading pages:</b> the lines being voiced, or the page photos, go to <a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noopener">OpenAI</a>. With Shannon's shared voices they pass through Shannon's small server on <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare</a>, which keeps only a monthly cost total for your account. AI voices are computer-generated, not real people.</li>
+    <li><b>AI voices and reading pages:</b> the lines being voiced, or the page photos, go to <a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noopener">OpenAI</a>. With Shannon's shared voices they pass through Shannon's small server on <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">Cloudflare</a>, which keeps only cost totals for your account (by month, and by day and kind: voices or pages). AI voices are computer-generated, not real people.</li>
     <li><b>Checking your lines by microphone:</b> your browser's own speech recognition (from Apple or Google) hears what you say. Line Learner doesn't keep the audio or make voiceprints.</li>
     <li><b>Songs:</b> song names go to <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a> to find lyrics. Playing a song uses <a href="https://www.spotify.com/legal/privacy-policy/" target="_blank" rel="noopener">Spotify</a>, whose player can set its own cookies.</li>
     <li><b>Send feedback:</b> your message, anything you add (contact details, a screenshot) and, if ticked, device details are stored for Shannon to read in the app, and emailed to Shannon through <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener">Resend</a>. Only Shannon can read them.</li>
@@ -252,6 +252,10 @@ VIEWS.about = renderAbout;
 // ---------- What's new ----------
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
+  ['2026-10-19', [
+    '<b>Welcome back:</b> the home screen greets you with the tagline again, and a different hello each time you come back.',
+    '<b>Usage counts:</b> when you\'re signed in, the app counts app opens, practice runs and minutes practicing each day (never what you practiced), so Shannon can see how the app is used. The privacy notice explains it.',
+  ]],
   ['2026-10-18', [
     '<b>Edit any session:</b> tap the pencil on an upcoming session to change what it\'s for, when, or how long. Full run-throughs now get their own length (a first guess from the script\'s length, which you can change when you make the plan).',
     '<b>Less clutter:</b> once you have scripts, the home screen starts with your next rehearsal and your scripts (Browse and the sample scene are under <b>More</b>). On a script, your character, category and scene fold into one line with <b>Change</b>; Type your lines and Listen, screen off are under <b>More ways to practice</b>; and a plan shows just the next session, with the full list under <b>All sessions and reminders</b>.',

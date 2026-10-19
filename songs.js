@@ -601,7 +601,7 @@ Object.assign(actions, {
     songUi.lyrics = [];
     refreshSongPanel();
   },
-  sing() { leave(); app.view = 'sing'; render(); window.scrollTo(0, 0); },
+  sing() { leave(); window.singRun = { mode: 'sing', began: Date.now() }; app.view = 'sing'; render(); window.scrollTo(0, 0); },
   'sing-mode'(b) { sing.mode = b.dataset.mode; renderLyrics(); $$('.sing-modes .chip').forEach(c => { c.classList.toggle('on', c.dataset.mode === sing.mode); c.setAttribute('aria-pressed', c.dataset.mode === sing.mode); }); },
   'sing-loop'() { sing.loop = sing.loop == null ? sing.idx : null; updateSing(true); },
   'sing-line'(b) { seekToLine(+b.dataset.li); },

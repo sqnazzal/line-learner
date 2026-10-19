@@ -13,6 +13,13 @@
 // Optional binding: a D1 database named DB, with this table (run once in the D1 console):
 //   CREATE TABLE usage (uid TEXT, month TEXT, usd REAL, PRIMARY KEY (uid, month));
 // Without DB there are no per-person allowances; the OpenAI project's budget still caps the total.
+// For Admin > Reports to show spending by day and by kind (voices, page reading), also run once:
+//   CREATE TABLE spend (day TEXT, uid TEXT, kind TEXT, n INTEGER, usd REAL, PRIMARY KEY (day, uid, kind));
+//
+// Optional, so Admin > Reports shows what OpenAI actually billed (not just the estimate):
+//   OPENAI_ADMIN_KEY    Secret. An OpenAI Admin key (platform.openai.com > Settings > Organization > Admin keys,
+//                       read-only is enough). It can see the organization's costs, so keep it only here.
+//   OPENAI_PROJECT_ID   Optional. The project the voices key belongs to (proj_...), to leave out other projects.
 //
 // Optional, for an email when someone sends feedback (uses Resend, resend.com):
 //   RESEND_API_KEY      Secret. An API key from resend.com (API Keys > Create, "Sending access").
@@ -76,6 +83,7 @@ export default {
       if (path.includes('/admin/')) {
         if (!isOwner) return json({ error: 'Only the admin can do that.' }, 403);
         if (path.endsWith('/admin/users')) return json(await signInAccounts(env));
+        if (path.endsWith('/admin/report')) return json(await adminReport(env, Number(new URL(request.url).searchParams.get('days')) || 30));
         if (!env.DB) return json({ rows: [] });
         if (path.endsWith('/admin/usage')) {
           const { results = [] } = await env.DB.prepare('SELECT uid, usd FROM usage WHERE month = ?').bind(month).all();
@@ -103,7 +111,7 @@ export default {
           body: JSON.stringify({ model: TTS_MODEL, voice, input, instructions, response_format: 'mp3' }),
         });
         if (!res.ok) return json({ error: `OpenAI couldn't make the voice (${res.status}).` }, res.status === 429 ? 503 : 502);
-        await addUsage(env, user.sub, month, (input.length + instructions.length / 4) * COST_PER_CHAR);
+        await addUsage(env, user.sub, month, (input.length + instructions.length / 4) * COST_PER_CHAR, 'voice', input.length);
         return new Response(res.body, { headers: { ...cors, 'Content-Type': 'audio/mpeg' } });
       }
 
@@ -121,7 +129,7 @@ export default {
         if (!res.ok) return json({ error: `OpenAI couldn't read the pages (${res.status}).` }, res.status === 429 ? 503 : 502);
         const data = await res.json();
         const text = data.output_text ?? (data.output || []).flatMap(o => o.content || []).filter(c => c.type === 'output_text').map(c => c.text).join('');
-        await addUsage(env, user.sub, month, images.length * COST_PER_PAGE);
+        await addUsage(env, user.sub, month, images.length * COST_PER_PAGE, 'pages', images.length);
         return json({ text });
       }
 
@@ -237,10 +245,50 @@ async function getUsage(env, uid, month) {
   const row = await env.DB.prepare('SELECT usd FROM usage WHERE uid = ? AND month = ?').bind(uid, month).first();
   return row?.usd || 0;
 }
-async function addUsage(env, uid, month, usd) {
+async function addUsage(env, uid, month, usd, kind, n) {
   if (!env.DB || !usd) return;
   await env.DB.prepare('INSERT INTO usage (uid, month, usd) VALUES (?, ?, ?) ON CONFLICT (uid, month) DO UPDATE SET usd = usd + excluded.usd')
     .bind(uid, month, usd).run();
+  // The daily detail for Admin > Reports, once the spend table exists (see the top of this file).
+  await env.DB.prepare('INSERT INTO spend (day, uid, kind, n, usd) VALUES (?, ?, ?, ?, ?) ON CONFLICT (day, uid, kind) DO UPDATE SET n = n + excluded.n, usd = usd + excluded.usd')
+    .bind(new Date().toISOString().slice(0, 10), uid, kind, n, usd).run().catch(() => {});
+}
+
+// ---------- Admin > Reports: spending over the last few days or months ----------
+async function adminReport(env, days) {
+  days = Math.min(Math.max(Math.round(days), 1), 400);
+  const since = new Date(Date.now() - (days - 1) * 864e5).toISOString().slice(0, 10);
+  const out = { months: null, days: null, openai: await openaiCosts(env, days) };
+  if (env.DB) {
+    out.months = (await env.DB.prepare('SELECT uid, month, usd FROM usage WHERE month >= ?').bind(since.slice(0, 7)).all()).results || [];
+    try { out.days = (await env.DB.prepare('SELECT day, uid, kind, n, usd FROM spend WHERE day >= ?').bind(since).all()).results || []; } catch { /* no spend table yet */ }
+  }
+  return out;
+}
+
+// What OpenAI actually billed, per day and line item (needs OPENAI_ADMIN_KEY).
+async function openaiCosts(env, days) {
+  if (!env.OPENAI_ADMIN_KEY) return { error: 'not set up' };
+  const start = (Math.floor(Date.now() / 864e5) - days + 1) * 86400;
+  const project = env.OPENAI_PROJECT_ID ? `&project_ids=${encodeURIComponent(env.OPENAI_PROJECT_ID)}` : '';
+  const rows = [];
+  let page = '', grouped = true;
+  for (let pages = 0; pages < 10;) {
+    const res = await fetch(`https://api.openai.com/v1/organization/costs?start_time=${start}&bucket_width=1d&limit=180${grouped ? '&group_by=line_item' : ''}${project}${page ? `&page=${encodeURIComponent(page)}` : ''}`,
+      { headers: { Authorization: `Bearer ${env.OPENAI_ADMIN_KEY}` } });
+    if (!res.ok) {
+      if (grouped && !page) { grouped = false; continue; } // try once more without the line items
+      return { error: `OpenAI answered ${res.status}` };
+    }
+    const data = await res.json();
+    for (const b of data.data || []) {
+      for (const r of b.results || []) rows.push({ day: new Date(b.start_time * 1000).toISOString().slice(0, 10), item: r.line_item || '', usd: Number(r.amount?.value) || 0 });
+    }
+    if (!data.has_more || !data.next_page) break;
+    page = data.next_page;
+    pages++;
+  }
+  return { rows };
 }
 
 // ---------- Email Shannon when someone sends feedback (only with RESEND_API_KEY and FEEDBACK_EMAIL) ----------

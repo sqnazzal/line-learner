@@ -156,7 +156,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | **GitHub** | Hosting, and the optional GitHub sync | This repository; Pages builds from `main` |
 
 - **Security rules:** `firestore.rules` is the source of truth. After changing it, paste it into Firestore > Rules and **Publish**.
-- **Admin:** signed in as Shannon (account ID in `admin.js` `ADMIN_UID` and `isAdmin()` in `firestore.rules`), the Group screen shows **Admin**: the **Feedback** inbox (notes sent with Send feedback), everyone who has signed in, block/unblock, remove from groups, reset a shared-voices allowance, delete synced scripts, manage or delete groups and shared items. Deleting a sign-in account itself is done in Firebase > Authentication > Users.
+- **Admin:** signed in as Shannon (account ID in `admin.js` `ADMIN_UID` and `isAdmin()` in `firestore.rules`), the Group screen shows **Admin**: the **Feedback** inbox (notes sent with Send feedback), everyone who has signed in, block/unblock, remove from groups, reset a shared-voices allowance, delete synced scripts, manage or delete groups and shared items. **Reports** shows app use (active people, new sign-ins, app opens, practice runs by mode, minutes practicing) and money spent (the shared voices estimate per person, by day and kind, and OpenAI's actual bill with an Admin key; see server/README.md step 9) for the last 7, 30 or 90 days or 12 months, with CSV downloads by day and by person. Use is counted only for signed-in people, as daily counts on their profile. Deleting a sign-in account itself is done in Firebase > Authentication > Users.
 - **Shared voices server:** code in `server/voices-worker.js`; settings, allowances and how it decides in `server/README.md`.
 - **Free script library:** lives in `library/`. To rebuild it (for example after adding a play to `tools/build-library.html`), run `powershell -ExecutionPolicy Bypass -File tools\build-library.ps1`. It downloads the Project Gutenberg texts into `tools/raw/` (not committed), converts them with `tools/convert.js`, and writes `library/plays/*.txt`, `library/plays.json` and `library/monologues.json`.
 - **Publishing a change:** push to `main`; GitHub Pages rebuilds in about a minute. Bump the `?v=` numbers in `index.html` so phones load the new files (the app also checks for updates and reloads itself on safe screens).
@@ -172,7 +172,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | `groups.js` | Google sign-in, groups, sharing, Google sync |
 | `plan.js` | Rehearsal plans and reminders |
 | `sw.js`, `manifest.webmanifest` | The service worker (only shows reminders, caches nothing) and the app manifest |
-| `admin.js` | The admin screen (Shannon only) |
+| `admin.js` | The admin screen and Reports (Shannon only), and the daily use counts |
 | `help.js` | Help & troubleshooting, Privacy, About, What's new and Send feedback |
 | `firestore.rules` | Firebase security rules |
 | `server/` | The Cloudflare Worker (shared voices, feedback emails, reminders) and its setup guide |

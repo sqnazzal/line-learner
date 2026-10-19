@@ -40,6 +40,16 @@
 
    Every 5 minutes the Worker reads the reminders due in the next 5 minutes and sends each to that person's devices through their push service (Apple, Google, Mozilla or Microsoft), encrypted for the device. **Send a test** in the app checks the whole path.
 
+9. **Reports: money spent (Admin > Reports).** Both parts are optional; without them, Reports shows each person's estimated spend per month.
+   1. **Spending by day and by kind.** In the D1 database's **Console** (step 4), run:
+      ```sql
+      CREATE TABLE spend (day TEXT, uid TEXT, kind TEXT, n INTEGER, usd REAL, PRIMARY KEY (day, uid, kind));
+      ```
+      It starts filling from then on.
+   2. **What OpenAI actually billed.** At platform.openai.com: **Settings > Organization > Admin keys > Create** (read-only is enough). In the Worker's **Settings > Variables and Secrets** add `OPENAI_ADMIN_KEY` (type **Secret**). To leave out other OpenAI projects, also add `OPENAI_PROJECT_ID` (type **Text**): the shared voices project's ID (`proj_...`, under **Settings > Project > General**).
+
+   Then paste the latest `voices-worker.js` into the Worker and **Deploy**.
+
 ## How it decides
 
 - Checks the Google sign-in token is genuine (signed by Google, for this Firebase project, not expired).
