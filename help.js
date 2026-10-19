@@ -253,6 +253,7 @@ VIEWS.about = renderAbout;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-18', [
+    '<b>Scene openers get a cue:</b> in Drill weak lines and Just my cues and lines, a line of yours that opens a scene is cued by the act or scene heading, called out first.',
     '<b>Plan first:</b> while a rehearsal plan is active, it\'s the top card on the script page. <b>+ Add a session</b> now lets you pick what it\'s for (any scene, a drill, a full run or a cues-only run), when, and how long.',
     '<b>Plans know their acts:</b> with separate act and scene headings, sessions are named like "Act 2, Scene 1", and a Learn session covers only its own scene (it used to run on into every act\'s scene of the same name).',
     '<b>Rehearsal in progress:</b> once you start a planned session, the home screen shows how far you got, with <b>Pick up</b> and <b>Start over</b>.',

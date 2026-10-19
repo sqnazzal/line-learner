@@ -1114,6 +1114,7 @@ function prevLineIndex(s, i) {
 // just the lines you've tried and are still working on (Drill weak lines); untried lines aren't "weak".
 // When the line just before is also yours (a speech split by a stage direction, say), your cue is the other
 // character's line before that run, and the run of your lines is kept too, so you come in where you really do.
+// Your line opening a scene gets the scene heading as its cue.
 function cueOrder(s, onlyWeak = false) {
   const order = [];
   for (const i of rangeOrder(s)) {
@@ -1123,6 +1124,10 @@ function cueOrder(s, onlyWeak = false) {
     let j = prevLineIndex(s, i);
     while (j >= 0 && isMine(s, s.lines[j])) { lead.unshift(j); j = prevLineIndex(s, j); }
     if (j >= 0) lead.unshift(j);
+    else {
+      // First line of a scene: the heading (and an act heading just above it) is the cue, called out like in Listen.
+      for (let h = (lead[0] ?? i) - 1; h >= 0 && s.lines[h].type !== 'line'; h--) if (s.lines[h].type === 'section') lead.unshift(h);
+    }
     for (const k of [...lead, i]) if (!(k <= order[order.length - 1])) order.push(k);
   }
   return order;
