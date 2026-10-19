@@ -184,7 +184,11 @@ function nextRehearsalHtml() {
   const p = sessionProgress(n.s, n.x);
   return `<div class="card stack-sm">
     <span><b>${p ? 'Rehearsal in progress' : 'Next rehearsal'}: ${esc(n.s.title)}</b> <span class="muted">${esc(whenText(n.x.at))} · ${esc(sessionLabel(n.x))} · ${n.x.min} min</span></span>
-    ${p ? `<div class="meter">${bar(p.total ? p.pos / p.total : 0)}<span class="muted small">${progressNote(p)}</span></div>` : ''}
+    ${p ? (p.total ? `<div class="meter">${bar(p.pos / p.total)}<span class="muted small">This session: ${progressNote(p)}</span></div>` : '<span class="muted small">This session: started, not finished yet</span>') : ''}
+    ${(() => {
+      const all = n.s.plan.sessions, done = all.filter(x => x.done).length;
+      return `<div class="meter">${bar(done / all.length)}<span class="muted small">Plan: ${done} of ${all.length} sessions done</span></div>`;
+    })()}
     ${sessionButtons(n.s, n.x, p, 'Start')}
   </div>`;
 }
