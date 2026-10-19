@@ -119,7 +119,7 @@ service cloud.firestore {
           && validItem(request.resource.data)
           && (request.resource.data.raw == resource.data.raw || request.resource.data.get('prevRaw', null) == resource.data.raw)
           && (request.resource.data.kind != 'song' || request.resource.data.raw == resource.data.raw
-            || request.resource.data.get('permission', false) == 'public-domain');
+            || request.resource.data.get('permission', false) == 'public-domain'));
         allow delete: if isAdmin();
       }
     }
