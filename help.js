@@ -138,7 +138,7 @@ const REAL_HELP = topic('Rehearsing for real: phone on a stand, headphones, long
 const PLAN_HELP = topic('Rehearsal plan and reminders', `<ul>
     <li><b>Make a plan:</b> open a script, pick who you're playing, then open <b>Rehearsal plan</b>. Enter opening night, the days you can rehearse, a usual time and how long a session can be, and tap <b>Make my plan</b>.</li>
     <li><b>How it's spread out:</b> about two sessions a week when opening is far off, three a week from five weeks out, and every free day in the last two weeks. First you learn each scene you're in, one per session (with drills of your shaky lines mixed in), then full run-throughs, and last a light run of just your cues and lines.</li>
-    <li><b>Change anything:</b> open <b>All sessions and reminders</b> in the plan to change a session's date and time right in the list, tick it done, delete it, or <b>+ Add a session</b> (learn a scene, drill weak lines, a full run-through or a cues-only run, at any time and length). <b>Change dates or days</b> makes a new plan and keeps the sessions you've done. Missed some? <b>Re-plan from today</b> spreads what's left over the days you have.</li>
+    <li><b>Change anything:</b> open <b>All sessions and reminders</b> in the plan and tap the pencil on any upcoming session to change what it's for, when, or how long; tick it done, delete it, or <b>+ Add a session</b> (learn a scene, drill weak lines, a full run-through or a cues-only run, at any time and length). <b>Change dates or days</b> makes a new plan and keeps the sessions you've done. Missed some? <b>Re-plan from today</b> spreads what's left over the days you have.</li>
     <li><b>Ticking off:</b> <b>Start</b> on a session opens the right practice (that scene, your weak lines or the whole show). Finish it, or finish any run of that script on a session's day, and it's ticked off by itself.</li>
     <li><b>Home screen:</b> your next rehearsal shows at the top, with a <b>Start</b> button.</li>
     <li><b>On every device:</b> the plan syncs with the script when you're signed in with Google.</li>
@@ -253,6 +253,7 @@ VIEWS.about = renderAbout;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-18', [
+    '<b>Edit any session:</b> tap the pencil on an upcoming session to change what it\'s for, when, or how long. Full run-throughs now get their own length (a first guess from the script\'s length, which you can change when you make the plan).',
     '<b>Less clutter:</b> once you have scripts, the home screen starts with your next rehearsal and your scripts (Browse and the sample scene are under <b>More</b>). On a script, your character, category and scene fold into one line with <b>Change</b>; Type your lines and Listen, screen off are under <b>More ways to practice</b>; and a plan shows just the next session, with the full list under <b>All sessions and reminders</b>.',
     '<b>Sharing songs:</b> a song can only be shared to a group when its lyrics are public domain, which the sharer confirms. Other songs, including lyrics found online, stay private to you.',
     '<b>Scene openers get a cue:</b> in Drill weak lines and Just my cues and lines, a line of yours that opens a scene is cued by the act or scene heading, called out first.',

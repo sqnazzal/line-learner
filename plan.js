@@ -107,7 +107,10 @@ function buildPlan(s, conf) {
     for (let k = 0; k < runs; k++) kinds.push({ kind: 'run' });
     kinds.push({ kind: 'final' });
   }
-  const made = times.map((at, k) => ({ id: uid().slice(-8), at, min: conf.min, ...kinds[k] }));
+  // Full runs take as long as the show; the last, cues-only run about half that.
+  const runMin = conf.runMin || conf.min;
+  const minFor = kind => (kind === 'run' ? runMin : kind === 'final' ? Math.max(conf.min, Math.round(runMin / 10) * 5) : conf.min);
+  const made = times.map((at, k) => ({ id: uid().slice(-8), at, min: minFor(kinds[k]?.kind), ...kinds[k] }));
   return { ...conf, lead: s.plan?.lead ?? 15, sessions: [...keep, ...made].sort((a, b) => a.at - b.at) };
 }
 
@@ -197,7 +200,15 @@ function nextRehearsalHtml() {
 function planDraft(s) {
   if (planUi.draft?.sid === s.id) return planUi.draft;
   const p = s.plan;
-  return planUi.draft = { sid: s.id, opening: p?.opening || '', time: p?.time || '19:00', min: p?.min || 30, days: p?.days || [1, 2, 3, 4, 5] };
+  return planUi.draft = { sid: s.id, opening: p?.opening || '', time: p?.time || '19:00', min: p?.min || 30, runMin: p?.runMin || runEstimate(s), days: p?.days || [1, 2, 3, 4, 5] };
+}
+
+const MINUTES = [15, 20, 30, 45, 60, 75, 90, 120, 150, 180];
+const minuteOptions = sel => [...new Set([...MINUTES, +sel])].sort((a, b) => a - b).map(m => `<option value="${m}" ${m === +sel ? 'selected' : ''}>${m} minutes</option>`).join('');
+// A first guess at a full run: the words of the whole script at about 130 a minute, to the nearest 15 minutes.
+function runEstimate(s) {
+  const n = s.lines.reduce((sum, l) => sum + (l.type === 'line' ? words(l.text).length : 0), 0);
+  return clamp(Math.round(n / 130 / 15) * 15, 15, 180);
 }
 
 function planFormHtml(s) {
@@ -207,7 +218,8 @@ function planFormHtml(s) {
     <div class="row wrap">
       <label class="field inline"><span>Opening night</span><input type="date" id="plan-opening" min="${tomorrow}" value="${esc(d.opening)}"></label>
       <label class="field inline"><span>Usual time</span><input type="time" id="plan-time" step="300" value="${esc(d.time)}"></label>
-      <label class="field inline"><span>Each session</span><select id="plan-min">${[15, 20, 30, 45, 60, 90].map(m => `<option value="${m}" ${m === +d.min ? 'selected' : ''}>${m} minutes</option>`).join('')}</select></label>
+      <label class="field inline"><span>Each session</span><select id="plan-min">${minuteOptions(d.min)}</select></label>
+      <label class="field inline"><span>A full run-through</span><select id="plan-run-min">${minuteOptions(d.runMin)}</select></label>
     </div>
     <fieldset class="plan-days"><legend>Days I can rehearse</legend>
       ${DAY_NAMES.map((n, k) => `<label class="check-row"><input type="checkbox" data-plan-day="${k}" ${d.days.includes(k) ? 'checked' : ''}><span>${n}</span></label>`).join('')}
@@ -219,9 +231,9 @@ function planFormHtml(s) {
 function sessionRowHtml(s, x) {
   const state = x.done ? 'done' : missed(x) ? 'missed' : '';
   return `<li class="plan-row${state ? ' ' + state : ''}">
-    <div class="plan-what"><b>${esc(sessionLabel(x))}</b> <span class="muted small">${x.min} min${x.done ? ' · done' : state === 'missed' ? ' · missed' : ''}</span></div>
-    <input class="plan-when" type="datetime-local" data-plan-move="${x.id}" value="${localInput(x.at)}" aria-label="When: ${esc(sessionLabel(x))}"${x.done ? ' disabled' : ''}>
+    <div class="plan-what"><b>${esc(sessionLabel(x))}</b> <span class="muted small">${esc(whenText(x.at))} · ${x.min} min${x.done ? ' · done' : state === 'missed' ? ' · missed' : ''}</span></div>
     <div class="tools">
+      ${x.done ? '' : `<button class="icon-btn" data-action="plan-change" data-id="${x.id}" title="Change this session" aria-label="Change this session">${icon('edit')}</button>`}
       ${x.done ? '' : `<button class="icon-btn" data-action="plan-start" data-sid="${s.id}" data-id="${x.id}" title="Start this session" aria-label="Start this session">${icon('play')}</button>`}
       <button class="icon-btn${x.done ? ' on' : ''}" data-action="plan-done" data-id="${x.id}" title="${x.done ? 'Not done after all' : 'Mark done'}" aria-label="${x.done ? 'Mark not done' : 'Mark done'}" aria-pressed="${!!x.done}">${icon('check')}</button>
       <button class="icon-btn" data-action="plan-del" data-id="${x.id}" title="Delete this session" aria-label="Delete this session">${icon('trash')}</button>
@@ -257,6 +269,7 @@ function remindHtml(s) {
   return `<div class="stack-sm plan-remind"><b>Reminders</b>${body}${remind.error ? `<p class="note small">${esc(remind.error)}</p>` : ''}</div>`;
 }
 
+// Adding a session, or changing one (a.id set).
 function addFormHtml(s) {
   const a = planUi.adding;
   const kinds = [
@@ -264,11 +277,11 @@ function addFormHtml(s) {
     ['drill', 'Drill weak lines'], ['run', 'Full run-through'], ['final', 'Run just your cues and lines'],
   ];
   return `<div class="note stack-sm plan-add">
-    <b>Add a session</b>
+    <b>${a.id ? 'Change this session' : 'Add a session'}</b>
     <label class="field inline"><span>What</span><select id="plan-add-kind">${kinds.map(([v, t]) => `<option value="${v}" ${v === a.kind ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
     <label class="field inline"><span>When</span><input type="datetime-local" id="plan-add-at" value="${localInput(a.at)}"></label>
-    <label class="field inline"><span>How long</span><select id="plan-add-min">${[15, 20, 30, 45, 60, 90].map(m => `<option value="${m}" ${m === +a.min ? 'selected' : ''}>${m} minutes</option>`).join('')}</select></label>
-    <div class="row wrap"><button class="btn primary" data-action="plan-add-save">Add it</button><button class="btn ghost" data-action="plan-add-cancel">Cancel</button></div>
+    <label class="field inline"><span>How long</span><select id="plan-add-min">${minuteOptions(a.min)}</select></label>
+    <div class="row wrap"><button class="btn primary" data-action="plan-add-save">${a.id ? 'Save' : 'Add it'}</button><button class="btn ghost" data-action="plan-add-cancel">Cancel</button></div>
   </div>`;
 }
 
@@ -357,7 +370,7 @@ Object.assign(actions, {
     if (!d.opening) { toast('When is opening night? Pick the date first.'); $('#plan-opening')?.focus(); return; }
     if (!d.days.length) { toast('Pick at least one day you can rehearse.'); return; }
     if (new Date(d.opening + 'T00:00') <= new Date()) { toast('Opening night needs to be after today.'); return; }
-    s.plan = buildPlan(s, { opening: d.opening, time: d.time || '19:00', min: +d.min || 30, days: d.days });
+    s.plan = buildPlan(s, { opening: d.opening, time: d.time || '19:00', min: +d.min || 30, runMin: +d.runMin || +d.min || 30, days: d.days });
     planUi.editing = false;
     planUi.open = true;
     planChanged(s);
@@ -400,18 +413,29 @@ Object.assign(actions, {
     render();
     $('#plan-add-kind')?.focus();
   },
+  'plan-change'(b) {
+    const s = current(), x = findSession(s, b.dataset.id);
+    if (!x) return;
+    const k = x.kind === 'learn' ? planScenes(s).findIndex(sc => x.scenes?.includes(sc[2])) : -1;
+    planUi.adding = { sid: s.id, id: x.id, kind: x.kind === 'learn' ? `learn:${Math.max(0, k)}` : x.kind, at: x.at, min: x.min };
+    render();
+    $('.plan-add')?.scrollIntoView({ block: 'nearest' });
+    $('#plan-add-kind')?.focus({ preventScroll: true });
+  },
   'plan-add-cancel'() { planUi.adding = null; render(); },
   'plan-add-save'() {
     const s = current(), a = planUi.adding;
     if (!a || !s.plan || !a.at) return;
     const [kind, scene] = a.kind.split(':');
-    const x = { id: uid().slice(-8), at: a.at, min: a.min, kind };
-    if (kind === 'learn') x.scenes = [planScenes(s)[+scene]?.[2] ?? ''];
-    s.plan.sessions.push(x);
+    const old = a.id && findSession(s, a.id);
+    const x = old || { id: uid().slice(-8) };
+    Object.assign(x, { at: a.at, min: a.min, kind });
+    if (kind === 'learn') x.scenes = [planScenes(s)[+scene]?.[2] ?? '']; else delete x.scenes;
+    if (!old) s.plan.sessions.push(x);
     s.plan.sessions.sort((p, q) => p.at - q.at);
     planUi.adding = null;
     planChanged(s);
-    toast(`Added: ${sessionLabel(x)}, ${whenText(x.at)}.`);
+    toast(`${old ? 'Changed' : 'Added'}: ${sessionLabel(x)}, ${whenText(x.at)}.`);
   },
   'plan-start'(b) {
     const s = planOf(b.dataset.sid), x = findSession(s, b.dataset.id);
@@ -480,6 +504,7 @@ document.addEventListener('change', e => {
   if (d && e.target.id === 'plan-opening') d.opening = e.target.value;
   if (d && e.target.id === 'plan-time') d.time = e.target.value;
   if (d && e.target.id === 'plan-min') d.min = +e.target.value;
+  if (d && e.target.id === 'plan-run-min') d.runMin = +e.target.value;
   if (d && e.target.dataset.planDay != null) {
     const k = +e.target.dataset.planDay;
     d.days = e.target.checked ? [...new Set([...d.days, k])].sort() : d.days.filter(x => x !== k);
@@ -489,10 +514,6 @@ document.addEventListener('change', e => {
   if (a && e.target.id === 'plan-add-at') a.at = new Date(e.target.value).getTime() || a.at;
   if (a && e.target.id === 'plan-add-min') a.min = +e.target.value;
   if (e.target.id === 'plan-lead' && s.plan) { s.plan.lead = +e.target.value; planChanged(s); }
-  if (e.target.dataset.planMove && s.plan) {
-    const x = findSession(s, e.target.dataset.planMove), at = new Date(e.target.value).getTime();
-    if (x && at) { x.at = at; s.plan.sessions.sort((a, b) => a.at - b.at); planChanged(s); }
-  }
 });
 document.addEventListener('toggle', e => {
   if (e.target.id === 'plan') planUi.open = e.target.open;
