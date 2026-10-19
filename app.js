@@ -1241,7 +1241,8 @@ function accountLineHtml() {
   const user = signedInUser();
   if (user) {
     const syncing = typeof gsync !== 'undefined' && gsync.conf.on;
-    return `<p class="muted small account-line">Signed in as ${esc(user.name)}. ${syncing ? 'Your scripts, songs and progress sync to your other devices.' : 'Turn on <button class="link-btn" data-action="sync-view">Sync</button> to keep your scripts the same on your other devices.'}</p>`;
+    if (syncing) return ''; // the Synced button at the top already says so
+    return `<p class="muted small account-line">Signed in as ${esc(user.name)}. Turn on <button class="link-btn" data-action="sync-view">Sync</button> to keep your scripts the same on your other devices.</p>`;
   }
   return `<p class="muted small account-line">Signing in is optional. Everything works on this device without it. <button class="link-btn" data-action="group">Sign in with Google</button> to keep your scripts in sync across your devices and to share with a cast or group (ages 13 and up).</p>`;
 }
@@ -1250,7 +1251,7 @@ function accountLineHtml() {
 // section and Just my cues setting, from where you stopped if it was a long scene. Hidden once the script is moved to Past.
 function continueHtml() {
   const s = lastRun && scripts.find(x => x.id === lastRun.id);
-  if (!s || s.kind === 'song' || catOf(s) === 'past' || window.planInProgress?.(s.id) || (lastRun.mode !== 'listen' && !s.myChar)) return '';
+  if (!s || s.kind === 'song' || catOf(s) === 'past' || (typeof nextSession === 'function' && nextSession()) || (lastRun.mode !== 'listen' && !s.myChar)) return '';
   const r = resumeAt[s.id]?.mode === lastRun.mode ? resumeAt[s.id] : null;
   const at = r ? r.line : rangeBounds(s)[0];
   let section = '';
@@ -1264,8 +1265,18 @@ function continueHtml() {
 
 function renderLibrary() {
   const has = scripts.length > 0;
+  // Once you have scripts, the welcome shrinks to one row of buttons, so your rehearsals and scripts come first.
+  const hero = has ? `<div class="row wrap home-actions">
+      <button class="btn primary" data-action="new">+ New script</button>
+      <button class="btn" data-action="new-song">+ New song</button>
+      <details class="more-menu"${app.homeMore ? ' open' : ''}><summary class="btn ghost">More</summary>
+        <div class="row wrap"><button class="btn" data-action="browse">Browse free scripts &amp; monologues</button><button class="btn ghost" data-action="sample">Try a sample scene</button></div>
+      </details>
+    </div>
+    ${accountLineHtml()}` : '';
   return `<section class="stack">
-    <div class="hero">
+    ${hero}
+    ${has ? '<h1 class="sr-only">Line Learner</h1>' : `<div class="hero">
       <h1 class="tagline">Because your family is tired of running lines with you.</h1>
       <p class="lede">Paste your script, pick your part, and let’s rehearse. Listen on repeat, work through tricky speeches, or run the whole scene out loud. Forget a line? Just say “line.” We can do this all night.</p>
       <div class="row wrap">
@@ -1275,7 +1286,7 @@ function renderLibrary() {
         <button class="btn ghost" data-action="sample">Try a sample scene</button>
       </div>
       ${accountLineHtml()}
-    </div>
+    </div>`}
     ${typeof nextRehearsalHtml === 'function' ? nextRehearsalHtml() : ''}
     ${continueHtml()}
     ${supportNote()}
@@ -2013,6 +2024,13 @@ function renderScript() {
   const voices = voiceList();
   const cast = castVoices(s);
   const planOnTop = !!window.planActive?.(s); // an active rehearsal plan is the first card (plan.js)
+  // Character, category and part of the script fold into one line once you've picked who you're playing.
+  const setupOpen = !s.myChar || app.setupOpen === s.id;
+  const setupSummary = [
+    s.kind !== 'song' && `As ${titleCase(s.myChar)}`,
+    !s.sample && catLabel(catOf(s)),
+    start > 0 || end < s.lines.length ? `${start > 0 ? s.lines[start].text : 'The beginning'} to ${end < s.lines.length ? `before ${s.lines[end].text}` : 'the end'}` : s.kind === 'song' ? 'Whole song' : 'Whole script',
+  ].filter(Boolean).join(' · ');
 
   const rangeHtml = sections.length ? `<div class="row wrap">
       <label class="field inline"><span>Start at</span><select id="range-start">
@@ -2053,24 +2071,30 @@ function renderScript() {
     ${planOnTop ? planCardHtml(s) : ''}
     ${supportNote()}
     <div class="card stack-sm">
-      ${s.sample ? '' : `<label class="field inline"><span>Category</span><select data-cat-id="${s.id}" aria-label="Category">${categoryOptions(catOf(s))}</select></label>`}
+      ${setupOpen ? `${s.sample ? '' : `<label class="field inline"><span>Category</span><select data-cat-id="${s.id}" aria-label="Category">${categoryOptions(catOf(s))}</select></label>`}
       <label class="field inline"><span>I'm playing</span><select id="my-char">
         <option value="">Choose a character…</option>
         ${chars.map(([c, n]) => `<option value="${esc(c)}" ${c === s.myChar ? 'selected' : ''}>${esc(titleCase(c))} (${n} ${n === 1 ? 'line' : 'lines'})</option>`).join('')}
       </select></label>
       ${rangeHtml}
-      ${s.kind !== 'song' && s.myChar ? `<label class="check-row"><input type="checkbox" id="cues-only" ${app.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines.</b> Listen, Rehearse and Type play only the line before each of yours, then yours, and skip the rest.</span></label>` : ''}
+      ${s.myChar ? '<div><button class="btn ghost" data-action="setup-done">Done</button></div>' : ''}`
+      : `<div class="row between setup-line"><span>${esc(setupSummary)}</span><button class="btn ghost" data-action="setup-edit" aria-label="Change character, category or part of the script">Change</button></div>`}
+      ${s.kind !== 'song' && s.myChar ? `<label class="check-row"><input type="checkbox" id="cues-only" ${app.cuesOnly ? 'checked' : ''}><span><b>Just my cues and lines:</b> only the line before each of yours, then yours.</span></label>` : ''}
       ${mine.length ? `<div class="meter">${bar(solid / mine.length)}<span class="muted small">${progressText(s, mine)}</span></div>` : ''}
     </div>
     ${resumeHtml(s)}
     <div class="modes">
       ${s.kind === 'song' ? `<button class="mode" data-action="sing">${icon('headphones')}<b>Sing along</b><span>${s.song?.spotify ? 'Play the real song with the lyrics highlighted, and hide words as you learn them.' : 'Learn the lyrics. Add the Spotify song (Edit) to sing with the track.'}</span></button>` : ''}
-      <button class="mode" data-action="listen">${icon('headphones')}<b>Listen</b><span>Hear the scene like an audio track. It pauses for you to say your lines.</span></button>
-      ${s.kind !== 'song' ? `<button class="mode" data-action="track">${icon('headphones')}<b>Listen, screen off</b><span>One audio track of the scene that keeps playing when your phone locks, like a podcast.${aiReady() ? '' : ' <i>Needs the AI voices (set up under Voices below) or your recordings of every line.</i>'}</span></button>` : ''}
-      <button class="mode" data-action="rehearse" ${s.myChar ? '' : 'disabled'}>${icon('mic')}<b>Rehearse</b><span>Your cues are read aloud. Say your lines and the mic checks them.</span></button>
-      <button class="mode" data-action="type" ${s.myChar ? '' : 'disabled'}>${icon('keyboard')}<b>Type your lines</b><span>For the train or anywhere you can't talk. Read your cues, type your lines, and get the same word-by-word check.</span></button>
+      <button class="mode" data-action="listen">${icon('headphones')}<b>Listen</b><span>Hear the scene. It pauses for your lines.</span></button>
+      <button class="mode" data-action="rehearse" ${s.myChar ? '' : 'disabled'}>${icon('mic')}<b>Rehearse</b><span>Say your lines and the mic checks them.</span></button>
       <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line' : 'lines'} you're working on` : mine.some(l => isSolid(s, l)) ? 'Nothing shaky right now' : 'Nothing to drill yet: rehearse first') : 'Pick your character first'}</span></button>
     </div>
+    <details class="more-modes"${app.moreModes ? ' open' : ''}><summary>More ways to practice</summary>
+      <div class="modes">
+        <button class="mode" data-action="type" ${s.myChar ? '' : 'disabled'}>${icon('keyboard')}<b>Type your lines</b><span>Read your cues and type your lines. No talking needed.</span></button>
+        ${s.kind !== 'song' ? `<button class="mode" data-action="track">${icon('headphones')}<b>Listen, screen off</b><span>One audio track that keeps playing with your phone locked.${aiReady() ? '' : ' <i>Needs the AI voices or your recordings of every line.</i>'}</span></button>` : ''}
+      </div>
+    </details>
     ${typeof planCardHtml === 'function' && !planOnTop ? planCardHtml(s) : ''}
     <details id="voices" class="card" ${app.voicesOpen ? 'open' : ''}>
       <summary>Voices for each character</summary>
@@ -2920,6 +2944,8 @@ const actions = {
     sayHello(c);
   },
   back() { leave(); app.view = 'script'; render(); },
+  'setup-edit'() { app.setupOpen = app.scriptId; render(); $('#my-char')?.focus(); },
+  'setup-done'() { app.setupOpen = null; render(); },
   toggle: togglePlay,
   prev() { jump(-1); },
   next() { jump(1); },
@@ -3067,6 +3093,8 @@ document.addEventListener('input', e => {
 
 document.addEventListener('toggle', e => {
   if (e.target.id === 'voices') app.voicesOpen = e.target.open;
+  if (e.target.classList?.contains('more-modes')) app.moreModes = e.target.open;
+  if (e.target.classList?.contains('more-menu')) app.homeMore = e.target.open;
   if (e.target.id === 'find-box') {
     app.findOpen = e.target.open;
     if (e.target.open && !merger.autoOpened) $('#find-q')?.focus(); // not when it opened itself for duplicate names

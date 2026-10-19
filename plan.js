@@ -282,11 +282,12 @@ function planCardHtml(s) {
     const left = Math.round((new Date(p.opening + 'T00:00') - new Date().setHours(0, 0, 0, 0)) / DAY_MS);
     const shown = planUi.showAll ? all : ahead.slice(0, 6);
     const next = ahead[0], nextP = next && sessionProgress(s, next);
-    inner = `<p>Opening night: <b>${esc(new Date(p.opening + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))}</b>${left > 0 ? ` <span class="muted">(in ${left} ${left === 1 ? 'day' : 'days'})</span>` : left === 0 ? ' <span class="muted">(today: break a leg!)</span>' : ''} · ${done} of ${all.length} done</p>
+    inner = `<p>Opening night: <b>${esc(new Date(p.opening + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))}</b>${left > 0 ? ` <span class="muted">(in ${left} ${left === 1 ? 'day' : 'days'})</span>` : left === 0 ? ' <span class="muted">(today: break a leg!)</span>' : ''}</p>
       ${all.length ? `<div class="meter">${bar(done / all.length)}</div>` : ''}
       ${next ? `<div class="note stack-sm"><span><b>${nextP ? 'In progress' : 'Next'}: ${esc(whenText(next.at))}</b> · ${esc(sessionLabel(next))}, ${next.min} min</span><span class="small">${nextP ? progressNote(nextP) + '.' : SESSION_HOW[next.kind] || ''}</span>
         ${sessionButtons(s, next, nextP, 'Start now')}</div>` : left > 0 ? '<p class="muted small">No sessions left. Add one, or make a new plan.</p>' : ''}
       ${gone.length && left > 0 ? `<p class="note small row between wrap"><span>${gone.length} ${gone.length === 1 ? 'session was' : 'sessions were'} missed. Spread what's left over the days you have?</span><button class="btn" data-action="plan-replan">Re-plan from today</button></p>` : ''}
+      <details class="plan-more"${planUi.listOpen || planUi.adding?.sid === s.id ? ' open' : ''}><summary>All sessions and reminders</summary><div class="stack-sm">
       ${shown.length ? `<ol class="plan-list">${shown.map(x => sessionRowHtml(s, x)).join('')}</ol>` : ''}
       <div class="row wrap">
         ${all.length > shown.length || planUi.showAll ? `<button class="btn ghost" data-action="plan-all">${planUi.showAll ? 'Show upcoming only' : `Show all ${all.length} sessions`}</button>` : ''}
@@ -295,7 +296,8 @@ function planCardHtml(s) {
         <button class="btn ghost" data-action="plan-delete">Delete plan</button>
       </div>
       ${planUi.adding?.sid === s.id ? addFormHtml(s) : ''}
-      ${remindHtml(s)}`;
+      ${remindHtml(s)}
+      </div></details>`;
   }
   return `<details id="plan" class="card"${(planUi.open ?? !!p) ? ' open' : ''}>
     <summary>Rehearsal plan${p ? `: ${p.sessions.filter(x => x.done).length} of ${p.sessions.length} done` : ''}</summary>
@@ -470,7 +472,10 @@ document.addEventListener('change', e => {
     if (x && at) { x.at = at; s.plan.sessions.sort((a, b) => a.at - b.at); planChanged(s); }
   }
 });
-document.addEventListener('toggle', e => { if (e.target.id === 'plan') planUi.open = e.target.open; }, true);
+document.addEventListener('toggle', e => {
+  if (e.target.id === 'plan') planUi.open = e.target.open;
+  if (e.target.classList?.contains('plan-more')) planUi.listOpen = e.target.open;
+}, true);
 
 // ---------- Push subscription ----------
 const keyBytes = k => Uint8Array.from(atob(k.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(k.length / 4) * 4, '=')), c => c.charCodeAt(0));

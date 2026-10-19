@@ -53,7 +53,7 @@ Madam! Your mother calls.
 
 ## Practicing
 
-On a script, choose who you're playing (**I'm playing**) and, optionally, a scene (**Start at** / **Stop**). Then:
+On a script, choose who you're playing (**I'm playing**) and, optionally, a scene (**Start at** / **Stop**). Once chosen, these fold into one line ("As Clarice · Current · Whole script") with **Change** to edit them. Listen, Rehearse and Drill weak lines are the main buttons; **Type your lines** and **Listen, screen off** are under **More ways to practice**. Then:
 
 | Mode | What happens |
 | --- | --- |

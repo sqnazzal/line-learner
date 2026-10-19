@@ -508,3 +508,13 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 .icon-btn.on { color: var(--good); }
 .plan-remind { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
 .plan-remind svg { width: 16px; height: 16px; vertical-align: -3px; color: var(--good); }
+
+/* Decluttered home and script pages */
+.home-actions { align-items: flex-start; }
+.more-menu > summary { list-style: none; cursor: pointer; }
+.more-menu > summary::-webkit-details-marker { display: none; }
+.more-menu[open] { flex-basis: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.setup-line { align-items: center; gap: 10px; }
+.setup-line > span { font-weight: 600; }
+.more-modes > summary, .plan-more > summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 4px 0; }
+.more-modes[open] > summary, .plan-more[open] > summary { margin-bottom: 10px; }
