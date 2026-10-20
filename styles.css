@@ -542,3 +542,16 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 .report-table { border-collapse: collapse; width: 100%; font-size: .95rem; }
 .report-table th, .report-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .report-table td { font-variant-numeric: tabular-nums; }
+
+/* Admin > People: one line each, tap to open */
+.people-tools { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+.people-tools .field:first-child { grid-column: 1 / -1; }
+@media (min-width: 700px) { .people-tools { grid-template-columns: 2fr 1fr 1fr; } .people-tools .field:first-child { grid-column: auto; } }
+.people-list { list-style: none; margin: 0; padding: 0; }
+.people-list > li + li { border-top: 1px solid var(--border); }
+.person > summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; padding: 10px 4px; cursor: pointer; list-style: none; }
+.person > summary::-webkit-details-marker { display: none; }
+.person-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.person-email { overflow-wrap: anywhere; }
+.person-meta { white-space: nowrap; }
+.person-more { padding: 0 4px 12px; }

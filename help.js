@@ -161,7 +161,7 @@ const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.p
   </ul>
   <p><b>If you sign in with Google</b> (optional, ages 13 and up), Shannon's Firebase project (run by Google) keeps:</p>
   <ul>
-    <li>Your name, email and when you last used the app, so Shannon can see who's using it, plus daily counts of how you use it (app opens, practice runs by mode, and minutes practicing; never what you practiced), for Shannon's usage reports</li>
+    <li>Your name, email and when you last used the app, so Shannon can see who's using it, plus daily counts of how you use it (app opens, practice runs by mode, minutes practicing, and times you share the app; never what you practiced), for Shannon's usage reports</li>
     <li>Your synced scripts, songs, categories and progress, and your recordings if you back them up. Other people can't see them. Shannon, as the app's admin, has access to them and to your account details, and uses it only to delete data you ask to have removed or to fix a problem you report</li>
     <li>The groups you're in, and anything you <b>Share to group</b>, which everyone in that group can see</li>
     <li>If you turn on <b>rehearsal reminders</b>: a push address for each device you turn them on for (made by Apple, Google, Mozilla or Microsoft, whose push service delivers the notification), and your next rehearsals (time, script title and what you're working on) so Shannon's small server on Cloudflare can send each reminder. Turning reminders off on every device removes them</li>
@@ -242,16 +242,54 @@ const renderAbout = () => `<section class="stack about-page">
     <h2>Say hello or help out</h2>
     <p>Have an idea? Find something broken? Have a better name for this thing? Just want to tell me you love it (or that I should stick to acting)? I'd love to hear from you!</p>
     <p>I built this for fun and plan to keep it free. If you find it useful and feel like buying me a coffee, there's a tip jar below. Absolutely no pressure!</p>
-    <div class="row wrap"><button class="btn" data-action="feedback">Send feedback</button><a class="btn" href="${TIP_URL}" target="_blank" rel="noopener">☕ Tip jar on Venmo</a></div>
+    <div class="row wrap"><button class="btn" data-action="feedback">Send feedback</button><button class="btn" data-action="share-app">Share Line Learner</button><a class="btn" href="${TIP_URL}" target="_blank" rel="noopener">☕ Tip jar on Venmo</a></div>
   </div>
 </section>`;
 
 actions.about = () => { leave(); app.view = 'about'; render(); window.scrollTo(0, 0); };
 VIEWS.about = renderAbout;
 
+// ---------- Share the app ----------
+// The device's own share sheet when it has one (Messages, email, WhatsApp and so on); otherwise a page with
+// the link to copy, email or text.
+const APP_URL = 'https://sqnazzal.github.io/line-learner/';
+const SHARE_TEXT = "Line Learner is a free rehearsal partner: it reads your cues, listens for your lines, and runs the scene as many times as you like. Because your family is tired of running lines with you.";
+const sharedApp = () => { if (typeof fb !== 'undefined') fb.logUse?.({ share: 1 }); }; // counted for Admin > Reports
+
+const renderShare = () => `<section class="stack">
+  <div class="row between wrap"><h1>Share Line Learner</h1><button class="btn ghost" data-action="home">${icon('back')} Your scripts</button></div>
+  <div class="card stack">
+    <p>Know an actor, singer or castmate who could use a rehearsal partner? Send them the link. It's free and works in any browser, with nothing to install.</p>
+    <label class="field"><span>Link to the app</span><input id="share-link" readonly value="${APP_URL}"></label>
+    <div class="row wrap">
+      <button class="btn primary" data-action="share-copy">Copy link</button>
+      <a class="btn" data-action="share-sent" href="mailto:?subject=${encodeURIComponent('Line Learner: a free app for learning your lines')}&amp;body=${encodeURIComponent(`${SHARE_TEXT}\n\n${APP_URL}`)}">Email it</a>
+      <a class="btn" data-action="share-sent" href="sms:?&amp;body=${encodeURIComponent(`${SHARE_TEXT} ${APP_URL}`)}">Text it</a>
+    </div>
+  </div>
+</section>`;
+
+Object.assign(actions, {
+  async 'share-app'() {
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Line Learner', text: SHARE_TEXT, url: APP_URL }); sharedApp(); return; } catch (e) { if (e?.name === 'AbortError') return; }
+    }
+    leave(); app.view = 'share'; render(); window.scrollTo(0, 0);
+  },
+  'share-copy'() {
+    const box = $('#share-link');
+    navigator.clipboard?.writeText(APP_URL).then(() => { toast('Link copied. Paste it anywhere.'); sharedApp(); }, () => { box.select(); toast('Select and copy the link.'); });
+  },
+  'share-sent'() { sharedApp(); },
+});
+VIEWS.share = renderShare;
+
 // ---------- What's new ----------
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
+  ['2026-10-20', [
+    '<b>Share Line Learner:</b> send the app to a castmate from the link at the bottom of any page (or under <b>More</b> on the home screen). On a phone it opens your share sheet; elsewhere you can copy the link, email it or text it.',
+  ]],
   ['2026-10-19', [
     '<b>Welcome back:</b> the home screen greets you with the tagline again, and a different hello each time you come back.',
     '<b>Usage counts:</b> when you\'re signed in, the app counts app opens, practice runs and minutes practicing each day (never what you practiced), so Shannon can see how the app is used. The privacy notice explains it.',

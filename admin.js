@@ -110,10 +110,29 @@ async function voicesAdmin(path, body) {
 }
 
 // ---------- Screen ----------
-const adm = { data: null, usage: {}, loading: false, error: '', open: null, items: {}, sort: loadJSON('lineLearner.peopleSort', 'recent') };
+const adm = {
+  data: null, usage: {}, loading: false, error: '', open: null, items: {}, sort: loadJSON('lineLearner.peopleSort', 'recent'),
+  filter: loadJSON('lineLearner.peopleFilter', 'all'), search: '', expanded: new Set(), // People: which ones, and which are opened up
+};
 document.addEventListener('change', e => {
   if (e.target.id === 'people-sort') { adm.sort = e.target.value; saveJSON('lineLearner.peopleSort', adm.sort); render(); }
+  if (e.target.id === 'people-filter') { adm.filter = e.target.value; saveJSON('lineLearner.peopleFilter', adm.filter); render(); }
 });
+// Search narrows the list as you type, without redrawing the screen.
+document.addEventListener('input', e => {
+  if (e.target.id !== 'people-search') return;
+  adm.search = e.target.value;
+  const q = adm.search.trim().toLowerCase();
+  let n = 0;
+  document.querySelectorAll('.people-list > li[data-find]').forEach(li => { li.hidden = !!q && !li.dataset.find.includes(q); n += !li.hidden; });
+  const c = $('#people-count');
+  if (c) c.textContent = peopleCount(n, Number(c.dataset.total));
+});
+document.addEventListener('toggle', e => {
+  const uid = e.target.dataset?.person;
+  if (uid != null) e.target.open ? adm.expanded.add(uid) : adm.expanded.delete(uid);
+}, true);
+const peopleCount = (n, total) => (n === total ? `${total} ${total === 1 ? 'person' : 'people'}` : `Showing ${n} of ${total}`);
 
 async function loadAdmin() {
   if (adm.loading) return;
@@ -163,6 +182,44 @@ function sortPeople(list, groupsOf) {
   return list.sort((a, b) => by(a, b) || active(b) - active(a));
 }
 
+// Which people the list shows (remembered on this device). Each group is a filter too.
+const PEOPLE_FILTERS = {
+  all: 'Everyone', week: 'Active in the last 7 days', month: 'Active in the last 30 days', quiet: 'Not active for 30+ days',
+  new: 'Signed up in the last 30 days', grouped: 'In a group', solo: 'Not in any group', voices: 'Used shared voices this month', blocked: 'Blocked',
+};
+function peopleFilter(groupsOf) {
+  const active = p => Math.max(p.lastSeen || 0, p.lastSignIn || 0), since = days => Date.now() - days * DAY_MS;
+  const created = p => adm.accounts?.find(a => a.uid === p.id)?.created || 0;
+  if (adm.filter.startsWith('g:')) return p => groupsOf(p.id).some(g => g.id === adm.filter.slice(2));
+  return {
+    week: p => active(p) >= since(7), month: p => active(p) >= since(30), quiet: p => active(p) < since(30),
+    new: p => created(p) >= since(30), grouped: p => groupsOf(p.id).length > 0, solo: p => !groupsOf(p.id).length,
+    voices: p => (adm.usage[p.id] || 0) > 0, blocked: p => adm.data.blocked.has(p.id),
+  }[adm.filter] || (() => true);
+}
+
+// One line per person (name, email, when, groups, voices); tap to see their groups and the actions.
+function personHtml(p, gs) {
+  const isBlocked = adm.data.blocked.has(p.id), me = p.id === fb.user.uid, usd = adm.usage[p.id];
+  const last = Math.max(p.lastSeen || 0, p.lastSignIn || 0), q = adm.search.trim().toLowerCase();
+  const find = `${p.name || ''} ${p.email || ''}`.toLowerCase();
+  const meta = [last ? ago(last) : 'never', gs.length ? `${gs.length} ${gs.length === 1 ? 'group' : 'groups'}` : '', usd ? `$${usd.toFixed(2)}` : ''].filter(Boolean).join(' · ');
+  return `<li data-find="${esc(find)}"${q && !find.includes(q) ? ' hidden' : ''}><details class="person" data-person="${esc(p.id)}"${adm.expanded.has(p.id) ? ' open' : ''}>
+    <summary><span class="person-who"><b>${esc(p.name || 'Unknown')}</b>${me ? ' <span class="muted small">(you)</span>' : ''}${isBlocked ? ' <span class="tag">Blocked</span>' : ''}
+      <span class="muted small person-email">${esc(p.email || '')}</span></span>
+      <span class="muted small person-meta">${esc(meta)}</span></summary>
+    <div class="person-more stack-sm">
+      <span class="small">${p.lastSeen ? `Last seen in the app ${when(p.lastSeen)}` : `Signed in ${when(p.lastSignIn)}, not seen in the app since the Admin screen was added`}${adm.accounts?.find(a => a.uid === p.id)?.created ? ` · signed up ${esc(new Date(adm.accounts.find(a => a.uid === p.id).created).toLocaleDateString())}` : ''}</span>
+      <span class="small">${gs.length ? `In: ${esc(gs.map(g => g.name).join(', '))}` : 'Not in any group'}${usd != null ? ` · shared voices this month: about $${usd.toFixed(2)}` : ''}</span>
+      ${me ? '' : `<div class="row wrap">
+        ${gs.length ? `<button class="btn ghost" data-action="admin-kick-all" data-uid="${esc(p.id)}">Remove from all groups</button>` : ''}
+        <button class="btn ghost" data-action="admin-block" data-uid="${esc(p.id)}" data-on="${isBlocked ? '' : '1'}">${isBlocked ? 'Unblock' : 'Block'}</button>
+        ${usd ? `<button class="btn ghost" data-action="admin-reset" data-uid="${esc(p.id)}">Reset voices share</button>` : ''}
+        <button class="btn ghost" data-action="admin-wipe" data-uid="${esc(p.id)}">Delete their data</button>
+      </div>`}
+    </div></details></li>`;
+}
+
 const nameOf = uid => adm.data?.profiles.find(p => p.id === uid)?.name || adm.accounts?.find(a => a.uid === uid)?.name || 'Unknown person';
 const when = t => (t ? ago(t) : 'never');
 
@@ -173,19 +230,14 @@ function renderAdmin() {
   if (adm.error) return `<section class="stack">${head}<p class="note">${esc(adm.error)}</p><div><button class="btn" data-action="admin-reload">Try again</button></div></section>`;
   const { groups, blocked } = adm.data, profiles = allPeople();
   const groupsOf = uid => groups.filter(g => (g.members || []).includes(uid));
-  const people = sortPeople(profiles, groupsOf).map(p => {
-    const gs = groupsOf(p.id), isBlocked = blocked.has(p.id), me = p.id === fb.user.uid;
-    return `<li class="card admin-row">
-      <div class="lib-main"><b>${esc(p.name || 'Unknown')}${me ? ' (you)' : ''}${isBlocked ? ' <span class="tag">Blocked</span>' : ''}</b>
-        <span class="muted small">${esc(p.email || '')} · ${p.lastSeen ? `last seen ${when(p.lastSeen)}` : `signed in ${when(p.lastSignIn)}, not seen in the app since the Admin screen was added`}</span>
-        <span class="small">${gs.length ? `In: ${esc(gs.map(g => g.name).join(', '))}` : 'Not in any group'}${adm.usage[p.id] != null ? ` · shared voices this month: about $${adm.usage[p.id].toFixed(2)}` : ''}</span></div>
-      ${me ? '' : `<div class="row wrap">
-        ${gs.length ? `<button class="btn ghost" data-action="admin-kick-all" data-uid="${esc(p.id)}">Remove from all groups</button>` : ''}
-        <button class="btn ghost" data-action="admin-block" data-uid="${esc(p.id)}" data-on="${isBlocked ? '' : '1'}">${isBlocked ? 'Unblock' : 'Block'}</button>
-        ${adm.usage[p.id] ? `<button class="btn ghost" data-action="admin-reset" data-uid="${esc(p.id)}">Reset voices share</button>` : ''}
-        <button class="btn ghost" data-action="admin-wipe" data-uid="${esc(p.id)}">Delete their data</button>
-      </div>`}</li>`;
-  }).join('');
+  if (adm.filter.startsWith('g:') && !groups.some(g => `g:${g.id}` === adm.filter)) adm.filter = 'all';
+  const shown = sortPeople(profiles.filter(peopleFilter(groupsOf)), groupsOf);
+  const q = adm.search.trim().toLowerCase();
+  const visible = shown.filter(p => !q || `${p.name || ''} ${p.email || ''}`.toLowerCase().includes(q)).length;
+  const people = shown.map(p => personHtml(p, groupsOf(p.id))).join('');
+  const filterOptions = Object.entries(PEOPLE_FILTERS).map(([k, v]) => [k, v])
+    .concat(groups.slice().sort((a, b) => a.name.localeCompare(b.name)).map(g => [`g:${g.id}`, `In ${g.name}`]))
+    .map(([k, v]) => `<option value="${esc(k)}"${adm.filter === k ? ' selected' : ''}>${esc(v)}</option>`).join('');
   const groupRows = groups.slice().sort((a, b) => a.name.localeCompare(b.name)).map(g => {
     const open = adm.open === g.id, items = adm.items[g.id];
     return `<li class="card admin-row">
@@ -209,10 +261,15 @@ function renderAdmin() {
     ${head}
     <p class="muted">You're the app's admin. Changes here affect other people right away. <button class="link-btn" data-action="admin-reload">Refresh</button></p>
     ${feedbackHtml()}
-    <div class="row between wrap"><h2>People (${profiles.length})</h2>
-      <label class="field inline small"><span>Sort by</span><select id="people-sort">${Object.entries(PEOPLE_SORTS).map(([k, v]) => `<option value="${k}"${adm.sort === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label></div>
+    <h2>People (${profiles.length})</h2>
+    <div class="people-tools">
+      <label class="field"><span>Search</span><input id="people-search" type="search" value="${esc(adm.search)}" placeholder="Name or email" autocomplete="off"></label>
+      <label class="field"><span>Show</span><select id="people-filter">${filterOptions}</select></label>
+      <label class="field"><span>Sort by</span><select id="people-sort">${Object.entries(PEOPLE_SORTS).map(([k, v]) => `<option value="${k}"${adm.sort === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+    </div>
+    <p class="muted small"><span id="people-count" data-total="${shown.length}" aria-live="polite">${peopleCount(visible, shown.length)}</span>${adm.filter !== 'all' ? ` (${esc(PEOPLE_FILTERS[adm.filter] || `In ${groups.find(g => `g:${g.id}` === adm.filter)?.name || 'a group'}`)})` : ''}</p>
     ${adm.accounts ? '' : '<p class="muted small">Showing people who have opened the app since the Admin screen was added. To list everyone who has ever signed in, set up GOOGLE_SERVICE_ACCOUNT on the voices server (server/README.md, step 7).</p>'}
-    <ul class="lib-list">${people || '<li class="muted">No one has signed in yet.</li>'}</ul>
+    ${people ? `<ul class="people-list card">${people}</ul>` : `<p class="muted">${profiles.length ? 'No one matches.' : 'No one has signed in yet.'}</p>`}
     <p class="muted small"><b>Block</b> stops someone using groups, sharing and the shared voices (their own scripts on their own device are unaffected). To delete someone's Google sign-in completely, use <a href="${FIREBASE_USERS_URL}" target="_blank" rel="noopener">Firebase > Authentication > Users</a> after removing and blocking them here.</p>
     <h2>Groups (${groups.length})</h2>
     <ul class="lib-list">${groupRows || '<li class="muted">No groups yet.</li>'}</ul>
@@ -366,6 +423,7 @@ function reportData() {
   const days = [...Array(n)].map((_, i) => isoDay(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (n - 1 - i))));
   const byDay = new Map(days.map(d => [d, { day: d, who: new Set(), open: 0, runs: 0, min: 0, est: 0, billed: 0 }]));
   const people = new Map(), modes = {}, kinds = {}, items = {};
+  let shares = 0;
   const person = (id, p = {}) => {
     if (!people.has(id)) people.set(id, { id, name: p.name || nameOf(id), email: p.email || '', days: 0, open: 0, runs: 0, min: 0, est: 0, last: '' });
     return people.get(id);
@@ -379,6 +437,7 @@ function reportData() {
       const row = byDay.get(d), runs = Object.keys(PRACTICE_KINDS).reduce((sum, k) => sum + (c[k] || 0), 0);
       for (const k in PRACTICE_KINDS) if (c[k]) modes[k] = (modes[k] || 0) + c[k];
       row.who.add(p.id); row.open += c.open || 0; row.runs += runs; row.min += c.min || 0;
+      shares += c.share || 0;
       u.days++; u.open += c.open || 0; u.runs += runs; u.min += c.min || 0; u.last = d;
     }
   }
@@ -409,7 +468,7 @@ function reportData() {
     total: {
       people: all.length, active: list.filter(u => u.days).length,
       newcomers: adm.accounts ? adm.accounts.filter(a => a.created >= since).length : null,
-      open: sum('open'), runs: sum('runs'), min: sum('min'), est: sum('est'),
+      open: sum('open'), runs: sum('runs'), min: sum('min'), est: sum('est'), shares,
       billed: m.openai?.rows ? Object.values(items).reduce((s, v) => s + v, 0) : null,
     },
   };
@@ -473,6 +532,7 @@ function renderReport() {
       ${tile('App opens', t.open)}
       ${tile('Practice runs', t.runs)}
       ${tile('Time practicing', esc(fmtMin(t.min)))}
+      ${tile('Shared the app', t.shares)}
     </div>
     <div class="report-charts">
       ${barsHtml(b.length < r.rows.length ? 'People active each month' : 'People active each day', b, x => x.people, String)}

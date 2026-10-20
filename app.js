@@ -1291,7 +1291,7 @@ function renderLibrary() {
       <button class="btn primary" data-action="new">+ New script</button>
       <button class="btn" data-action="new-song">+ New song</button>
       <details class="more-menu"${app.homeMore ? ' open' : ''}><summary class="btn ghost">More</summary>
-        <div class="row wrap"><button class="btn" data-action="browse">Browse free scripts &amp; monologues</button><button class="btn ghost" data-action="sample">Try a sample scene</button></div>
+        <div class="row wrap"><button class="btn" data-action="browse">Browse free scripts &amp; monologues</button><button class="btn ghost" data-action="sample">Try a sample scene</button><button class="btn ghost" data-action="share-app">Share Line Learner</button></div>
       </details>
     </div>
     ${accountLineHtml()}` : '';
