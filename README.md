@@ -156,7 +156,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | **GitHub** | Hosting, and the optional GitHub sync | This repository; Pages builds from `main` |
 
 - **Security rules:** `firestore.rules` is the source of truth. After changing it, paste it into Firestore > Rules and **Publish**.
-- **Share Line Learner:** in the footer (and under **More** on the home screen). Opens the device's share sheet when there is one; otherwise a page to copy, email or text the link.
+- **Share Line Learner:** in the footer (and under **More** on the home screen). A page with the device's share sheet, copy/email/text the link, and a QR code (qr-app.svg, the app's link; regenerate it only if the address changes).
 - **Admin:** signed in as Shannon (account ID in `admin.js` `ADMIN_UID` and `isAdmin()` in `firestore.rules`), the Group screen shows **Admin**: the **Feedback** inbox (notes sent with Send feedback), everyone who has signed in, block/unblock, remove from groups, reset a shared-voices allowance, delete synced scripts, manage or delete groups and shared items. The **People** list is one line per person (tap for details and actions), with search by name or email, filters (active lately, inactive for 30+ days, new, in a particular group, not in a group, used shared voices, blocked) and sorting. **Reports** shows app use (active people, new sign-ins, app opens, practice runs by mode, minutes practicing) and money spent (the shared voices estimate per person, by day and kind, and OpenAI's actual bill with an Admin key; see server/README.md step 9) for the last 7, 30 or 90 days or 12 months, with CSV downloads by day and by person. Use is counted only for signed-in people, as daily counts on their profile. Deleting a sign-in account itself is done in Firebase > Authentication > Users.
 - **Shared voices server:** code in `server/voices-worker.js`; settings, allowances and how it decides in `server/README.md`.
 - **Free script library:** lives in `library/`. To rebuild it (for example after adding a play to `tools/build-library.html`), run `powershell -ExecutionPolicy Bypass -File tools\build-library.ps1`. It downloads the Project Gutenberg texts into `tools/raw/` (not committed), converts them with `tools/convert.js`, and writes `library/plays/*.txt`, `library/plays.json` and `library/monologues.json`.
@@ -173,6 +173,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | `groups.js` | Google sign-in, groups, sharing, Google sync |
 | `plan.js` | Rehearsal plans and reminders |
 | `sw.js`, `manifest.webmanifest` | The service worker (only shows reminders, caches nothing) and the app manifest |
+| `qr-app.svg` | QR code of the app's link, for the Share page |
 | `admin.js` | The admin screen and Reports (Shannon only), and the daily use counts |
 | `help.js` | Help & troubleshooting, Privacy, About, What's new and Send feedback |
 | `firestore.rules` | Firebase security rules |

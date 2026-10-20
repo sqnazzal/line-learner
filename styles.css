@@ -555,3 +555,6 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 .person-email { overflow-wrap: anywhere; }
 .person-meta { white-space: nowrap; }
 .person-more { padding: 0 4px 12px; }
+
+/* Share Line Learner: the QR code stays dark on white (what cameras read best), even in dark mode */
+.share-qr img { width: min(240px, 70vw); height: auto; padding: 10px; background: #fff; border-radius: 10px; align-self: center; image-rendering: pixelated; }

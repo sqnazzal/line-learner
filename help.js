@@ -250,8 +250,8 @@ actions.about = () => { leave(); app.view = 'about'; render(); window.scrollTo(0
 VIEWS.about = renderAbout;
 
 // ---------- Share the app ----------
-// The device's own share sheet when it has one (Messages, email, WhatsApp and so on); otherwise a page with
-// the link to copy, email or text.
+// A page with the device's own share sheet (when it has one), the link to copy, email or text, and a QR code
+// to show someone in person. qr-app.svg is the app's link as a QR code, made once (it never changes).
 const APP_URL = 'https://sqnazzal.github.io/line-learner/';
 const SHARE_TEXT = "Line Learner is a free rehearsal partner: it reads your cues, listens for your lines, and runs the scene as many times as you like. Because your family is tired of running lines with you.";
 const sharedApp = () => { if (typeof fb !== 'undefined') fb.logUse?.({ share: 1 }); }; // counted for Admin > Reports
@@ -262,19 +262,23 @@ const renderShare = () => `<section class="stack">
     <p>Know an actor, singer or castmate who could use a rehearsal partner? Send them the link. It's free and works in any browser, with nothing to install.</p>
     <label class="field"><span>Link to the app</span><input id="share-link" readonly value="${APP_URL}"></label>
     <div class="row wrap">
-      <button class="btn primary" data-action="share-copy">Copy link</button>
+      ${navigator.share ? '<button class="btn primary" data-action="share-sheet">Share…</button>' : ''}
+      <button class="btn${navigator.share ? '' : ' primary'}" data-action="share-copy">Copy link</button>
       <a class="btn" data-action="share-sent" href="mailto:?subject=${encodeURIComponent('Line Learner: a free app for learning your lines')}&amp;body=${encodeURIComponent(`${SHARE_TEXT}\n\n${APP_URL}`)}">Email it</a>
       <a class="btn" data-action="share-sent" href="sms:?&amp;body=${encodeURIComponent(`${SHARE_TEXT} ${APP_URL}`)}">Text it</a>
     </div>
   </div>
+  <div class="card stack share-qr">
+    <h2>Show the code</h2>
+    <p>At rehearsal? Hold this up and they point their phone's camera at it to open Line Learner.</p>
+    <img src="qr-app.svg" width="240" height="240" alt="QR code that opens ${APP_URL}">
+  </div>
 </section>`;
 
 Object.assign(actions, {
-  async 'share-app'() {
-    if (navigator.share) {
-      try { await navigator.share({ title: 'Line Learner', text: SHARE_TEXT, url: APP_URL }); sharedApp(); return; } catch (e) { if (e?.name === 'AbortError') return; }
-    }
-    leave(); app.view = 'share'; render(); window.scrollTo(0, 0);
+  'share-app'() { leave(); app.view = 'share'; render(); window.scrollTo(0, 0); },
+  async 'share-sheet'() {
+    try { await navigator.share({ title: 'Line Learner', text: SHARE_TEXT, url: APP_URL }); sharedApp(); } catch (e) { if (e?.name !== 'AbortError') actions['share-copy'](); }
   },
   'share-copy'() {
     const box = $('#share-link');
@@ -288,7 +292,7 @@ VIEWS.share = renderShare;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-20', [
-    '<b>Share Line Learner:</b> send the app to a castmate from the link at the bottom of any page (or under <b>More</b> on the home screen). On a phone it opens your share sheet; elsewhere you can copy the link, email it or text it.',
+    '<b>Share Line Learner:</b> send the app to a castmate from the link at the bottom of any page (or under <b>More</b> on the home screen). Use your phone\'s share sheet, copy the link, email or text it, or show the QR code so a castmate can scan it at rehearsal.',
   ]],
   ['2026-10-19', [
     '<b>Welcome back:</b> the home screen greets you with the tagline again, and a different hello each time you come back.',
