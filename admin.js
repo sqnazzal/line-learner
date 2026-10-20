@@ -198,17 +198,17 @@ function peopleFilter(groupsOf) {
   }[adm.filter] || (() => true);
 }
 
-// One line per person (name, email, when, groups, voices); tap to see their groups and the actions.
+// One line per person (name, when, groups, voices); tap to see their email, groups and the actions.
 function personHtml(p, gs) {
   const isBlocked = adm.data.blocked.has(p.id), me = p.id === fb.user.uid, usd = adm.usage[p.id];
   const last = Math.max(p.lastSeen || 0, p.lastSignIn || 0), q = adm.search.trim().toLowerCase();
   const find = `${p.name || ''} ${p.email || ''}`.toLowerCase();
   const meta = [last ? ago(last) : 'never', gs.length ? `${gs.length} ${gs.length === 1 ? 'group' : 'groups'}` : '', usd ? `$${usd.toFixed(2)}` : ''].filter(Boolean).join(' · ');
   return `<li data-find="${esc(find)}"${q && !find.includes(q) ? ' hidden' : ''}><details class="person" data-person="${esc(p.id)}"${adm.expanded.has(p.id) ? ' open' : ''}>
-    <summary><span class="person-who"><b>${esc(p.name || 'Unknown')}</b>${me ? ' <span class="muted small">(you)</span>' : ''}${isBlocked ? ' <span class="tag">Blocked</span>' : ''}
-      <span class="muted small person-email">${esc(p.email || '')}</span></span>
+    <summary><span class="person-who"><b>${esc(p.name || 'Unknown')}</b>${me ? ' <span class="muted small">(you)</span>' : ''}${isBlocked ? ' <span class="tag">Blocked</span>' : ''}</span>
       <span class="muted small person-meta">${esc(meta)}</span></summary>
     <div class="person-more stack-sm">
+      ${p.email ? `<a class="small person-email" href="mailto:${esc(p.email)}">${esc(p.email)}</a>` : '<span class="muted small">No email on file</span>'}
       <span class="small">${p.lastSeen ? `Last seen in the app ${when(p.lastSeen)}` : `Signed in ${when(p.lastSignIn)}, not seen in the app since the Admin screen was added`}${adm.accounts?.find(a => a.uid === p.id)?.created ? ` · signed up ${esc(new Date(adm.accounts.find(a => a.uid === p.id).created).toLocaleDateString())}` : ''}</span>
       <span class="small">${gs.length ? `In: ${esc(gs.map(g => g.name).join(', '))}` : 'Not in any group'}${usd != null ? ` · shared voices this month: about $${usd.toFixed(2)}` : ''}</span>
       ${me ? '' : `<div class="row wrap">
