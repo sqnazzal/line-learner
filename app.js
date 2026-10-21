@@ -887,9 +887,13 @@ function chime(ok) {
 // ---------- Listening ----------
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const COMMAND_RE = /^(line|line please|prompt|whats my line)$/;
+const COMMAND_START_RE = /^(line|prompt|whats my line)\b/;
 
 // Resolves with { reason, text } once you stop talking, finish the line, say "line", or the run is cancelled.
 function listen(token, expected) {
+  // "Line" is acted on the moment it's heard, before the browser settles on it (which can take seconds),
+  // unless your line itself starts with that word: then it waits to be sure.
+  const quickCall = !COMMAND_START_RE.test(words(expected).join(' '));
   return new Promise(resolve => {
     let finalText = '', interim = '', heard = false, settled = false, timer = 0, off = () => {};
     const rec = new SR();
@@ -917,7 +921,7 @@ function listen(token, expected) {
         else interim += ' ' + res[0].transcript;
       }
       setTranscript(said());
-      if (!interim.trim() && COMMAND_RE.test(words(finalText).join(' '))) return finish('prompt');
+      if (COMMAND_RE.test(words(interim.trim() && quickCall ? said() : finalText).join(' '))) return finish('prompt');
       const score = compare(expected, said()).score;
       if (score === 100) return finish('complete');
       // Not far enough into the line to pass yet: allow a real pause (a beat, a breath) before deciding you've stopped.
@@ -2213,7 +2217,7 @@ function refreshPlayer() {
   if (app.view !== 'player') return;
   const s = current(), key = focusKey(document.activeElement);
   announce(s);
-  $('#stage').innerHTML = P.status === 'done' ? doneHtml(s) : P.mode === 'buildup' ? buildUpStageHtml(s) : lineStageHtml(s);
+  $('#stage').innerHTML = P.fixing != null && s.lines[P.fixing] ? fixLineHtml(s) : P.status === 'done' ? doneHtml(s) : P.mode === 'buildup' ? buildUpStageHtml(s) : lineStageHtml(s);
   $('#controls').innerHTML = `
     <button class="ctrl" data-action="prev" aria-label="Previous">${icon('prev')}</button>
     <button class="ctrl big" data-action="toggle" aria-label="${P.running ? 'Pause' : 'Play'}">${icon(P.running ? 'pause' : 'play')}</button>
@@ -2268,19 +2272,55 @@ function myLineBody(text) {
   return hintHtml(text, P.reveal);
 }
 
+// ---------- Fixing a line while you practice ----------
+// The pencil on the line (or the cue above it) pauses and opens a small editor for just that line. Saving
+// changes the script (its text too, so Edit shows it) and keeps your place and that line's progress.
+const fixBtn = (s, i) => (s.sample ? '' : `<button class="icon-btn fix-btn" data-action="fix-line" data-i="${i}" aria-label="Fix this line" title="Fix this line">${icon('edit')}</button>`);
+
+function fixLineHtml(s) {
+  const l = s.lines[P.fixing], chars = [...characters(s).keys()];
+  return `<div class="card stage-card stack-sm fix-card">
+    <h2>Fix this ${l.type === 'line' ? 'line' : l.type === 'section' ? 'heading' : 'stage direction'}</h2>
+    ${l.type === 'line' ? `<label class="field"><span>Who says it</span><input id="fix-who" list="fix-chars" value="${esc(titleCase(l.speaker))}" autocomplete="off"></label>
+      <datalist id="fix-chars">${chars.map(c => `<option value="${esc(titleCase(c))}">`).join('')}</datalist>` : ''}
+    <label class="field"><span>${l.type === 'line' ? 'The line' : 'Text'}</span><textarea id="fix-text" rows="4">${esc(l.text)}</textarea></label>
+    <div class="row wrap"><button class="btn primary" data-action="fix-save">Save</button><button class="btn ghost" data-action="fix-cancel">Cancel</button>
+      <button class="link-btn small" data-action="edit-script">Edit the whole script</button></div>
+  </div>`;
+}
+
+// Changes one line. The script's text is patched in place when the old line can be found exactly once (so
+// your formatting stays); otherwise it's rewritten from the lines.
+function fixLine(s, i, speaker, text) {
+  const l = s.lines[i], old = { ...l }, oldKey = l.type === 'line' ? lineKey(l) : null;
+  Object.assign(l, l.type === 'line' ? { speaker, text } : { text });
+  let raw = null;
+  if (old.speaker === l.speaker && s.raw.split(old.text).length === 2) {
+    raw = s.raw.replace(old.text, () => text);
+    const check = parseScript(raw);
+    if (check.length !== s.lines.length || check[i]?.text !== l.text || check[i]?.speaker !== l.speaker) raw = null;
+  }
+  s.raw = raw ?? scriptToText(s.lines);
+  if (oldKey && s.stats[oldKey] && !s.stats[lineKey(l)]) s.stats[lineKey(l)] = s.stats[oldKey];
+  s.updated = Date.now();
+  if (s.myChar && !characters(s).has(s.myChar)) s.myChar = '';
+  saveScripts();
+}
+
 function lineStageHtml(s) {
   const pos = P.orderPos, item = s.lines[P.order[pos]];
   let prevIdx = -1;
   for (let p = pos - 1; p >= 0; p--) if (s.lines[P.order[p]].type === 'line') { prevIdx = P.order[p]; break; }
   const prev = prevIdx >= 0 && item.type === 'line'
-    ? `<div class="context"><span class="who">${esc(titleCase(s.lines[prevIdx].speaker))}</span> ${fmt(s.lines[prevIdx].text)}</div>` : '';
+    ? `<div class="context"><span class="who">${esc(titleCase(s.lines[prevIdx].speaker))}</span> ${fmt(s.lines[prevIdx].text)}${fixBtn(s, prevIdx)}</div>` : '';
+  const fix = fixBtn(s, P.order[pos]);
 
   let card;
-  if (item.type === 'section') card = `<div class="card stage-card section-card"><h2>${esc(item.text)}</h2></div>`;
-  else if (item.type === 'direction') card = `<div class="card stage-card direction-card">${pill()}<p><em>${esc(item.text)}</em></p></div>`;
+  if (item.type === 'section') card = `<div class="card stage-card section-card"><div class="card-head"><h2>${esc(item.text)}</h2>${fix}</div></div>`;
+  else if (item.type === 'direction') card = `<div class="card stage-card direction-card"><div class="card-head">${pill()}${fix}</div><p><em>${esc(item.text)}</em></p></div>`;
   else if (isMine(s, item)) {
     card = `<div class="card stage-card mine-card">
-      <div class="card-head"><span class="who">You${s.myChar !== 'YOU' ? ` (${esc(titleCase(s.myChar))})` : ''}</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}</div>
+      <div class="card-head"><span class="who">You${s.myChar !== 'YOU' ? ` (${esc(titleCase(s.myChar))})` : ''}</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}${fix}</div>
       <p class="script-text">${myLineBody(item.text)}</p>
       ${micOn() && (P.mode === 'rehearse' || (P.mode === 'listen' && settings.listenHears)) ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
       ${P.status === 'typing' ? `<textarea id="typed" class="typed" rows="3" placeholder="Type your line, then Check (or press Enter)" autocapitalize="sentences" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Type your line">${esc(P.typed || '')}</textarea>` : ''}
@@ -2289,7 +2329,7 @@ function lineStageHtml(s) {
     </div>`;
   } else {
     const go = P.status === 'reading' ? '<div class="row card-actions"><button class="btn" data-action="choose">Continue</button></div>' : '';
-    card = `<div class="card stage-card"><div class="card-head"><span class="who">${esc(titleCase(item.speaker))}</span>${pill()}</div><p class="script-text">${fmt(item.text)}</p>${go}</div>`;
+    card = `<div class="card stage-card"><div class="card-head"><span class="who">${esc(titleCase(item.speaker))}</span>${pill()}${fix}</div><p class="script-text">${fmt(item.text)}</p>${go}</div>`;
   }
   return `<div class="progress" aria-hidden="true"><div style="width:${Math.round(100 * (pos + 1) / P.order.length)}%"></div></div>
     <p class="muted small">${pos + 1} of ${P.order.length}</p>
@@ -2309,7 +2349,7 @@ function buildUpStageHtml(s) {
     <p class="muted small">Piece ${k + 1} of ${parts.length}: ${phase === 'listen' ? 'listen to the next piece' : 'now say it all from the top'}</p>
     ${P.note ? `<p class="note">${esc(P.note)}</p>` : ''}
     <div class="card stage-card mine-card">
-      <div class="card-head"><span class="who">You</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}</div>
+      <div class="card-head"><span class="who">You</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}${fixBtn(s, P.bu.i)}</div>
       <p class="script-text">${body}</p>
       ${micOn() ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
       ${myActions()}
@@ -2389,6 +2429,7 @@ function stopRun() {
 function beginRun() {
   stopRun();
   P.running = true;
+  P.fixing = null; // Play closes the line editor (unsaved changes are dropped)
   P.note = '';
   keepAwake(true);
   return P.token = makeToken();
@@ -2546,6 +2587,12 @@ async function listenMine(item, token) {
     if (r.reason.startsWith('error:')) {
       if (lostMic(r.reason.slice(6))) { carryOnWithoutMic(r.reason.slice(6)); refreshPlayer(); }
       await sleep(gapMs(item.text), token);
+    }
+    // Said "line": hear it now (unless it's about to be read anyway).
+    if (r.reason === 'prompt' && settings.myLines !== 'gapThenSpeak' && !token.cancelled) {
+      P.status = 'answer';
+      refreshPlayer();
+      await sayLine(item, token);
     }
   } else {
     await sleep(gapMs(item.text), token);
@@ -2953,6 +3000,29 @@ const actions = {
     startPlayer('rehearse', span(cue >= 0 ? cue : i, end));
   },
   buildup(b, i) { startBuildUp(i); },
+  'fix-line'(b, i) {
+    if (P.running) pauseRun();
+    P.fixing = i;
+    refreshPlayer();
+    $('#fix-text')?.focus();
+  },
+  'fix-cancel'() { P.fixing = null; refreshPlayer(); },
+  'fix-save'() {
+    const s = current(), i = P.fixing, l = s.lines[i];
+    const text = $('#fix-text').value.replace(/\s+/g, ' ').trim();
+    if (!text) { toast('The line is empty. Type it in, or Cancel.'); return; }
+    let speaker = l.speaker;
+    if (l.type === 'line') {
+      const typed = $('#fix-who').value.trim();
+      if (!typed) { toast('Who says it? Type a name.'); return; }
+      speaker = [...characters(s).keys()].find(c => nameKey(c) === nameKey(typed)) || cleanName(typed);
+    }
+    fixLine(s, i, speaker, text);
+    Object.assign(P, { fixing: null, result: null, transcript: '' });
+    if (P.mode === 'buildup') P.bu = { ...P.bu, parts: buildParts(text), k: 0, phase: 'listen' };
+    toast('Fixed in your script. Press play to carry on.');
+    refreshPlayer();
+  },
   hear(b, i) { const l = current().lines[i]; preview(t => sayLine(l, t)); },
   rec(b, i) { toggleRecord(lineKey(current().lines[i])); },
   async 'del-rec'(b, i) {

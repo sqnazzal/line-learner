@@ -558,3 +558,10 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 
 /* Share Line Learner: the QR code stays dark on white (what cameras read best), even in dark mode */
 .share-qr img { width: min(240px, 70vw); height: auto; padding: 10px; background: #fff; border-radius: 10px; align-self: center; image-rendering: pixelated; }
+
+/* Fixing a line while practicing: a quiet pencil at the end of the card's top row */
+.card-head .fix-btn { margin-left: auto; }
+.context .fix-btn { margin-left: 6px; vertical-align: middle; }
+.fix-btn { opacity: .7; }
+.fix-btn:hover, .fix-btn:focus-visible { opacity: 1; }
+.section-card .card-head h2 { margin: 0; }

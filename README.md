@@ -68,7 +68,8 @@ Each of your lines is **Not practiced**, **Working on it**, or **Solid**. Solid 
 
 - **No microphone?** Listen carries on with timed pauses at your lines, and Rehearse lets you mark yourself (or use **Type your lines**).
 
-- **Stuck?** Say **"line"** and it feeds you the line.
+- **Stuck?** Say **"line"** and it feeds you the line right away (in Rehearse, and in Listen when it hears you).
+- **Spotted a mistake?** The pencil on the current line (or the cue above it) pauses and lets you fix that line: the words, or who says it. It saves to your script and keeps your place and progress. In Sing, **Fix lyrics** opens the song's editor.
 - **Sound-alikes pass:** different spellings that sound the same (Dotty / Dottie, Jon / John) and run-together words (dammit / damn it, wanna / want to, gonna / going to) count as right.
 - **Just your part:** tick **Just my cues and lines** on a script and Listen, Rehearse and Type play only each cue line and your line, skipping the rest.
 - **Scene breaks:** each scene heading is read out by an announcer ("Act 2", "Scene 1") with a pause, so a new scene is clear even with the screen off.

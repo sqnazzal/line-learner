@@ -680,7 +680,7 @@ function renderSing() {
   const chips = Object.entries(SING_MODES).map(([k, v]) => `<button class="chip${sing.mode === k ? ' on' : ''}" data-action="sing-mode" data-mode="${k}" aria-pressed="${sing.mode === k}">${v}</button>`).join('');
   return `<section class="stack sing">
     <h1 class="sr-only">Sing along: ${esc(s.title)}</h1>
-    <div class="row between wrap"><button class="btn ghost" data-action="back">${icon('back')} Song</button><span class="mode-tag">Sing along</span></div>
+    <div class="row between wrap"><button class="btn ghost" data-action="back">${icon('back')} Song</button><span class="row"><span class="mode-tag">Sing along</span>${s.sample ? '' : `<button class="btn ghost" data-action="edit-script">${icon('edit')} Fix lyrics</button>`}</span></div>
     ${s.song?.instrumental ? `<div class="segmented" role="group" aria-label="Which version plays">
       <button class="seg${usingInst(s) ? '' : ' on'}" data-action="sing-version" data-v="original" aria-pressed="${!usingInst(s)}">Original</button>
       <button class="seg${usingInst(s) ? ' on' : ''}" data-action="sing-version" data-v="instrumental" aria-pressed="${usingInst(s)}">Instrumental</button></div>` : ''}

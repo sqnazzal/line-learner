@@ -23,7 +23,8 @@ const HELP = {
       <li><b>Chrome:</b> iPhone <b>Settings</b> &gt; <b>Apps</b> &gt; <b>Chrome</b>: turn <b>Microphone</b> on, then tap <b>Allow</b> when the site asks.</li>
       <li>Checking lines needs an internet connection (it uses Apple's speech service).</li>
       <li>Listen mode hears you say your line and moves on when you finish (turn it off in Practice settings).</li>
-      <li>Stuck in a scene? Say <i>"line"</i> and it reads your line to you.</li></ul>`],
+      <li>Stuck in a scene? Say <i>"line"</i> and it reads your line to you right away.</li>
+      <li>Spotted a typo or a line given to the wrong character? Tap the pencil on the line (or on the cue above it) to fix it without leaving the scene.</li></ul>`],
     ['Sound and voices', `<ul>
       <li>No sound? Turn the volume up and check the phone isn't in <b>Silent mode</b> (the switch or Action button); the chimes are quiet in Silent mode.</li>
       <li>Better built-in voices: open <b>Settings</b>, search <b>"Voices"</b>, choose <b>English</b>, and download an <b>Enhanced</b> or <b>Premium</b> US voice (such as Ava, Zoe or Evan).</li>
@@ -53,7 +54,8 @@ const HELP = {
       <li>Still blocked? Phone <b>Settings</b> &gt; <b>Apps</b> &gt; <b>Chrome</b> &gt; <b>Permissions</b> &gt; <b>Microphone</b> &gt; <b>Allow</b>.</li>
       <li>Checking lines needs an internet connection.</li>
       <li>Listen mode hears you say your line and moves on when you finish (turn it off in Practice settings).</li>
-      <li>Stuck in a scene? Say <i>"line"</i> and it reads your line to you.</li></ul>`],
+      <li>Stuck in a scene? Say <i>"line"</i> and it reads your line to you right away.</li>
+      <li>Spotted a typo or a line given to the wrong character? Tap the pencil on the line (or on the cue above it) to fix it without leaving the scene.</li></ul>`],
     ['Sound and voices', `<ul>
       <li>Better built-in voices: phone <b>Settings</b> &gt; search <b>"Text-to-speech"</b> &gt; <b>Speech Services by Google</b> &gt; install <b>English (US)</b> voice data. (Menus differ a little between phones.)</li>
       <li>Most natural: AI voices. In one of Shannon's groups? Sign in, then open a script &gt; <b>Voices for each character</b> &gt; tick <b>Use Shannon's shared voices</b>, no key needed (each person gets a monthly share). Or add your own OpenAI key there.</li>
@@ -291,6 +293,10 @@ VIEWS.share = renderShare;
 // ---------- What's new ----------
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
+  ['2026-10-21', [
+    '<b>Fix a line while you practice:</b> spotted a typo, or a line given to the wrong character? Tap the pencil on the line (or on the cue above it) in Listen, Rehearse, Drill, Type or Build up. It pauses, you fix the words or who says it, and you carry on from the same spot with your progress kept. In Sing, <b>Fix lyrics</b> opens the song.',
+    '<b>"Line" answers right away:</b> say "line" and you hear it at once, instead of after a few seconds. It works in Listen too, when it\'s listening for your lines.',
+  ]],
   ['2026-10-20', [
     '<b>Share Line Learner:</b> send the app to a castmate from the link at the bottom of any page (or under <b>More</b> on the home screen). Use your phone\'s share sheet, copy the link, email or text it, or show the QR code so a castmate can scan it at rehearsal.',
   ]],
