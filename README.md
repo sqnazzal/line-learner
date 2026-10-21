@@ -70,6 +70,7 @@ Each of your lines is **Not practiced**, **Working on it**, or **Solid**. Solid 
 
 - **Stuck?** Say **"line"** and it feeds you the line right away (in Rehearse, and in Listen when it hears you).
 - **Spotted a mistake?** The pencil on the current line (or the cue above it) pauses and lets you fix that line: the words, or who says it. It saves to your script and keeps your place and progress. In Sing, **Fix lyrics** opens the song's editor.
+- **Long lines one sentence at a time** (Rehearse and Type): tap **One sentence at a time** on a line with several sentences (or tick it in Practice settings). Each sentence is checked on its own, "line" feeds just that sentence, and the line's score is the average of each sentence's first try. **Whole line at once** switches back.
 - **Sound-alikes pass:** different spellings that sound the same (Dotty / Dottie, Jon / John) and run-together words (dammit / damn it, wanna / want to, gonna / going to) count as right.
 - **Just your part:** tick **Just my cues and lines** on a script and Listen, Rehearse and Type play only each cue line and your line, skipping the rest.
 - **Scene breaks:** each scene heading is read out by an announcer ("Act 2", "Scene 1") with a pause, so a new scene is clear even with the screen off.

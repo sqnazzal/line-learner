@@ -65,6 +65,7 @@ const DEFAULT_SETTINGS = {
   textSize: 'normal',      // normal | large | huge (bigger words for a phone on a stand)
   typeCues: 'show',        // Type mode: show (silent) | speak (headphones)
   shortcuts: true,         // single-key shortcuts in the player (Space, arrows, H, L, Enter); can be turned off
+  splitLines: false,       // Rehearse and Type: a line of several sentences one sentence at a time
 };
 
 function loadJSON(key, fallback) {
@@ -549,7 +550,7 @@ document.addEventListener('visibilitychange', () => {
 // Plays your own recording of a line if there is one, otherwise the computer voice for that character.
 async function sayLine(item, token, text = item.text) {
   const key = lineKey(item);
-  if (settings.useRecordings && recorded.has(key)) {
+  if (settings.useRecordings && text === item.text && recorded.has(key)) {
     const blob = await recordings.get(key).catch(() => null);
     if (blob) return playBlob(blob, token, speedOf(item.speaker));
   }
@@ -2263,10 +2264,25 @@ function myActions() {
     ${P.status === 'prompting' && quiet() ? '<button class="btn primary" data-action="choose">Try again</button>' : ''}
     ${P.status === 'listening' ? `<button class="btn primary" data-action="done-speaking">${icon('check')} Done</button>` : ''}
     ${P.status === 'self' ? '<button class="btn good" data-action="choose" data-choice="got">Got it</button><button class="btn bad" data-action="choose" data-choice="miss">Missed it</button>' : ''}
+    ${canSplit() ? `<button class="btn ghost" data-action="split-toggle" aria-pressed="${!!settings.splitLines}">${settings.splitLines ? 'Whole line at once' : 'One sentence at a time'}</button>` : ''}
   </div>`;
 }
 
+// Offered on your line in Rehearse and Type when it has more than one sentence.
+function canSplit() {
+  if (P.mode !== 'rehearse' && P.mode !== 'type') return false;
+  const item = current().lines[P.order[P.orderPos]];
+  return item?.type === 'line' && buildParts(item.text).length > 1;
+}
+
 function myLineBody(text) {
+  const part = P.part?.text === text ? P.part : null;
+  if (!part) return pieceBody(text);
+  // One sentence at a time: the ones done, the one you're on, and how many are left.
+  const { parts, k } = part, rest = parts.length - k - 1;
+  return `${parts.slice(0, k).map(p => `<span class="part-done">${fmt(p)}</span> `).join('')}<span class="part-now">${pieceBody(parts[k])}</span>${rest ? ` <span class="muted small part-more">(${rest} more ${rest === 1 ? 'sentence' : 'sentences'})</span>` : ''}`;
+}
+function pieceBody(text) {
   if (['prompting', 'answer', 'you'].includes(P.status)) return fmt(text);
   if (P.result) return diffHtml(text, P.result);
   return hintHtml(text, P.reveal);
@@ -2391,6 +2407,7 @@ function settingsHtml() {
     spoken && `<label><span>Reading speed</span>${rng('rate', 0.6, 1.5, 0.05)}</label>`,
     m === 'listen' && `<label><span>Your lines</span>${sel('myLines', [['gapThenSpeak', 'Pause for me, then read them'], ['gap', 'Pause for me only'], ['speak', 'Read them aloud'], ['skip', 'Skip them']])}</label>`,
     `<label><span>Hints when it's your line</span>${sel('hint', [['hidden', 'No words, just blanks'], ['first', 'First few words'], ['initials', 'First letter of each word'], ['full', 'Show the whole line']])}<small class="muted">A line counts as solid only when you get it without help (a hint showing half the line or more counts as help).</small></label>`,
+    (m === 'rehearse' || m === 'type') && `<label class="check">${chk('splitLines')}<span>Long lines one sentence at a time</span></label>`,
     m === 'type' && `<label><span>Cues</span>${sel('typeCues', [['show', 'Show them on screen (silent)'], ['speak', 'Read them aloud (headphones)']])}</label>`,
     m === 'rehearse' && `<label><span>Cue before your line</span>${sel('cueLength', [['full', 'Read the whole line'], ['last', 'Last sentence only']])}</label>`,
     m === 'listen' && `<label class="check">${chk('loop')}<span>Loop the scene</span></label>`,
@@ -2515,7 +2532,7 @@ async function run(from) {
   for (let p = from; p < P.order.length; p++) {
     if (token.cancelled) return;
     const item = s.lines[P.order[p]];
-    Object.assign(P, { orderPos: p, result: null, transcript: '', reveal: settings.hint, status: 'idle' });
+    Object.assign(P, { orderPos: p, result: null, transcript: '', reveal: settings.hint, status: 'idle', part: null });
     refreshPlayer();
     saveResume();
     if (!quiet()) aiPrefetch(s, P.order.slice(p, p + 4));
@@ -2573,7 +2590,7 @@ function waitChoice(token, ms = 0) {
 }
 
 // Feeds you the line: read aloud, or in quiet Type mode shown in full for a moment.
-const feedLine = (item, token) => (quiet() ? waitRead(gapMs(item.text) + 1500, token) : sayLine(item, token));
+const feedLine = (item, token, text = item.text) => (quiet() ? waitRead(gapMs(text) + 1500, token) : sayLine(item, token, text));
 
 async function listenMine(item, token) {
   if (settings.myLines === 'skip') return;
@@ -2640,7 +2657,7 @@ const IDLE_NOTE = "Holding for you: I didn't hear anything. If you were talking,
 async function rehearseLine(item, token) {
   const s = current(), key = lineKey(item);
   const wasShaky = isWorking(s, item);
-  let tries = 0, idle = 0, first = null;
+  let first = null;
   // The first attempt in a run is what counts toward "solid" (if no help was needed); best keeps your best ever.
   const note = score => {
     const st = s.stats[key] || { tries: 0, best: 0, last: 0 };
@@ -2657,8 +2674,26 @@ async function rehearseLine(item, token) {
     s.stats[key] = st;
     saveScripts();
   };
+  // A line of several sentences can go one sentence at a time (a Practice setting): each piece is checked on
+  // its own, and the line's score is the average of each piece's first try.
+  const parts = settings.splitLines ? buildParts(item.text) : [];
+  if (parts.length < 2) { P.part = null; return rehearseText(item, item.text, token, note, wasShaky); }
+  const firsts = [];
+  for (let k = 0; k < parts.length; k++) {
+    P.part = { text: item.text, parts, k };
+    let firstHere = null;
+    await rehearseText(item, parts[k], token, score => { firstHere ??= score; }, wasShaky, k < parts.length - 1);
+    if (token.cancelled) return;
+    firsts.push(firstHere ?? 0);
+  }
+  note(Math.round(firsts.reduce((a, b) => a + b, 0) / firsts.length));
+}
+
+// Tries for one line (or one piece of it): up to two goes, feeding you the words after a miss or "line".
+async function rehearseText(item, text, token, note, wasShaky, piece = false) {
+  let tries = 0, idle = 0;
   while (!token.cancelled) {
-    const r = await attempt(item.text, token);
+    const r = await attempt(text, token);
     if (token.cancelled) return;
     if (r.reason === 'error' && lostMic(r.error)) { carryOnWithoutMic(r.error); continue; }
     if (r.reason === 'error') return pauseRun(micError(r.error));
@@ -2667,7 +2702,7 @@ async function rehearseLine(item, token) {
       note(0);
       P.status = 'prompting';
       refreshPlayer();
-      await feedLine(item, token);
+      await feedLine(item, token, text);
       continue;
     }
     note(r.score);
@@ -2675,9 +2710,9 @@ async function rehearseLine(item, token) {
     if (r.score >= settings.passScore) {
       chime(true);
       P.status = 'good';
-      P.goodText = goodWord(wasShaky);
+      P.goodText = piece ? 'Next sentence' : goodWord(wasShaky);
       refreshPlayer();
-      await sleep(900, token);
+      await sleep(piece ? 600 : 900, token);
       return;
     }
     chime(false);
@@ -2687,7 +2722,7 @@ async function rehearseLine(item, token) {
     if (token.cancelled) return;
     P.status = 'prompting';
     refreshPlayer();
-    await feedLine(item, token);
+    await feedLine(item, token, text);
     if (tries >= 2) return;
   }
 }
@@ -2765,7 +2800,7 @@ function jump(delta) {
     P.orderPos = clamp(p, 0, P.order.length - 1);
     if (wasRunning) return run(P.orderPos);
   }
-  Object.assign(P, { result: null, transcript: '', status: 'idle', reveal: settings.hint });
+  Object.assign(P, { result: null, transcript: '', status: 'idle', reveal: settings.hint, part: null });
   refreshPlayer();
 }
 
@@ -3058,6 +3093,13 @@ const actions = {
     if (item?.type === 'line') preview(t => sayLine(item, t));
   },
   'done-speaking'() { P.finishListen?.('manual'); },
+  'split-toggle'() {
+    settings.splitLines = !settings.splitLines;
+    saveSettings();
+    const box = $('[data-setting="splitLines"]');
+    if (box) box.checked = settings.splitLines;
+    if (P.running) { stopRun(); run(P.orderPos); } else { P.part = null; refreshPlayer(); }
+  },
   choose(b) { P.choose?.(b.dataset.choice); },
   restart() {
     P.status = 'idle';

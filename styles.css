@@ -565,3 +565,7 @@ h1[tabindex="-1"]:focus, main:focus { outline: none; }
 .fix-btn { opacity: .7; }
 .fix-btn:hover, .fix-btn:focus-visible { opacity: 1; }
 .section-card .card-head h2 { margin: 0; }
+
+/* One sentence at a time: finished sentences fade back, the current one stands out */
+.part-done { color: var(--muted); }
+.part-more { font-family: var(--font-ui); white-space: nowrap; }
