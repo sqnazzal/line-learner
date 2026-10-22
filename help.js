@@ -299,7 +299,7 @@ VIEWS.share = renderShare;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-21', [
-    '<b>Fairer line checking:</b> words that sound the same now count however the microphone spells them (sight or site, knight or night, pairs or pears, and about 150 more), and so do words run together or split apart (nighttime or night time).',
+    '<b>Fairer line checking:</b> words that sound the same now count however the microphone spells them (sight or site, knight or night, pairs or pears, and about 150 more), and so do words run together or split apart (nighttime or night time). Numbers too: "50-50" counts for "fifty-fifty", "1985" for "nineteen eighty-five", and "21st", "90%" and "1,000" work.',
     '<b>Plans sync session by session:</b> when your devices sync, each rehearsal session is kept unless you deleted it, so a device with an older copy of your plan (or a tab left open on a computer) can no longer make sessions disappear.',
     '<b>Missed rehearsals stay put:</b> a plan session you didn\'t get to now stays on the plan (in plain view, not folded away) and on the home screen, until you do it, tick it done or delete it. Re-planning and making a new plan keep them too.',
     '<b>Director\'s mode:</b> whoever made a group can make members directors. Directors see the cast\'s progress on the group\'s scripts and set <b>at-home rehearsals</b> (a scene or the whole script, how to practice, a due date). The cast sees them on the home screen with a <b>Start</b> button that opens the right scene, and finishing the run marks it done. Your progress summary is shared only with the director, and you can stop sharing it on the Group screen.',

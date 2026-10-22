@@ -220,6 +220,22 @@ const fmt = s => esc(s).replace(/(\([^)]*\)|\[[^\]]*\])/g, '<em class="dir">$1</
 
 // ---------- Scoring ----------
 const NUMS = 'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty'.split(' ');
+const TENS = ',,twenty,thirty,forty,fifty,sixty,seventy,eighty,ninety'.split(',');
+// Numbers as they're said, since recognition writes "50-50" for "fifty-fifty". Years read the way people say
+// them ("1985" is "nineteen eighty five", "1905" is "nineteen oh five").
+function numWords(n) {
+  if (n <= 20) return NUMS[n];
+  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? ' ' + NUMS[n % 10] : '');
+  if (n < 1000) return `${NUMS[Math.floor(n / 100)]} hundred${n % 100 ? ' ' + numWords(n % 100) : ''}`;
+  if (n % 100 && ((n > 1100 && n < 2000) || (n > 2010 && n < 2100))) return `${numWords(Math.floor(n / 100))} ${n % 100 < 10 ? 'oh ' : ''}${numWords(n % 100)}`;
+  for (const [size, name] of [[1e9, 'billion'], [1e6, 'million'], [1e3, 'thousand']]) {
+    if (n >= size && n < size * 1000) return `${numWords(Math.floor(n / size))} ${name}${n % size ? ' ' + numWords(n % size) : ''}`;
+  }
+  return String(n);
+}
+// 1st, 2nd, 23rd... as words: the last word becomes "first", "second", "twentieth" and so on.
+const ORDINAL = { one: 'first', two: 'second', three: 'third', five: 'fifth', eight: 'eighth', nine: 'ninth', twelve: 'twelfth' };
+const ordinalWords = n => numWords(n).replace(/(\w+)$/, w => ORDINAL[w] || (w.endsWith('y') ? w.slice(0, -1) + 'ieth' : w + 'th'));
 // Words speech recognition commonly swaps; mapped to one spelling so they still count as correct.
 const SOUNDALIKE = {
   their: 'there', theyre: 'there', youre: 'your', too: 'to', two: 'to', hear: 'here', know: 'no',
@@ -263,9 +279,15 @@ function words(s) {
   return spokenText(s).toLowerCase()
     .replace(/['‘’`]/g, '')
     .replace(/(?:\p{L}\.){2,}/gu, m => m.replace(/\./g, '')) // initials: S.O.B. is one word, like "SOB"
+    .replace(/(\d),(?=\d{3}\b)/g, '$1') // 1,000
+    .replace(/%/g, ' percent')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .split(' ').filter(Boolean)
-    .map(w => (/^\d+$/.test(w) && +w <= 20 ? NUMS[+w] : w))
+    .flatMap(w => {
+      if (/^\d{1,12}$/.test(w)) return numWords(+w).split(' ');
+      const ord = w.match(/^(\d{1,12})(st|nd|rd|th)$/);
+      return ord ? ordinalWords(+ord[1]).split(' ') : [w];
+    })
     .flatMap(w => (RUN_TOGETHER[w] ? RUN_TOGETHER[w].split(' ') : [w]))
     .map(w => SOUNDALIKE[w] || (w.length > 3 && w.endsWith('s') && SOUNDALIKE[w.slice(0, -1)] ? SOUNDALIKE[w.slice(0, -1)] + 's' : w)); // pears and pairs too
 }
