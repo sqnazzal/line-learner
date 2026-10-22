@@ -112,7 +112,7 @@ function buildPlan(s, conf) {
   const runMin = conf.runMin || conf.min;
   const minFor = kind => (kind === 'run' ? runMin : kind === 'final' ? Math.max(conf.min, Math.round(runMin / 10) * 5) : conf.min);
   const made = times.map((at, k) => ({ id: uid().slice(-8), at, min: minFor(kinds[k]?.kind), ...kinds[k] }));
-  return { ...conf, lead: s.plan?.lead ?? 15, sessions: [...keep, ...made].sort((a, b) => a.at - b.at) };
+  return { ...conf, lead: s.plan?.lead ?? 15, made: Date.now(), sessions: [...keep, ...made].sort((a, b) => a.at - b.at) };
 }
 
 // ---------- Describing a session ----------
@@ -342,6 +342,39 @@ function planChanged(s) {
 }
 const findSession = (s, id) => s?.plan?.sessions.find(x => x.id === id);
 
+// Two devices' copies of a plan, merged session by session, so a device with an older copy can't make
+// sessions disappear. Same plan: every session is kept unless one side deleted it, and where both have one,
+// the copy changed last wins. A plan made again (Re-plan, or new dates) replaces the older one, keeping the
+// older copy's done ticks. `mineOlder` says whose settings (dates, days, times) to keep.
+window.mergePlan = (mine, theirs, mineOlder) => {
+  if (!mine || !theirs) return undefined; // one side has no plan: the newer copy of the script decides
+  const [old, cur] = mineOlder ? [mine, theirs] : [theirs, mine];
+  const later = (x, y) => ((x.edited || 0) !== (y.edited || 0) ? (x.edited || 0) > (y.edited || 0) : !!x.done && !y.done);
+  let sessions;
+  if ((old.made || 0) !== (cur.made || 0)) {
+    const [first, second] = (old.made || 0) > (cur.made || 0) ? [cur, old] : [old, cur];
+    const byId = new Map(second.sessions.map(x => [x.id, { ...x }]));
+    for (const x of first.sessions) {
+      if (!x.done) continue;
+      const y = byId.get(x.id);
+      if (!y) byId.set(x.id, x);
+      else if (!y.done) Object.assign(y, { done: x.done, edited: Math.max(x.edited || 0, y.edited || 0) });
+    }
+    sessions = [...byId.values()];
+    return { ...second, sessions: sessions.sort((a, b) => a.at - b.at) };
+  }
+  const gone = new Set([...(old.removed || []), ...(cur.removed || [])]);
+  const byId = new Map();
+  for (const x of [...cur.sessions, ...old.sessions]) {
+    if (gone.has(x.id)) continue;
+    const y = byId.get(x.id);
+    if (!y || later(x, y)) byId.set(x.id, x);
+  }
+  const out = { ...cur, sessions: [...byId.values()].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1)) };
+  if (gone.size) out.removed = [...gone].sort().slice(-300); // sorted, so both devices end up with the same copy
+  return out;
+};
+
 // Leaving a run (or the app) keeps the session's place with the plan, so your other devices show it too.
 window.planSaveProgress = s => {
   const r = resumeAt[s?.id];
@@ -352,6 +385,7 @@ window.planSaveProgress = s => {
   const [from, to] = sessionRange(s, x);
   if (r.line < from || r.line >= to) return;
   x.progress = { line: r.line, pos: r.pos, total: r.total, at: r.at };
+  x.edited = Date.now();
   s.updated = Date.now();
   saveScripts();
 };
@@ -365,7 +399,7 @@ window.planRunDone = s => {
     || s.plan.sessions.find(y => !y.done && sameDay(y.at, Date.now()));
   planUi.active = null;
   if (!x || x.done) return;
-  x.done = Date.now();
+  x.done = x.edited = Date.now();
   s.updated = Date.now();
   saveScripts();
   scheduleReminders();
@@ -406,11 +440,13 @@ Object.assign(actions, {
     const s = current(), x = findSession(s, b.dataset.id);
     if (!x) return;
     if (x.done) delete x.done; else x.done = Date.now();
+    x.edited = Date.now();
     planChanged(s);
   },
   'plan-del'(b) {
     const s = current();
     s.plan.sessions = s.plan.sessions.filter(x => x.id !== b.dataset.id);
+    s.plan.removed = [...(s.plan.removed || []), b.dataset.id].sort().slice(-300); // so a sync doesn't bring it back
     planChanged(s);
   },
   // Opens the Add a session form, set to the next day without a session, at the usual time.
@@ -438,7 +474,7 @@ Object.assign(actions, {
     const [kind, scene] = a.kind.split(':');
     const old = a.id && findSession(s, a.id);
     const x = old || { id: uid().slice(-8) };
-    Object.assign(x, { at: a.at, min: a.min, kind });
+    Object.assign(x, { at: a.at, min: a.min, kind, edited: Date.now() });
     if (kind === 'learn') x.scenes = [planScenes(s)[+scene]?.[2] ?? '']; else delete x.scenes;
     if (!old) s.plan.sessions.push(x);
     s.plan.sessions.sort((p, q) => p.at - q.at);
@@ -453,7 +489,7 @@ Object.assign(actions, {
     if (app.view !== 'script' || app.scriptId !== s.id) openScript(s.id);
     planUi.active = { sid: s.id, id: x.id };
     const resume = b.dataset.resume && sessionProgress(s, x);
-    if (!x.started) { x.started = Date.now(); s.updated = Date.now(); }
+    if (!x.started) { x.started = x.edited = Date.now(); s.updated = Date.now(); }
     if (!resume) delete x.progress; // Start over
     [s.rangeStart, s.rangeEnd] = sessionRange(s, x);
     saveScripts();

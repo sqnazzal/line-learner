@@ -3340,12 +3340,17 @@ function mergeRemote(remote) {
     const mine = scripts.find(s => s.id === r.id);
     if (!mine) { scripts.push({ ...r, voices: {} }); continue; }
     const stats = mergeStats(mine.stats, r.stats);
-    if ((r.updated || 0) > (mine.updated || 0)) {
+    const theirsNewer = (r.updated || 0) > (mine.updated || 0);
+    const plan = window.mergePlan?.(mine.plan, r.plan, theirsNewer); // session by session (plan.js)
+    const planBefore = JSON.stringify((theirsNewer ? r : mine).plan);
+    if (theirsNewer) {
       const voices = mine.voices || {};
       for (const k of Object.keys(mine)) delete mine[k];
       Object.assign(mine, r, { voices });
     }
     mine.stats = stats;
+    // Took sessions from the other copy: count it as a change, so the merged plan goes back out to it.
+    if (plan) { mine.plan = plan; if (JSON.stringify(plan) !== planBefore) mine.updated = Date.now(); }
   }
   scripts = scripts.filter(s => !(deleted[s.id] && deleted[s.id] >= (s.updated || 0)));
 }

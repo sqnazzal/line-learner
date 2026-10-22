@@ -299,6 +299,7 @@ VIEWS.share = renderShare;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-21', [
+    '<b>Plans sync session by session:</b> when your devices sync, each rehearsal session is kept unless you deleted it, so a device with an older copy of your plan (or a tab left open on a computer) can no longer make sessions disappear.',
     '<b>Missed rehearsals stay put:</b> a plan session you didn\'t get to now stays on the plan (in plain view, not folded away) and on the home screen, until you do it, tick it done or delete it. Re-planning and making a new plan keep them too.',
     '<b>Director\'s mode:</b> whoever made a group can make members directors. Directors see the cast\'s progress on the group\'s scripts and set <b>at-home rehearsals</b> (a scene or the whole script, how to practice, a due date). The cast sees them on the home screen with a <b>Start</b> button that opens the right scene, and finishing the run marks it done. Your progress summary is shared only with the director, and you can stop sharing it on the Group screen.',
     '<b>Long lines, one sentence at a time:</b> in Rehearse or Type, a line with several sentences has a <b>One sentence at a time</b> button. Each sentence is checked on its own (saying "line" gives you just that sentence), then the next one appears. Tap <b>Whole line at once</b> to switch back; it\'s also in Practice settings.',
