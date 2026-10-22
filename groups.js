@@ -346,7 +346,7 @@ function showGroupButton() {
 
 function onUserChanged() {
   showGroupButton();
-  grp.unsubGroups?.(); grp.unsubItems?.();
+  grp.unsubGroups?.(); grp.unsubItems?.(); window.directorReset?.();
   Object.assign(grp, { groups: [], items: [], unsubGroups: null, unsubItems: null, loaded: false });
   if (fb.user) {
     saveJSON(LS_GROUP_USED, true);
@@ -356,6 +356,7 @@ function onUserChanged() {
       grp.loaded = true;
       if (!groups.some(g => g.id === grp.current)) selectGroup(groups[0]?.id || null);
       window.checkSpotifyAccess?.();
+      window.directorGroupsChanged?.(); // assignments and progress for directors (director.js)
       refreshGroupUi();
     });
     const pending = sessionStorage.getItem(SS_JOIN);
@@ -470,9 +471,11 @@ function renderGroup() {
     ${switcher}
     <div class="card stack-sm">
       <div class="row between wrap"><b class="group-name">${esc(g.name)}</b><span class="muted small">${members.length} ${members.length === 1 ? 'member' : 'members'}: ${esc(members.join(', '))}</span></div>
+      ${window.directorsManageHtml?.(g) || ''}
       <p class="small">Invite people with code <b class="code">${esc(g.inviteCode)}</b> or this link:</p>
       <div class="row wrap"><input id="invite-link" type="text" readonly value="${esc(inviteLink(g.inviteCode))}" aria-label="Invite link" class="search"><button class="btn" data-action="group-copy">Copy link</button></div>
     </div>
+    ${window.directorSectionHtml?.(g) || ''}
     <h2>Shared scripts and songs</h2>
     ${list}
     ${grp.items.length ? `<p class="muted small">${LICENSE_NOTE}</p>` : ''}
@@ -597,6 +600,7 @@ Object.assign(actions, {
   async 'group-leave'() {
     const g = currentGroup();
     if (!g || !confirm(`Leave "${g.name}"? Scripts you added to your own list stay there.`)) return;
+    await fb.deleteProgress?.(g.id)?.catch(() => {}); // what the director could see goes too (director.js)
     try { await fb.leaveGroup(g.id); toast(`You left ${g.name}.`); } catch (e) { groupError(e); }
   },
   'group-share-panel'() {

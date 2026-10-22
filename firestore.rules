@@ -12,6 +12,10 @@ service cloud.firestore {
       return signedIn() && notBlocked() && request.auth.uid in get(/databases/$(database)/documents/groups/$(gid)).data.members;
     }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    // A group's directors (chosen by its creator): they see the cast's progress and set at-home rehearsals.
+    function directorOf(gid) {
+      return memberOf(gid) && request.auth.uid in get(/databases/$(database)/documents/groups/$(gid)).data.get('directors', []);
+    }
 
     // Each person's own synced scripts: only they can read or write them. The admin can see and delete
     // them (to remove someone's data).
@@ -88,8 +92,10 @@ service cloud.firestore {
           && request.resource.data.members.toSet().hasAll(resource.data.members.toSet())
           && request.resource.data.members.toSet().difference(resource.data.members.toSet()).hasOnly([request.auth.uid])
           && request.resource.data.memberNames.diff(resource.data.memberNames).affectedKeys().hasOnly([request.auth.uid]))
-        // Renaming: the group's creator only.
-        || (resource.data.ownerUid == request.auth.uid && changed().hasOnly(['name']))
+        // Renaming, and choosing directors (from the members): the group's creator only.
+        || (resource.data.ownerUid == request.auth.uid && changed().hasOnly(['name', 'directors'])
+          && request.resource.data.get('directors', []) is list
+          && resource.data.members.toSet().hasAll(request.resource.data.get('directors', []).toSet()))
       ));
       // Only the admin can delete a group, so no one else can make shared scripts disappear that way.
       allow delete: if isAdmin();
@@ -121,6 +127,36 @@ service cloud.firestore {
           && (request.resource.data.kind != 'song' || request.resource.data.raw == resource.data.raw
             || request.resource.data.get('permission', false) == 'public-domain'));
         allow delete: if isAdmin();
+      }
+
+      // Each member's practice summary for this group's scripts. Only they write it; only they and the
+      // group's directors can read it. Leaving the group (or the admin) deletes it.
+      match /progress/{uid} {
+        allow read: if (signedIn() && request.auth.uid == uid) || directorOf(gid) || isAdmin();
+        allow create, update: if memberOf(gid) && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'updated', 'optOut', 'items', 'done'])
+          && request.resource.data.uid == uid
+          && request.resource.data.name is string && request.resource.data.name.size() <= 100
+          && (!('items' in request.resource.data) || request.resource.data.items is map)
+          && (!('done' in request.resource.data) || request.resource.data.done is map)
+          && (!('optOut' in request.resource.data) || request.resource.data.optOut is bool);
+        allow delete: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      }
+
+      // At-home rehearsals: directors set them, the whole group sees them.
+      match /assignments/{aid} {
+        allow read: if memberOf(gid) || isAdmin();
+        allow create, update: if directorOf(gid)
+          && request.resource.data.keys().hasOnly(['itemId', 'itemTitle', 'scene', 'mode', 'due', 'note', 'for', 'by', 'byName', 'created', 'updated'])
+          && request.resource.data.mode in ['rehearse', 'listen', 'drill', 'type']
+          && request.resource.data.itemId is string && request.resource.data.itemId.size() <= 60
+          && request.resource.data.itemTitle is string && request.resource.data.itemTitle.size() <= 300
+          && request.resource.data.scene is string && request.resource.data.scene.size() <= 300
+          && request.resource.data.due is string && request.resource.data.due.size() <= 10
+          && request.resource.data.note is string && request.resource.data.note.size() <= 500
+          && request.resource.data['for'] is list && request.resource.data['for'].size() <= 300
+          && request.resource.data.byName is string && request.resource.data.byName.size() <= 100;
+        allow delete: if directorOf(gid) || isAdmin();
       }
     }
   }

@@ -77,6 +77,9 @@ Object.assign(fb, {
   async adminDeleteGroup(g) {
     const { F, db } = fb.api;
     for (const it of await fb.adminItems(g.id)) await F.deleteDoc(F.doc(db, 'groups', g.id, 'items', it.id));
+    for (const sub of ['assignments', 'progress']) { // director's mode (director.js)
+      for (const d of (await F.getDocs(F.collection(db, 'groups', g.id, sub))).docs) await F.deleteDoc(d.ref);
+    }
     if (g.inviteCode) await F.deleteDoc(F.doc(db, 'invites', g.inviteCode)).catch(() => {});
     await F.deleteDoc(F.doc(db, 'groups', g.id));
   },
@@ -336,6 +339,7 @@ Object.assign(actions, {
     const uid = b.dataset.uid, gs = adm.data.groups.filter(g => (g.members || []).includes(uid));
     adminDo(`Delete ${nameOf(uid)}'s data? This removes them from ${gs.length} ${gs.length === 1 ? 'group' : 'groups'} and deletes their synced scripts and profile. Copies on their own devices stay. If they sign in again, a new profile starts. This can't be undone.`,
       async () => {
+        await Promise.all(gs.map(g => fb.deleteProgress(g.id, uid).catch(() => {})));
         await Promise.all(gs.map(g => fb.adminRemoveMember(g.id, uid)));
         const n = await fb.adminDeleteSynced(uid);
         await fb.adminDeleteProfile(uid);

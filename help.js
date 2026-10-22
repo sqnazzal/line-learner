@@ -117,7 +117,8 @@ const SYNC_HELP = topic('Sync, groups and backups', `<h2>Syncing your devices</h
   <h2>Groups</h2>
   <ul>
     <li><b>Sign in</b> (top of the screen) to create a group or join one from an invite, then <b>Share to group</b> from a script so your cast can add it. Only share what your production's license (or the publisher) allows: sharing asks for the show's last performance date and a tick confirming permission (can't confirm? keep it private). Whoever shares is responsible; Line Learner and Shannon don't check licenses. After that date, or once the sharer taps <b>Mark inactive</b>, no one new can add it, and people who have it see a note. <b>Songs</b> can only be shared when their lyrics are public domain (the sharer confirms it); newer songs stay private to you.</li>
-    <li><b>Private:</b> other people can't see your synced scripts; people in your groups only see what you choose to share. The app's admin (Shannon) can remove accounts and their synced data if needed.</li>
+    <li><b>Director's mode:</b> the person who made a group can make members directors (Group &gt; <b>Directors</b>). Directors get a <b>Director</b> section: <b>At-home rehearsals</b> (pick a script, a scene or the whole thing, how to practice, a due date, and everyone or just some people) and <b>Cast progress</b> (each person's character, lines solid, last practiced, plan sessions). The cast sees assignments on the home screen with <b>Start</b>, which opens the right scene; finishing the run marks it done. In a group with a director, your progress on its scripts is shared with the director; tap <b>Stop sharing my progress</b> on the Group screen to turn that off.</li>
+    <li><b>Private:</b> other people can't see your synced scripts; people in your groups only see what you choose to share (and, in a group with a director, the director sees your progress summary unless you stop sharing it). The app's admin (Shannon) can remove accounts and their synced data if needed.</li>
     <li><b>Sign-in window doesn't open?</b> Allow pop-ups for this site. On iPhone: <b>Settings</b> &gt; <b>Apps</b> &gt; <b>Safari</b> &gt; turn off <b>Block Pop-ups</b>, then try again.</li></ul>
   <h2>Backups</h2>
   <ul>
@@ -152,7 +153,7 @@ const PLAN_HELP = topic('Rehearsal plan and reminders', `<ul>
 
 // Kept in step with what the app actually stores and sends (and the access firestore.rules gives); update it
 // when either changes.
-const PRIVACY_DATE = 'October 19, 2026';
+const PRIVACY_DATE = 'October 21, 2026';
 const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.privacyOpen ? ' open' : ''}><summary>Privacy: what's stored and where</summary><div class="help-body">
   <p class="muted small">Last updated ${PRIVACY_DATE}.</p>
   <p>Line Learner is a free app Shannon made for friends, family and fellow actors. It has no ads and no analytics or advertising trackers, and nothing is ever sold. The services it uses (below) may keep their own technical logs, such as your IP address, under their own policies.</p>
@@ -168,6 +169,7 @@ const privacyHtml = () => `<details class="card help-topic" id="privacy"${help.p
     <li>Your name, email and when you last used the app, so Shannon can see who's using it, plus daily counts of how you use it (app opens, practice runs by mode, minutes practicing, and times you share the app; never what you practiced), for Shannon's usage reports</li>
     <li>Your synced scripts, songs, categories and progress, and your recordings if you back them up. Other people can't see them. Shannon, as the app's admin, has access to them and to your account details, and uses it only to delete data you ask to have removed or to fix a problem you report</li>
     <li>The groups you're in, and anything you <b>Share to group</b>, which everyone in that group can see</li>
+    <li>In a group with a <b>director</b>: a summary of your practice on that group's scripts (your character, how many of your lines are solid or being worked on, when you last practiced, rehearsal plan sessions done) and the at-home rehearsals you mark done, which only you and the group's directors can see. Stop sharing the summary any time on the Group screen; leaving the group deletes it</li>
     <li>If you turn on <b>rehearsal reminders</b>: a push address for each device you turn them on for (made by Apple, Google, Mozilla or Microsoft, whose push service delivers the notification), and your next rehearsals (time, script title and what you're working on) so Shannon's small server on Cloudflare can send each reminder. Turning reminders off on every device removes them</li>
   </ul>
   <p><b>Sent to other services, only when you use a feature that needs them:</b></p>
@@ -296,6 +298,7 @@ VIEWS.share = renderShare;
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
   ['2026-10-21', [
+    '<b>Director\'s mode:</b> whoever made a group can make members directors. Directors see the cast\'s progress on the group\'s scripts and set <b>at-home rehearsals</b> (a scene or the whole script, how to practice, a due date). The cast sees them on the home screen with a <b>Start</b> button that opens the right scene, and finishing the run marks it done. Your progress summary is shared only with the director, and you can stop sharing it on the Group screen.',
     '<b>Long lines, one sentence at a time:</b> in Rehearse or Type, a line with several sentences has a <b>One sentence at a time</b> button. Each sentence is checked on its own (saying "line" gives you just that sentence), then the next one appears. Tap <b>Whole line at once</b> to switch back; it\'s also in Practice settings.',
     '<b>Fix a line while you practice:</b> spotted a typo, or a line given to the wrong character? Tap the pencil on the line (or on the cue above it) in Listen, Rehearse, Drill, Type or Build up. It pauses, you fix the words or who says it, and you carry on from the same spot with your progress kept. In Sing, <b>Fix lyrics</b> opens the song.',
     '<b>"Line" answers right away:</b> say "line" and you hear it at once, instead of after a few seconds. It works in Listen too, when it\'s listening for your lines.',

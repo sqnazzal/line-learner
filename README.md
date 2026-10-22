@@ -129,7 +129,8 @@ Sign in, then tap **Group**.
 - Only the person who shared something can update or unshare it. Groups can't be deleted, and members can only remove themselves.
 - **Permission to share is the sharer's responsibility.** Sharing asks for the show's last performance date and a tick confirming the production's license (or the publisher) allows digital copies for the cast; without both it stays private. Line Learner and Shannon don't check licenses. After that date the item shows **License ended**, or the sharer can **Mark inactive**: either way no one new can add it, and people who have a copy see a note.
 - **Songs can only be shared when their lyrics are public domain** (for example, published in the U.S. before 1931, or a traditional song): sharing a song asks the sharer to confirm that instead of a performance date, and the security rules require it. Songs shared before this rule show **Not public domain** and can't be added until the sharer confirms it with **Update**. Lyrics found online stay private to the person who added them.
-- Each person's progress, recordings, voices and personal scripts stay private.
+- **Director's mode:** the group's creator ticks members under **Directors** on the Group screen. Directors get **At-home rehearsals** (script, scene or whole script, Rehearse / Listen / Drill / Type, due date, everyone or chosen people, a note) and **Cast progress** (per shared script: character, lines solid and working on, last practiced, plan sessions done, plus who finished each assignment). The cast sees assignments on the home screen and the Group screen with **Start** (opens the scene) and **Mark done**; finishing a run started from one marks it done. Data: `groups/{gid}/assignments` (directors write, members read) and `groups/{gid}/progress/{uid}` (written by each member's app a few seconds after practice, only for groups with a director; readable by that member and the directors; **Stop sharing my progress** sets `optOut`; leaving the group deletes it). Code: `director.js`.
+- Each person's progress, recordings, voices and personal scripts stay private, apart from the progress summary in a group with a director (above).
 
 ## Accessibility
 
@@ -174,6 +175,7 @@ The app is a static site on GitHub Pages (this repository), with these outside s
 | `songs.js` | Songs: lyrics, Spotify, Sing along |
 | `groups.js` | Google sign-in, groups, sharing, Google sync |
 | `plan.js` | Rehearsal plans and reminders |
+| `director.js` | Director's mode: cast progress and at-home rehearsals for groups |
 | `sw.js`, `manifest.webmanifest` | The service worker (only shows reminders, caches nothing) and the app manifest |
 | `qr-app.svg` | QR code of the app's link, for the Share page |
 | `admin.js` | The admin screen and Reports (Shannon only), and the daily use counts |

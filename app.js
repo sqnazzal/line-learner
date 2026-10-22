@@ -1314,6 +1314,7 @@ function renderLibrary() {
       </div>
       ${accountLineHtml()}
     </div>`}
+    ${window.assignmentCardHtml?.() || ''}
     ${typeof nextRehearsalHtml === 'function' ? nextRehearsalHtml() : ''}
     ${continueHtml()}
     ${supportNote()}
@@ -2458,6 +2459,7 @@ function finishRun() {
   saveResume();
   keepAwake(false);
   window.planRunDone?.(current()); // ticks off a rehearsal plan session (plan.js)
+  window.assignmentRunDone?.(P.assignment); // ticks off a director's at-home rehearsal (director.js)
   refreshPlayer();
 }
 
@@ -2469,7 +2471,7 @@ function pauseRun(note = '') {
 }
 
 function leave() {
-  if (app.view === 'player') { saveResume(); window.planSaveProgress?.(current()); window.logPractice?.(P); }
+  if (app.view === 'player') { saveResume(); window.planSaveProgress?.(current()); window.logPractice?.(P); window.scheduleProgress?.(); }
   if (app.view === 'sing') window.logPractice?.(window.singRun);
   stopRun();
   stopRecording();
