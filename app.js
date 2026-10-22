@@ -223,7 +223,32 @@ const NUMS = 'zero one two three four five six seven eight nine ten eleven twelv
 // Words speech recognition commonly swaps; mapped to one spelling so they still count as correct.
 const SOUNDALIKE = {
   their: 'there', theyre: 'there', youre: 'your', too: 'to', two: 'to', hear: 'here', know: 'no',
-  write: 'right', okay: 'ok', oh: 'o', ay: 'i', aye: 'i', eye: 'i', whose: 'whos', yeah: 'yes',
+  write: 'right', rite: 'right', wright: 'right', okay: 'ok', oh: 'o', owe: 'o', ay: 'i', aye: 'i', eye: 'i', whose: 'whos', yeah: 'yes',
+  // Words that sound alike (homophones): recognition picks one spelling, the script may use the other.
+  site: 'sight', cite: 'sight', knight: 'night', nite: 'night', knew: 'new', gnu: 'new', knot: 'not', weight: 'wait',
+  weigh: 'way', whey: 'way', would: 'wood', weak: 'week', wear: 'where', ware: 'where', witch: 'which', hole: 'whole',
+  hour: 'our', flour: 'flower', reign: 'rain', rein: 'rain', son: 'sun', meat: 'meet', mete: 'meet', piece: 'peace',
+  pear: 'pair', pare: 'pair', sea: 'see', bee: 'be', buy: 'by', bye: 'by', four: 'for', fore: 'for', won: 'one',
+  eight: 'ate', maid: 'made', male: 'mail', tale: 'tail', sale: 'sail', rode: 'road', rowed: 'road', deer: 'dear',
+  heel: 'heal', mourning: 'morning', through: 'threw', thru: 'threw', blue: 'blew', aloud: 'allowed',
+  bear: 'bare', brake: 'break', cell: 'sell', scent: 'sent', cent: 'sent', dye: 'die', fare: 'fair', flu: 'flew',
+  flue: 'flew', grate: 'great', hare: 'hair', high: 'hi', hire: 'higher', inn: 'in', colonel: 'kernel', knead: 'need',
+  kneed: 'need', nose: 'nos', lone: 'loan', plane: 'plain', prey: 'pray', rose: 'rows', seen: 'scene', sew: 'so',
+  sow: 'so', stare: 'stair', steel: 'steal', tee: 'tea', tow: 'toe', vein: 'vain', vane: 'vain', waste: 'waist',
+  whether: 'weather', whale: 'wail', whine: 'wine', yoke: 'yolk', aisle: 'isle', wheel: 'well', groan: 'grown',
+  mist: 'missed', past: 'passed', guest: 'guessed', banned: 'band', choose: 'chews', claws: 'clause', daze: 'days',
+  fined: 'find', mined: 'mind', sighed: 'side', tied: 'tide', weighed: 'wade', lesson: 'lessen', cellar: 'seller',
+  counsel: 'council', bored: 'board', bald: 'bawled', berry: 'bury', boarder: 'border', bough: 'bow', bridal: 'bridle',
+  ceiling: 'sealing', cereal: 'serial', chord: 'cord', course: 'coarse', creak: 'creek', dew: 'due', doe: 'dough',
+  dual: 'duel', ewe: 'you', u: 'you', faint: 'feint', feat: 'feet', fir: 'fur', flea: 'flee', gilt: 'guilt',
+  hall: 'haul', hay: 'hey', heard: 'herd', him: 'hymn', hoarse: 'horse', idle: 'idol', knit: 'nit', knock: 'nock',
+  lain: 'lane', leak: 'leek', mane: 'main', maze: 'maize', moose: 'mousse', naval: 'navel', none: 'nun', oar: 'or',
+  ore: 'or', pail: 'pale', pane: 'pain', patience: 'patients', pause: 'paws', peak: 'peek', pique: 'peek',
+  poor: 'pour', pore: 'pour', principle: 'principal', profit: 'prophet', quarts: 'quartz', rap: 'wrap', real: 'reel',
+  ring: 'wring', role: 'roll', root: 'route', rough: 'ruff', rye: 'wry', sole: 'soul', some: 'sum', stake: 'steak',
+  stationary: 'stationery', suite: 'sweet', tacks: 'tax', taught: 'taut',
+  throne: 'thrown', toad: 'towed', vial: 'vile', war: 'wore', warn: 'worn', wee: 'we',
+  wholly: 'holy', holey: 'holy', ewes: 'use', yews: 'use', yore: 'your',
 };
 // Run-together ways of saying two words; spelled out so "wanna" passes for "want to" (and the other way round).
 const RUN_TOGETHER = {
@@ -242,14 +267,14 @@ function words(s) {
     .split(' ').filter(Boolean)
     .map(w => (/^\d+$/.test(w) && +w <= 20 ? NUMS[+w] : w))
     .flatMap(w => (RUN_TOGETHER[w] ? RUN_TOGETHER[w].split(' ') : [w]))
-    .map(w => SOUNDALIKE[w] || w);
+    .map(w => SOUNDALIKE[w] || (w.length > 3 && w.endsWith('s') && SOUNDALIKE[w.slice(0, -1)] ? SOUNDALIKE[w.slice(0, -1)] + 's' : w)); // pears and pairs too
 }
 
 // A rough "how it sounds" spelling, so Dotty and Dottie, Jon and John, or till and 'til count as the same word.
 function soundKey(w) {
   return w
     .replace(/ph/g, 'f').replace(/ck|q/g, 'k').replace(/c(?=[eiy])/g, 's').replace(/c/g, 'k')
-    .replace(/^wr/, 'r').replace(/^kn/, 'n').replace(/(?!^)h(?![aeiou])/g, '')
+    .replace(/^wr/, 'r').replace(/^kn/, 'n').replace(/ight/g, 'ite').replace(/igh/g, 'i').replace(/(?!^)h(?![aeiou])/g, '') // sight and site, light and lite
     .replace(/(ie|ey|ee|y)(s?)$/, 'i$2')
     .replace(/(.)\1+/g, '$1');
 }
@@ -271,12 +296,17 @@ function near(a, b) {
 }
 
 // Recognition sometimes splits an old or unusual word ("wherefore" heard as "where for") or spells out
-// initials ("S O B"); glue those back, up to three pieces.
-function joinSplitWords(said, expected) {
-  const out = [];
+// initials ("S O B"); glue those back, up to three pieces. It also runs two words together that the script
+// keeps apart ("nighttime" for "night time"); split those back.
+function joinSplitWords(said, script) {
+  const expected = new Set(script), out = [];
+  const pairs = new Map();
+  for (let i = 0; i + 1 < script.length; i++) pairs.set(script[i] + script[i + 1], [script[i], script[i + 1]]);
   for (let j = 0; j < said.length; j++) {
     const k = expected.has(said[j]) ? 0 : [3, 2].find(n => j + n <= said.length && [...expected].some(w => near(w, said.slice(j, j + n).join(''))));
-    if (k) { out.push(said.slice(j, j + k).join('')); j += k - 1; }
+    if (k) { out.push(said.slice(j, j + k).join('')); j += k - 1; continue; }
+    const pair = !expected.has(said[j]) && (pairs.get(said[j]) || [...pairs].find(([w]) => near(w, said[j]))?.[1]);
+    if (pair) out.push(...pair);
     else out.push(said[j]);
   }
   return out;
@@ -284,7 +314,7 @@ function joinSplitWords(said, expected) {
 
 // Aligns what was said against the script (longest common subsequence) and marks each scripted word.
 function compare(expected, said) {
-  const a = words(expected), b = joinSplitWords(words(said), new Set(a));
+  const a = words(expected), b = joinSplitWords(words(said), a);
   const n = a.length, m = b.length;
   const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
   for (let i = n - 1; i >= 0; i--) {
