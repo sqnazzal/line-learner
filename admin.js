@@ -426,7 +426,7 @@ function reportData() {
   const n = Number(rpt.days), t = new Date();
   const days = [...Array(n)].map((_, i) => isoDay(new Date(t.getFullYear(), t.getMonth(), t.getDate() - (n - 1 - i))));
   const byDay = new Map(days.map(d => [d, { day: d, who: new Set(), open: 0, runs: 0, min: 0, est: 0, billed: 0 }]));
-  const people = new Map(), modes = {}, kinds = {}, items = {};
+  const people = new Map(), modes = {}, kinds = {}, items = {}, groups = {};
   let shares = 0;
   const person = (id, p = {}) => {
     if (!people.has(id)) people.set(id, { id, name: p.name || nameOf(id), email: p.email || '', days: 0, open: 0, runs: 0, min: 0, est: 0, last: '' });
@@ -446,15 +446,20 @@ function reportData() {
     }
   }
   const m = rpt.moneyFor === n ? rpt.money || {} : {};
+  // Day-by-day detail (the spend table) only counts from when it was added. Until it covers the whole range,
+  // the totals come from each person's whole-month totals instead, and the daily chart shows what it has.
+  const firstDay = m.days?.length ? m.days.reduce((d, r) => (r.day < d ? r.day : d), '9999') : '';
+  const daily = !!firstDay && firstDay <= days[0];
   if (m.days) {
     for (const r of m.days) {
       const row = byDay.get(r.day);
       if (!row) continue;
       row.est += r.usd;
       kinds[r.kind] = (kinds[r.kind] || 0) + r.usd;
-      person(r.uid).est += r.usd;
+      if (daily) person(r.uid).est += r.usd;
     }
-  } else if (m.months) {
+  }
+  if (!daily && m.months) {
     // Only monthly totals: the whole of each month that overlaps the range.
     for (const r of m.months) if (r.month >= days[0].slice(0, 7)) person(r.uid).est += r.usd;
   }
@@ -463,12 +468,13 @@ function reportData() {
     if (!row) continue;
     row.billed += r.usd;
     items[r.item || 'Other'] = (items[r.item || 'Other'] || 0) + r.usd;
+    groups[billItemName(r.item)] = (groups[billItemName(r.item)] || 0) + r.usd;
   }
   const list = [...people.values()];
   const sum = k => list.reduce((s, u) => s + u[k], 0);
   const since = new Date(`${days[0]}T00:00`).getTime();
   return {
-    rows: [...byDay.values()], people: list.sort((a, b) => b.runs - a.runs || b.days - a.days || b.est - a.est), modes, kinds, items, m,
+    rows: [...byDay.values()], people: list.sort((a, b) => b.runs - a.runs || b.days - a.days || b.est - a.est), modes, kinds, items, groups, m, daily, firstDay,
     total: {
       people: all.length, active: list.filter(u => u.days).length,
       newcomers: adm.accounts ? adm.accounts.filter(a => a.created >= since).length : null,
@@ -502,6 +508,13 @@ function barsHtml(title, rows, val, fmt) {
   </figure>`;
 }
 
+// OpenAI's line items ("gpt-4o-mini-tts-2025-12-15 audio, output") in plain words: what the app uses each model for.
+function billItemName(item = '') {
+  if (/tts/i.test(item)) return 'AI voices';
+  if (item.startsWith(VISION_MODEL)) return 'Reading pages from photos';
+  return item ? `Other OpenAI use (${item.split(/[ ,]/)[0]})` : 'Other OpenAI use';
+}
+
 function shareRowsHtml(obj, names, fmt) {
   const list = Object.entries(obj).sort((a, b) => b[1] - a[1]), total = list.reduce((s, [, v]) => s + v, 0);
   if (!list.length) return '<p class="muted small">Nothing yet in this range.</p>';
@@ -519,6 +532,8 @@ function renderReport() {
   const tile = (label, value, note = '') => `<div class="card report-tile"><span class="muted small">${label}</span><b>${value}</b>${note ? `<span class="muted small">${note}</span>` : ''}</div>`;
   const notes = [];
   if (!moneyWait && m.error) notes.push(`Couldn't get spending from the voices server (${esc(m.error)}).`);
+  if (!moneyWait && !m.error && m.days && !r.daily) notes.push(`Day-by-day detail ${r.firstDay ? `started ${esc(dayName(r.firstDay))}` : 'has just been turned on'}, so until it covers this whole range, the shared voices total is each person's whole-month totals.`);
+  if (!moneyWait && t.billed != null && t.billed > t.est + 0.5) notes.push("OpenAI billed more than the shared voices estimate. The bill also includes anything else on that OpenAI account, such as the AI voices made with your own key on your devices (the estimate only counts the shared voices server), and the estimate is rough.");
   if (!moneyWait && !m.error && !m.days) notes.push('Spending shows whole-month totals per person. For spending by day and by kind, add the spend table to the voices server (server/README.md, step 9).');
   if (!moneyWait && !m.error && m.openai?.error === 'not set up') notes.push("To see what OpenAI actually billed, not only the app's estimate, add an OpenAI Admin key to the voices server (server/README.md, step 9).");
   else if (!moneyWait && m.openai?.error) notes.push(`OpenAI's bill couldn't be read (${esc(m.openai.error)}). Check the OPENAI_ADMIN_KEY secret.`);
@@ -547,15 +562,17 @@ function renderReport() {
     ${shareRowsHtml(r.modes, PRACTICE_KINDS, v => `${v} ${v === 1 ? 'run' : 'runs'}`)}
     <h2>Money spent</h2>
     ${moneyWait ? '<p class="muted">Loading spending…</p>' : `<div class="report-tiles">
-      ${tile('Shared voices', usd(t.est), m.days ? "the app's estimate" : "the app's estimate, whole months")}
+      ${tile('Shared voices', usd(t.est), r.daily ? "the app's estimate" : "the app's estimate, whole months")}
       ${t.billed != null ? tile('OpenAI billed', usd(t.billed), 'from OpenAI') : ''}
     </div>
     <div class="report-charts">
-      ${m.days ? barsHtml('Shared voices (estimate)', b, x => x.est, usd) : ''}
+      ${r.firstDay ? barsHtml(r.daily ? 'Shared voices (estimate)' : `Shared voices (estimate, from ${dayName(r.firstDay)})`, b, x => x.est, usd) : ''}
       ${t.billed != null ? barsHtml('OpenAI billed', b, x => x.billed, usd) : ''}
     </div>
-    ${m.days ? `<h3>Spending by kind</h3>${shareRowsHtml(r.kinds, SPEND_KINDS, usd)}` : ''}
-    ${t.billed != null ? `<h3>OpenAI bill by item</h3>${shareRowsHtml(r.items, {}, usd)}` : ''}`}
+    ${r.firstDay ? `<h3>Shared voices by kind${r.daily ? '' : ` <span class="muted small">(from ${esc(dayName(r.firstDay))})</span>`}</h3>${shareRowsHtml(r.kinds, SPEND_KINDS, usd)}` : ''}
+    ${t.billed != null ? `<h3>OpenAI bill by what it paid for</h3>${shareRowsHtml(r.groups, {}, usd)}
+      <details><summary class="small">OpenAI's own line items</summary>${shareRowsHtml(r.items, {}, usd)}
+        <p class="muted small">"Audio, output" is the voice audio made; "text, input" is the words sent to be read. Page reading is billed as input (the photos and instructions) and output (the text read back); "cache" lines are discounted repeats.</p></details>` : ''}`}
     ${notes.map(n => `<p class="note small">${n}</p>`).join('')}
     <h2>By person</h2>
     ${peopleRows ? `<div class="table-scroll" tabindex="0" role="region" aria-label="Use and spending by person"><table class="report-table">
