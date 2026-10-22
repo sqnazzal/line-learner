@@ -201,8 +201,18 @@ function parseMonologue(raw) {
   }).filter(x => x.type !== 'line' || spokenText(x.text));
 }
 
+// Titles and initials end with a full stop without ending the sentence ("Mr. Whittington", "J. R. Ewing",
+// "5 a.m."), so a piece ending in one joins the next.
+const NOT_AN_END = /(?:^|[\s(“"‘'.])(?:mr|mrs|ms|mx|messrs|dr|st|jr|sr|prof|rev|fr|capt|col|gen|lt|sgt|cpl|maj|cmdr|gov|sen|rep|pres|supt|mt|ft|vs|\p{L})\.$/iu;
 function sentences(text) {
-  return (text.match(/[^.!?;]+(?:[.!?;]+["'’”)]*|$)/g) || []).map(p => p.trim()).filter(Boolean);
+  const out = [];
+  for (const p of text.match(/[^.!?;]+(?:[.!?;]+["'’”)]*|$)/g) || []) {
+    const piece = p.trim();
+    if (!piece) continue;
+    if (out.length && NOT_AN_END.test(out[out.length - 1])) out[out.length - 1] += (/^\s/.test(p) ? ' ' : '') + piece;
+    else out.push(piece);
+  }
+  return out;
 }
 
 // Splits a speech into bite-sized pieces for Build-up mode, folding tiny fragments into neighbours.
