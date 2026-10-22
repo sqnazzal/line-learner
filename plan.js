@@ -84,8 +84,9 @@ function planTimes(conf, skip) {
 
 // Builds (or rebuilds, keeping sessions already done) the plan's sessions.
 function buildPlan(s, conf) {
-  const keep = (s.plan?.sessions || []).filter(x => x.done);
-  const learned = new Set(keep.filter(x => x.kind === 'learn').flatMap(x => x.scenes || []));
+  // Done and missed sessions stay (missed ones until you do them or delete them); new ones fill the days ahead.
+  const keep = (s.plan?.sessions || []).filter(x => x.done || missed(x));
+  const learned = new Set(keep.filter(x => x.done && x.kind === 'learn').flatMap(x => x.scenes || []));
   const times = planTimes(conf, keep.map(x => x.at));
   const n = times.length;
   const kinds = [];
@@ -183,7 +184,11 @@ function sessionButtons(s, x, p, startLabel) {
 function nextRehearsalHtml() {
   const n = nextSession();
   if (n) fixSceneNames(n.s);
-  if (!n) return '';
+  // Missed sessions show until you do them or delete them.
+  const gone = planScripts().flatMap(s => s.plan.sessions.filter(missed).map(x => ({ s, x })));
+  const goneHtml = gone.length ? `<p class="note small row between wrap"><span><b>${gone.length} missed ${gone.length === 1 ? 'session' : 'sessions'}:</b> ${esc(gone.slice(0, 3).map(({ s, x }) => `${sessionLabel(x)} (${new Date(x.at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}${planScripts().length > 1 ? `, ${s.title}` : ''})`).join('; '))}${gone.length > 3 ? '…' : ''}</span>
+    <button class="btn ghost" data-action="open" data-id="${esc(gone[0].s.id)}">See ${gone.length === 1 ? 'it' : 'them'}</button></p>` : '';
+  if (!n) return goneHtml ? `<div class="card stack-sm">${goneHtml}</div>` : '';
   const p = sessionProgress(n.s, n.x);
   return `<div class="card stack-sm">
     <span><b>${p ? 'Rehearsal in progress' : 'Next rehearsal'}: ${esc(n.s.title)}</b> <span class="muted">${esc(whenText(n.x.at))} · ${esc(sessionLabel(n.x))} · ${n.x.min} min</span></span>
@@ -193,6 +198,7 @@ function nextRehearsalHtml() {
       return `<div class="meter">${bar(done / all.length)}<span class="muted small">Plan: ${done} of ${all.length} sessions done</span></div>`;
     })()}
     ${sessionButtons(n.s, n.x, p, 'Start')}
+    ${goneHtml}
   </div>`;
 }
 
@@ -225,7 +231,7 @@ function planFormHtml(s) {
       ${DAY_NAMES.map((n, k) => `<label class="check-row"><input type="checkbox" data-plan-day="${k}" ${d.days.includes(k) ? 'checked' : ''}><span>${n}</span></label>`).join('')}
     </fieldset>
     <div class="row wrap"><button class="btn primary" data-action="plan-make">${s.plan ? 'Make a new plan' : 'Make my plan'}</button>${s.plan ? '<button class="btn ghost" data-action="plan-cancel">Cancel</button>' : ''}</div>
-    ${s.plan ? '<p class="muted small">A new plan keeps the sessions you\'ve already done.</p>' : ''}`;
+    ${s.plan ? '<p class="muted small">A new plan keeps the sessions you\'ve done, and any you missed (delete those you don\'t need).</p>' : ''}`;
 }
 
 function sessionRowHtml(s, x) {
@@ -299,13 +305,16 @@ function planCardHtml(s) {
     const all = p.sessions, done = all.filter(x => x.done).length;
     const ahead = all.filter(x => !x.done && !missed(x)), gone = all.filter(missed);
     const left = Math.round((new Date(p.opening + 'T00:00') - new Date().setHours(0, 0, 0, 0)) / DAY_MS);
-    const shown = planUi.showAll ? all : ahead.slice(0, 6);
+    const shown = planUi.showAll ? all : ahead.slice(0, 6); // missed ones show above, outside the fold
     const next = ahead[0], nextP = next && sessionProgress(s, next);
     inner = `<p>Opening night: <b>${esc(new Date(p.opening + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))}</b>${left > 0 ? ` <span class="muted">(in ${left} ${left === 1 ? 'day' : 'days'})</span>` : left === 0 ? ' <span class="muted">(today: break a leg!)</span>' : ''}</p>
       ${all.length ? `<div class="meter">${bar(done / all.length)}</div>` : ''}
       ${next ? `<div class="note stack-sm"><span><b>${nextP ? 'In progress' : 'Next'}: ${esc(whenText(next.at))}</b> · ${esc(sessionLabel(next))}, ${next.min} min</span><span class="small">${nextP ? progressNote(nextP) + '.' : SESSION_HOW[next.kind] || ''}</span>
         ${sessionButtons(s, next, nextP, 'Start now')}</div>` : left > 0 ? '<p class="muted small">No sessions left. Add one, or make a new plan.</p>' : ''}
-      ${gone.length && left > 0 ? `<p class="note small row between wrap"><span>${gone.length} ${gone.length === 1 ? 'session was' : 'sessions were'} missed. Spread what's left over the days you have?</span><button class="btn" data-action="plan-replan">Re-plan from today</button></p>` : ''}
+      ${gone.length ? `<div class="note stack-sm plan-missed"><b>${gone.length} missed ${gone.length === 1 ? 'session' : 'sessions'}</b>
+        <span class="small">${gone.length === 1 ? 'It stays' : 'They stay'} here until you do ${gone.length === 1 ? 'it' : 'them'} (${icon('play')}), tick ${gone.length === 1 ? 'it' : 'them'} done, or delete ${gone.length === 1 ? 'it' : 'them'}.${left > 0 ? ' Or re-plan: new sessions for what\'s left, from today (the missed ones stay until you delete them).' : ''}</span>
+        <ol class="plan-list">${gone.map(x => sessionRowHtml(s, x)).join('')}</ol>
+        ${left > 0 ? '<div><button class="btn" data-action="plan-replan">Re-plan from today</button></div>' : ''}</div>` : ''}
       <details class="plan-more"${planUi.listOpen || planUi.adding?.sid === s.id ? ' open' : ''}><summary>All sessions and reminders</summary><div class="stack-sm">
       ${shown.length ? `<ol class="plan-list">${shown.map(x => sessionRowHtml(s, x)).join('')}</ol>` : ''}
       <div class="row wrap">
@@ -374,7 +383,7 @@ Object.assign(actions, {
     planUi.editing = false;
     planUi.open = true;
     planChanged(s);
-    const n = s.plan.sessions.filter(x => !x.done).length;
+    const n = s.plan.sessions.filter(x => !x.done && !missed(x)).length;
     toast(n ? `Planned ${n} ${n === 1 ? 'session' : 'sessions'} before opening night.` : 'No time left for sessions before opening night. Add one yourself if you can.');
   },
   'plan-replan'() {
