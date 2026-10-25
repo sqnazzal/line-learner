@@ -300,6 +300,7 @@ VIEWS.share = renderShare;
 const UPDATES = [
   ['2026-10-25', [
     '<b>Drills keep your place:</b> stop <b>Drill weak lines</b> partway (or close the app) and the next time you tap it, it picks up at the line you were on instead of starting over. Lines you got right are already out of the list. A paused Listen or Rehearse run keeps its own place.',
+    '<b>See what you missed while you hear it:</b> after a miss, the words you got (green) and missed (red) stay marked, with your score, while the line is read back to you.',
   ]],
   ['2026-10-21', [
     '<b>Fairer line checking:</b> words that sound the same now count however the microphone spells them (sight or site, knight or night, pairs or pears, and about 150 more), and so do words run together or split apart (nighttime or night time). Numbers too: "50-50" counts for "fifty-fifty", "1985" for "nineteen eighty-five", and "21st", "90%" and "1,000" work.',

@@ -2347,6 +2347,8 @@ function myLineBody(text) {
   return `${parts.slice(0, k).map(p => `<span class="part-done">${fmt(p)}</span> `).join('')}<span class="part-now">${pieceBody(parts[k])}</span>${rest ? ` <span class="muted small part-more">(${rest} more ${rest === 1 ? 'sentence' : 'sentences'})</span>` : ''}`;
 }
 function pieceBody(text) {
+  // After a miss, the right and wrong words stay marked while the line is read back to you.
+  if (P.status === 'prompting' && P.result) return diffHtml(text, P.result);
   if (['prompting', 'answer', 'you'].includes(P.status)) return fmt(text);
   if (P.result) return diffHtml(text, P.result);
   return hintHtml(text, P.reveal);
@@ -2400,7 +2402,7 @@ function lineStageHtml(s) {
   else if (item.type === 'direction') card = `<div class="card stage-card direction-card"><div class="card-head">${pill()}${fix}</div><p><em>${esc(item.text)}</em></p></div>`;
   else if (isMine(s, item)) {
     card = `<div class="card stage-card mine-card">
-      <div class="card-head"><span class="who">You${s.myChar !== 'YOU' ? ` (${esc(titleCase(s.myChar))})` : ''}</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}${fix}</div>
+      <div class="card-head"><span class="who">You${s.myChar !== 'YOU' ? ` (${esc(titleCase(s.myChar))})` : ''}</span>${pill()}${P.result ? `<span class="score">${P.result.score}%</span>` : ''}${fix}</div>
       <p class="script-text">${myLineBody(item.text)}</p>
       ${micOn() && (P.mode === 'rehearse' || (P.mode === 'listen' && settings.listenHears)) ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
       ${P.status === 'typing' ? `<textarea id="typed" class="typed" rows="3" placeholder="Type your line, then Check (or press Enter)" autocapitalize="sentences" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Type your line">${esc(P.typed || '')}</textarea>` : ''}
@@ -2421,15 +2423,15 @@ function buildUpStageHtml(s) {
   const { parts, k, phase } = P.bu;
   const expected = parts.slice(0, k + 1).join(' ');
   let body;
-  if (P.status === 'prompting') body = esc(expected);
-  else if (P.result) body = diffHtml(expected, P.result);
+  if (P.result) body = diffHtml(expected, P.result);
+  else if (P.status === 'prompting') body = esc(expected);
   else body = parts.slice(0, k + 1).map((p, j) => `<span class="${j === k ? 'new-part' : ''}">${j === k && phase === 'listen' ? esc(p) : hintHtml(p, P.reveal)}</span>`).join(' ');
   const steps = parts.map((_, j) => `<span class="step${j < k ? ' done' : j === k ? ' now' : ''}"></span>`).join('');
   return `<div class="steps" aria-hidden="true">${steps}</div>
     <p class="muted small">Piece ${k + 1} of ${parts.length}: ${phase === 'listen' ? 'listen to the next piece' : 'now say it all from the top'}</p>
     ${P.note ? `<p class="note">${esc(P.note)}</p>` : ''}
     <div class="card stage-card mine-card">
-      <div class="card-head"><span class="who">You</span>${pill()}${P.result && P.status !== 'prompting' ? `<span class="score">${P.result.score}%</span>` : ''}${fixBtn(s, P.bu.i)}</div>
+      <div class="card-head"><span class="who">You</span>${pill()}${P.result ? `<span class="score">${P.result.score}%</span>` : ''}${fixBtn(s, P.bu.i)}</div>
       <p class="script-text">${body}</p>
       ${micOn() ? `<p id="transcript" class="transcript">${esc(P.transcript)}</p>` : ''}
       ${myActions()}
