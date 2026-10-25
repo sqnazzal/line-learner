@@ -298,6 +298,9 @@ VIEWS.share = renderShare;
 // ---------- What's new ----------
 // Newest first. Add a dated entry (or add to today's) whenever something people would notice changes.
 const UPDATES = [
+  ['2026-10-25', [
+    '<b>Drills keep your place:</b> stop <b>Drill weak lines</b> partway (or close the app) and the next time you tap it, it picks up at the line you were on instead of starting over. Lines you got right are already out of the list. A paused Listen or Rehearse run keeps its own place.',
+  ]],
   ['2026-10-21', [
     '<b>Fairer line checking:</b> words that sound the same now count however the microphone spells them (sight or site, knight or night, pairs or pears, and about 150 more), and so do words run together or split apart (nighttime or night time). Numbers too: "50-50" counts for "fifty-fifty", "1985" for "nineteen eighty-five", and "21st", "90%" and "1,000" work.',
     '<b>Plans sync session by session:</b> when your devices sync, each rehearsal session is kept unless you deleted it, so a device with an older copy of your plan (or a tab left open on a computer) can no longer make sessions disappear.',

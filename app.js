@@ -1158,10 +1158,11 @@ function keepPlace(s, oldLines) {
     const j = s.rangeEnd >= oldLines.length ? -1 : follow(s.rangeEnd);
     if (j > (s.rangeStart || 0)) s.rangeEnd = j; else delete s.rangeEnd;
   }
-  const r = resumeAt[s.id];
-  if (r) {
+  for (const key of [s.id, s.id + ':weak']) {
+    const r = resumeAt[key];
+    if (!r) continue;
     const j = follow(r.line);
-    if (j >= 0) r.line = j; else delete resumeAt[s.id];
+    if (j >= 0) r.line = j; else delete resumeAt[key];
     saveJSON(LS_RESUME, resumeAt);
   }
 }
@@ -2177,7 +2178,7 @@ function renderScript() {
       ${s.kind === 'song' ? `<button class="mode" data-action="sing">${icon('headphones')}<b>Sing along</b><span>${s.song?.spotify ? 'Play the real song with the lyrics highlighted, and hide words as you learn them.' : 'Learn the lyrics. Add the Spotify song (Edit) to sing with the track.'}</span></button>` : ''}
       <button class="mode" data-action="listen">${icon('headphones')}<b>Listen</b><span>Hear the scene. It pauses for your lines.</span></button>
       <button class="mode" data-action="rehearse" ${s.myChar ? '' : 'disabled'}>${icon('mic')}<b>Rehearse</b><span>Say your lines and the mic checks them.</span></button>
-      <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line' : 'lines'} you're working on` : mine.some(l => isSolid(s, l)) ? 'Nothing shaky right now' : 'Nothing to drill yet: rehearse first') : 'Pick your character first'}</span></button>
+      <button class="mode" data-action="weak" ${s.myChar && weak ? '' : 'disabled'}>${icon('target')}<b>Drill weak lines</b><span>${s.myChar ? (weak ? `${weak} ${weak === 1 ? 'line' : 'lines'} you're working on${resumeAt[drillKey(s.id)] ? ', picks up where you stopped' : ''}` : mine.some(l => isSolid(s, l)) ? 'Nothing shaky right now' : 'Nothing to drill yet: rehearse first') : 'Pick your character first'}</span></button>
     </div>
     <details class="more-modes"${app.moreModes ? ' open' : ''}><summary>More ways to practice</summary>
       <div class="modes">
@@ -2571,12 +2572,15 @@ function headphoneControls() {
   set('previoustrack', () => app.view === 'player' && jump(-1));
 }
 
-// Remembers the line you're on in a long Listen or Rehearse run (not drills), so you can pick up there.
+// Remembers the line you're on in a long Listen or Rehearse run, so you can pick up there. Drill weak lines
+// keeps its own place (any length), so stopping a drill doesn't lose a paused run or the other way round.
+const drillKey = id => id + ':weak';
 function saveResume() {
   const s = current();
-  if (!s || P.drill || !['listen', 'rehearse', 'type'].includes(P.mode) || P.order.length < 30) return;
-  if (P.status === 'done' || P.orderPos < 3) delete resumeAt[s.id];
-  else resumeAt[s.id] = { mode: P.mode, line: P.order[P.orderPos], pos: P.orderPos + 1, total: P.order.length, at: Date.now() };
+  if (!s || !['listen', 'rehearse', 'type'].includes(P.mode) || (!P.drill && P.order.length < 30)) return;
+  const key = P.drill ? drillKey(s.id) : s.id;
+  if (P.status === 'done' || P.orderPos < 3) delete resumeAt[key];
+  else resumeAt[key] = { mode: P.mode, line: P.order[P.orderPos], pos: P.orderPos + 1, total: P.order.length, at: Date.now() };
   saveJSON(LS_RESUME, resumeAt);
 }
 
@@ -3078,7 +3082,13 @@ const actions = {
   listen() { startPlayer('listen'); },
   rehearse() { startPlayer('rehearse'); },
   type() { startPlayer('type'); },
-  weak() { startPlayer(app.view === 'player' && P.mode === 'type' ? 'type' : 'rehearse', weakOrder(current()), 0, true); },
+  // Picks up a stopped drill at the line you were on. Lines you've since got right have dropped out of the
+  // list, and it's in script order, so the first one at or after that line is where you left off.
+  weak() {
+    const s = current(), order = weakOrder(s), r = app.view === 'player' ? null : resumeAt[drillKey(s.id)];
+    const at = r ? order.findIndex(i => i >= r.line) : 0;
+    startPlayer(r && at >= 0 ? r.mode : app.view === 'player' && P.mode === 'type' ? 'type' : 'rehearse', order, Math.max(0, at), true);
+  },
   'type-check'() { P.choose?.({ text: P.typed = $('#typed')?.value ?? P.typed ?? '' }); },
   'continue-last'() {
     const { id, mode, cuesOnly } = lastRun;
